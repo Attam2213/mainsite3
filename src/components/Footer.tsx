@@ -1,4 +1,3 @@
-import React from 'react';
 import { Github, Twitter, Linkedin, Mail } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 

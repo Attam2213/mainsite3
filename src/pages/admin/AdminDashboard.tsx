@@ -5,8 +5,8 @@ import { usePortfolio, PortfolioItem } from '../../context/PortfolioContext';
 import { useSupport, Ticket } from '../../context/SupportContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useServices, Service } from '../../context/ServicesContext';
-import { useBilling, InvoiceType, InvoiceStatus } from '../../context/BillingContext';
-import { UserPlus, Users, User as UserIcon, Plus, FolderGit2, Trash2, Edit2, Paperclip, MessageSquare, X, Layout, Globe, Headphones, Send, ChevronLeft, Settings, Save, Monitor, ShoppingBag, PenTool, Database, Search, Code, Smartphone, Shield, Zap, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { useBilling, InvoiceType } from '../../context/BillingContext';
+import { UserPlus, Users, User as UserIcon, Plus, FolderGit2, Trash2, Edit2, Paperclip, MessageSquare, X, Layout, Globe, Headphones, Send, ChevronLeft, Save, ShoppingBag, PenTool, Database, Search, Code, Smartphone, Shield, Zap, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { users, registerUser, updateUser, deleteUser, user: currentUser } = useAuth();

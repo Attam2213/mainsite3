@@ -4,7 +4,7 @@ import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 
 const Contact = () => {
-  const { contactInfo, telegramConfig } = useSettings();
+  const { contactInfo } = useSettings();
   const location = useLocation();
   const formRef = useRef<HTMLDivElement>(null);
   const [isBlinking, setIsBlinking] = useState(false);
