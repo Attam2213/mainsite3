@@ -6,7 +6,7 @@ import { useSupport, Ticket } from '../../context/SupportContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useServices, Service } from '../../context/ServicesContext';
 import { useBilling, InvoiceType } from '../../context/BillingContext';
-import { UserPlus, Users, User as UserIcon, Plus, FolderGit2, Trash2, Edit2, Paperclip, MessageSquare, X, Layout, Globe, Headphones, Send, ChevronLeft, Save, Search, Smartphone, Shield, Zap, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Users, User as UserIcon, Plus, FolderGit2, Trash2, Edit2, Paperclip, MessageSquare, X, Layout, Globe, Headphones, Send, ChevronLeft, Save, Search, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { users, registerUser, updateUser, deleteUser, user: currentUser } = useAuth();
@@ -15,7 +15,7 @@ const AdminDashboard = () => {
   const { getAllTickets, addMessage, closeTicket } = useSupport();
   const { contactInfo, telegramConfig, seoSettings, updateContactInfo, updateTelegramConfig, updateSeoSettings } = useSettings();
   const { services, addService, updateService, deleteService } = useServices();
-  const { invoices, addInvoice, updateInvoice, deleteInvoice, getInvoicesByUserId } = useBilling();
+  const { addInvoice, updateInvoice, deleteInvoice, getInvoicesByUserId } = useBilling();
   
   const [activeSection, setActiveSection] = useState<'users' | 'projects' | 'portfolio' | 'support' | 'settings' | 'services'>('users');
 

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useProjects, Project } from '../../context/ProjectContext';
 import { useSupport, Ticket } from '../../context/SupportContext';
 import { useBilling } from '../../context/BillingContext';
-import { FolderGit2, Clock, CheckCircle, FileText, Paperclip, MessageSquare, Send, Plus, X, ChevronLeft, CreditCard } from 'lucide-react';
+import { FolderGit2, FileText, Paperclip, MessageSquare, Send, Plus, X, ChevronLeft, CreditCard } from 'lucide-react';
 
 const ClientDashboard = () => {
   const { user } = useAuth();
