@@ -8,7 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,12 +20,12 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
-      if (user?.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate(from, { replace: true });
-      }
+      const loggedUser = await login(email, password);
+      const target =
+        loggedUser.role === 'admin'
+          ? '/admin'
+          : from || '/dashboard';
+      navigate(target, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Ошибка входа');
     } finally {
