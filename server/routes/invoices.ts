@@ -4,7 +4,6 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get invoices
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;
@@ -21,6 +20,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     
     res.json(invoices);
   } catch (error) {
+    console.error('Error in GET /api/invoices:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -35,6 +35,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     const invoice = await Invoice.create(req.body);
     res.json(invoice);
   } catch (error) {
+    console.error('Error in POST /api/invoices:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -57,6 +58,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await invoice.update(req.body);
     res.json(invoice);
   } catch (error) {
+    console.error('Error in PUT /api/invoices/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -74,6 +76,7 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await invoice.destroy();
     res.json({ message: 'Invoice deleted' });
   } catch (error) {
+    console.error('Error in DELETE /api/invoices/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });

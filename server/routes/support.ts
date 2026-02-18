@@ -4,7 +4,6 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get tickets (filtered by user role)
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;
@@ -28,6 +27,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     
     res.json(tickets);
   } catch (error) {
+    console.error('Error in GET /api/support:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -66,6 +66,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     
     res.json(fullTicket);
   } catch (error) {
+    console.error('Error in POST /api/support:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -101,6 +102,7 @@ router.post('/:id/messages', authenticateToken, async (req: AuthRequest, res) =>
     
     res.json(fullMessage);
   } catch (error) {
+    console.error('Error in POST /api/support/:id/messages:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -118,6 +120,7 @@ router.put('/:id/close', authenticateToken, async (req: AuthRequest, res) => {
     await ticket.update({ status: 'closed' });
     res.json(ticket);
   } catch (error) {
+    console.error('Error in PUT /api/support/:id/close:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });

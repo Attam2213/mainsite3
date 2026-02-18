@@ -4,7 +4,6 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all projects (filtered by user role)
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;
@@ -25,6 +24,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     
     res.json(projects);
   } catch (error) {
+    console.error('Error in GET /api/projects:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -41,6 +41,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     const project = await Project.create(req.body);
     res.json(project);
   } catch (error) {
+    console.error('Error in POST /api/projects:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -54,6 +55,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await project.update(req.body);
     res.json(project);
   } catch (error) {
+    console.error('Error in PUT /api/projects/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -67,6 +69,7 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await project.destroy();
     res.json({ message: 'Project deleted' });
   } catch (error) {
+    console.error('Error in DELETE /api/projects/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -88,6 +91,7 @@ router.post('/:id/comments', authenticateToken, async (req: AuthRequest, res) =>
     
     res.json(fullComment);
   } catch (error) {
+    console.error('Error in POST /api/projects/:id/comments:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -101,6 +105,7 @@ router.post('/:id/attachments', authenticateToken, async (req: AuthRequest, res)
     });
     res.json(attachment);
   } catch (error) {
+    console.error('Error in POST /api/projects/:id/attachments:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -114,6 +119,7 @@ router.delete('/:id/attachments/:attachmentId', authenticateToken, async (req: A
     await attachment.destroy();
     res.json({ message: 'Attachment deleted' });
   } catch (error) {
+    console.error('Error in DELETE /api/projects/:id/attachments/:attachmentId:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });

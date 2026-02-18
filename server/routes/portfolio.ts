@@ -4,12 +4,12 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all items
 router.get('/', async (req, res) => {
   try {
     const items = await PortfolioItem.findAll();
     res.json(items);
   } catch (error) {
+    console.error('Error in GET /api/portfolio:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -24,6 +24,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     const item = await PortfolioItem.create(req.body);
     res.json(item);
   } catch (error) {
+    console.error('Error in POST /api/portfolio:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -41,6 +42,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await item.update(req.body);
     res.json(item);
   } catch (error) {
+    console.error('Error in PUT /api/portfolio/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
@@ -58,6 +60,7 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     await item.destroy();
     res.json({ message: 'Item deleted' });
   } catch (error) {
+    console.error('Error in DELETE /api/portfolio/:id:', error);
     res.status(500).json({ message: 'Server error', error });
   }
 });
