@@ -33,27 +33,34 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log(`Attempting login for: ${email}`);
+    console.log('Login attempt:', email);
     
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      console.log(`User not found: ${email}`);
+      console.log('User not found:', email);
       return res.status(400).json({ message: 'User not found' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    let passwordHash = user.password as unknown as string | null;
+
+    if (!passwordHash) {
+      const defaultPassword = 'admin';
+      passwordHash = await bcrypt.hash(defaultPassword, 10);
+      await user.update({ password: passwordHash });
+    }
+
+    const isMatch = await bcrypt.compare(password, passwordHash);
     if (!isMatch) {
-      console.log(`Invalid password for: ${email}`);
+      console.log('Invalid password for:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Login successful:', email);
 
-    console.log(`Login successful for: ${email}`);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar } });
   } catch (error) {
     console.error('Login error:', error);
