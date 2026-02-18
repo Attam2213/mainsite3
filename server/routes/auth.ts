@@ -62,10 +62,19 @@ router.post('/login', async (req, res) => {
       user = await user.update({ role: 'admin' });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-    console.log('Login successful:', email);
+    const payload = { id: user.id, role: user.role } as { id: string; role: 'admin' | 'client' };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+    const plain: any = (user as any)?.toJSON ? (user as any).toJSON() : user;
+    const safeUser = {
+      id: plain?.id,
+      name: plain?.name,
+      email: plain?.email,
+      role: plain?.role,
+      avatar: plain?.avatar
+    };
+    console.log('Login successful:', { email, role: safeUser.role, id: safeUser.id });
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar } });
+    res.json({ token, user: safeUser });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error', error: String(error) });
@@ -80,6 +89,28 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
+  }
+});
+
+// Debug endpoint to inspect current build and token payload
+router.get('/debug', (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let decoded: any = null;
+    if (token) {
+      try {
+        decoded = jwt.verify(token, JWT_SECRET);
+      } catch (e) {
+        decoded = { error: 'invalid token' };
+      }
+    }
+    res.json({
+      build: '2026-02-18Tdebug-01',
+      decoded
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: String(error) });
   }
 });
 
