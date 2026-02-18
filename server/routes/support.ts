@@ -7,8 +7,8 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;
-    let where = {};
-    if (user.role !== 'admin') {
+    let where: any = {};
+    if (user.role !== 'admin' && user.id) {
       where = { userId: user.id };
     }
     
