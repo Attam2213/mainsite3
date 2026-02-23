@@ -30,17 +30,23 @@ sudo npm install -g pm2 tsx
 echo \"🌐 Устанавливаем Nginx и Certbot...\"
 sudo apt install -y nginx certbot python3-certbot-nginx
 
-# 6. Параметры базы данных
-echo \"\"
-read -p \"📛 Имя БД [mainsite3]: \" DB_NAME
+# 6. Параметры базы данных (без специальных флагов, чтобы работало везде)
+echo ""
+echo "📛 Имя БД [mainsite3]:"
+read DB_NAME
 DB_NAME=${DB_NAME:-mainsite3}
-read -p \"👤 Пользователь БД [mainsite3]: \" DB_USER
+
+echo "👤 Пользователь БД [mainsite3]:"
+read DB_USER
 DB_USER=${DB_USER:-mainsite3}
-read -s -p \"🔑 Пароль для пользователя БД: \" DB_PASS
-echo \"\"
-read -p \"🔐 Использовать SSL для подключения к БД? [y/N]: \" USE_SSL
+
+echo "🔑 Пароль для пользователя БД:"
+read DB_PASS
+
+echo "🔐 Использовать SSL для подключения к БД? [y/N]:"
+read USE_SSL
 POSTGRES_SSL=false
-if [[ \"$USE_SSL\" =~ ^[Yy]$ ]]; then
+if [[ "$USE_SSL" =~ ^[Yy]$ ]]; then
   POSTGRES_SSL=true
 fi
 
