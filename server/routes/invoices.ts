@@ -1,13 +1,14 @@
 import express from 'express';
 import { Invoice, User } from '../models/index.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { WhereOptions } from 'sequelize';
 
 const router = express.Router();
 
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const user = req.user;
-    let where: any = {};
+    let where: WhereOptions = {};
     if (user.role !== 'admin' && user.id) {
       where = { userId: user.id };
     }

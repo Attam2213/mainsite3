@@ -17,9 +17,9 @@ router.post('/', async (req, res) => {
       return res.json({ message: 'Message received (Telegram not configured)' });
     }
 
-    const config = setting.value as any;
+    const config = setting.value as { isEnabled?: boolean; botToken?: string; chatId?: string } | null;
     
-    if (config.isEnabled && config.botToken && config.chatId) {
+    if (config?.isEnabled && config.botToken && config.chatId) {
       const text = `
 📩 *Новая заявка с сайта*
 

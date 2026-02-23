@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { User, Service, Setting } from './models/index.js';
+import { User, Service } from './models/index.js';
 
 export const seedDatabase = async () => {
   try {

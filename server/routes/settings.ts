@@ -10,17 +10,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'wexa-secret-key';
 router.get('/', async (req, res) => {
   try {
     const settings = await Setting.findAll();
-    const formattedSettings: any = {};
+    const formattedSettings: Record<string, unknown> = {};
     
     // Try to get user from token
-    let user: any = null;
+    type TokenPayload = { id: string; role: 'admin' | 'client'; iat?: number; exp?: number };
+    let user: TokenPayload | null = null;
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     
     if (token) {
       try {
-        user = jwt.verify(token, JWT_SECRET);
-      } catch (e) {
+        user = jwt.verify(token, JWT_SECRET) as TokenPayload;
+      } catch {
         // Invalid token, treat as guest
       }
     }
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
       let val = s.value;
       // If not admin, sanitize sensitive config
       if ((!user || user.role !== 'admin') && s.key === 'telegram_config') {
-        const conf = val as any;
+        const conf = (val || {}) as Record<string, unknown>;
         val = {
           ...conf,
           botToken: undefined, // Hide token

@@ -26,8 +26,8 @@ const Login = () => {
           ? '/admin'
           : from || '/dashboard';
       navigate(target, { replace: true });
-    } catch (err: any) {
-      setError(err.message || 'Ошибка входа');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка входа');
     } finally {
       setIsLoading(false);
     }

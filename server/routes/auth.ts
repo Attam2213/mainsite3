@@ -64,14 +64,7 @@ router.post('/login', async (req, res) => {
 
     const payload = { id: user.id, role: user.role } as { id: string; role: 'admin' | 'client' };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-    const plain: any = (user as any)?.toJSON ? (user as any).toJSON() : user;
-    const safeUser = {
-      id: plain?.id,
-      name: plain?.name,
-      email: plain?.email,
-      role: plain?.role,
-      avatar: plain?.avatar
-    };
+    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar };
     console.log('Login successful:', { email, role: safeUser.role, id: safeUser.id });
 
     res.json({ token, user: safeUser });
@@ -97,11 +90,11 @@ router.get('/debug', (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    let decoded: any = null;
+    let decoded: unknown = null;
     if (token) {
       try {
         decoded = jwt.verify(token, JWT_SECRET);
-      } catch (e) {
+      } catch {
         decoded = { error: 'invalid token' };
       }
     }

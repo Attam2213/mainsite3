@@ -18,37 +18,70 @@ else
     echo "✅ Node.js уже установлен"
 fi
 
-# 3. Установка глобальных инструментов
-echo "🛠 Устанавливаем PM2 и TSX..."
+# 3. Установка PostgreSQL
+echo \"🐘 Устанавливаем PostgreSQL...\"
+sudo apt install -y postgresql postgresql-contrib
+
+# 4. Установка глобальных инструментов
+echo \"🛠 Устанавливаем PM2 и TSX...\"
 sudo npm install -g pm2 tsx
 
-# 4. Установка Nginx и Certbot (для SSL)
-echo "🌐 Устанавливаем Nginx и Certbot..."
+# 5. Установка Nginx и Certbot (для SSL)
+echo \"🌐 Устанавливаем Nginx и Certbot...\"
 sudo apt install -y nginx certbot python3-certbot-nginx
 
-# 5. Установка зависимостей проекта
-echo "📂 Устанавливаем библиотеки проекта..."
+# 6. Параметры базы данных
+echo \"\"
+read -p \"📛 Имя БД [mainsite3]: \" DB_NAME
+DB_NAME=${DB_NAME:-mainsite3}
+read -p \"👤 Пользователь БД [mainsite3]: \" DB_USER
+DB_USER=${DB_USER:-mainsite3}
+read -s -p \"🔑 Пароль для пользователя БД: \" DB_PASS
+echo \"\"
+read -p \"🔐 Использовать SSL для подключения к БД? [y/N]: \" USE_SSL
+POSTGRES_SSL=false
+if [[ \"$USE_SSL\" =~ ^[Yy]$ ]]; then
+  POSTGRES_SSL=true
+fi
+
+echo \"🗄 Создаём пользователя и базу...\"
+sudo -u postgres psql <<SQL
+DO
+\$do\$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles WHERE rolname = '$DB_USER') THEN
+      CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASS';
+   END IF;
+END
+\$do\$;
+CREATE DATABASE $DB_NAME OWNER $DB_USER;
+GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
+SQL
+
+# 7. Установка зависимостей проекта
+echo \"📂 Устанавливаем библиотеки проекта...\"
 npm install
 
-echo "🏗 Собираем Frontend..."
+echo \"🏗 Собираем Frontend...\"
 npm run build
 
-# 6. Запрос домена
-echo ""
-echo "❓ Введи свой домен (например, mysite.com):"
+# 8. Запрос домена
+echo \"\"
+echo \"❓ Введи свой домен (например, mysite.com):\"
 read DOMAIN_NAME
 
-if [ -z "$DOMAIN_NAME" ]; then
-    echo "❌ Домен не введен. Выход."
+if [ -z \"$DOMAIN_NAME\" ]; then
+    echo \"❌ Домен не введен. Выход.\"
     exit 1
 fi
 
-# 7. Настройка Nginx
-echo "⚙️ Настраиваем Nginx для $DOMAIN_NAME..."
-NGINX_CONF="/etc/nginx/sites-available/$DOMAIN_NAME"
+# 9. Настройка Nginx
+echo \"⚙️ Настраиваем Nginx для $DOMAIN_NAME...\"
+NGINX_CONF=\"/etc/nginx/sites-available/$DOMAIN_NAME\"
 CURRENT_DIR=$(pwd)
 
-sudo bash -c "cat > $NGINX_CONF" <<EOL
+sudo bash -c \"cat > $NGINX_CONF\" <<EOL
 server {
     listen 80;
     server_name $DOMAIN_NAME www.$DOMAIN_NAME;
@@ -79,14 +112,14 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
-# 8. Получение SSL сертификата
+# 10. Получение SSL сертификата
 echo "🔒 Получаем SSL сертификат (HTTPS)..."
 sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME --non-interactive --agree-tos -m admin@$DOMAIN_NAME --redirect
 
-# 9. Запуск приложения через PM2
+# 11. Запуск приложения через PM2 (PostgreSQL)
 echo "🚀 Запускаем сервер..."
 pm2 delete mainsite3 || true
-pm2 start "npm run start" --name mainsite3
+POSTGRES_URL="postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME" POSTGRES_SSL=$POSTGRES_SSL pm2 start "npm run start" --name mainsite3
 pm2 save
 pm2 startup
 

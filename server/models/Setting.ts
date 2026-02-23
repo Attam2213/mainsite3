@@ -3,7 +3,7 @@ import { sequelize } from '../config/database.js';
 
 export class Setting extends Model {
   public key!: string;
-  public value!: any;
+  public value!: unknown;
 }
 
 Setting.init({

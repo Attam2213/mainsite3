@@ -76,14 +76,16 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers: getHeaders()
       });
       if (res.ok) {
-        const data = await res.json();
-        // Backend returns structured data, need to map if necessary
-        // But let's assume direct mapping for now.
-        // We might need to map sender.name to senderName manually if UI relies on flat structure.
-        const mappedData = data.map((t: any) => ({
+        const data = await res.json() as Array<
+          Omit<Ticket, 'userName' | 'messages'> & {
+            user?: { id: string; name: string; email?: string };
+            messages?: Array<Omit<Message, 'senderName'> & { sender?: { id: string; name: string } }>;
+          }
+        >;
+        const mappedData: Ticket[] = data.map(t => ({
           ...t,
           userName: t.user?.name || 'Unknown',
-          messages: t.messages?.map((m: any) => ({
+          messages: (t.messages || []).map(m => ({
             ...m,
             senderName: m.sender?.name || 'Unknown'
           }))
@@ -109,14 +111,16 @@ export const SupportProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
     
     if (res.ok) {
-      const newTicket = await res.json();
-      // Map
-      const mappedTicket = {
+      const newTicket = await res.json() as Omit<Ticket, 'userName' | 'messages'> & {
+        user?: { id: string; name: string; email?: string };
+        messages?: Array<Omit<Message, 'senderName'> & { sender?: { id: string; name: string } }>;
+      };
+      const mappedTicket: Ticket = {
         ...newTicket,
         userName: newTicket.user?.name || 'Unknown',
-        messages: newTicket.messages?.map((m: any) => ({
-            ...m,
-            senderName: m.sender?.name || 'Unknown'
+        messages: (newTicket.messages || []).map(m => ({
+          ...m,
+          senderName: m.sender?.name || 'Unknown'
         }))
       };
       setTickets(prev => [mappedTicket, ...prev]);

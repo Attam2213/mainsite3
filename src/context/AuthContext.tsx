@@ -11,11 +11,13 @@ export interface User {
   // password is not stored on client
 }
 
+type NewUser = { name: string; email: string; password: string; role: UserRole; avatar?: string };
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
   logout: () => void;
-  registerUser: (newUser: any) => Promise<void>;
+  registerUser: (newUser: NewUser) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   users: User[];
@@ -53,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.removeItem('token');
             setUser(null);
           }
-        } catch (error) {
+        } catch {
           localStorage.removeItem('token');
           setUser(null);
         }
@@ -107,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers([]);
   };
 
-  const registerUser = async (userData: any) => {
+  const registerUser = async (userData: NewUser) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
