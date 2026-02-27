@@ -47,7 +47,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
               WHERE
                 "message"."orderId" = "Order"."id"
                 AND "message"."senderId" != '${user.id}'
-                AND ("message"."isRead" = 0 OR "message"."isRead" IS NULL)
+                AND ("message"."isRead" IS FALSE OR "message"."isRead" IS NULL)
             )`),
             'unreadCount'
           ]
