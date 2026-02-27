@@ -135,15 +135,18 @@ const Home = () => {
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
+                  whileHover={{ y: -10 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100"
+                  className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 relative overflow-hidden group"
                 >
-                  <div className={`w-12 h-12 rounded-xl ${feature.color} text-white flex items-center justify-center mb-6`}>
-                    <feature.icon size={24} />
+                  <div className="absolute top-0 right-0 -mr-20 -mt-20 w-40 h-40 rounded-full bg-gradient-to-br from-indigo-50 to-purple-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl" />
+                  
+                  <div className={`w-14 h-14 rounded-2xl ${feature.color} text-white flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 relative z-10`}>
+                    <feature.icon size={28} />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3 break-words">{feature.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 break-words relative z-10">{feature.title}</h3>
+                  <p className="text-gray-600 leading-relaxed relative z-10">
                     {feature.description}
                   </p>
                 </motion.div>
