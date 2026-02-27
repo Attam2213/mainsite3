@@ -131,8 +131,8 @@ const Home = () => {
               {[...technologies, ...technologies, ...technologies, ...technologies].map((tech, index) => (
                 <span 
                   key={index} 
-                  className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-200 via-indigo-200 to-gray-200 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-500 cursor-default transform hover:scale-105 select-none"
-                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.02)' }}
+                  className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 transition-all duration-500 cursor-default transform hover:scale-105 select-none opacity-80 hover:opacity-100"
+                  style={{ textShadow: '0 2px 10px rgba(79, 70, 229, 0.2)' }}
                 >
                   {tech}
                 </span>
