@@ -110,6 +110,17 @@ EOL
 # 7. Configure Nginx
 echo "[7/10] Configuring Nginx..."
 PROJECT_DIR=$(pwd)
+
+# Fix permissions if running in /root (common cause of 500 errors)
+if [[ "$PROJECT_DIR" == "/root"* ]]; then
+    echo "Fixing permissions for /root directory for Nginx access..."
+    chmod 755 /root
+    chmod 755 "$PROJECT_DIR"
+    if [ -d "$PROJECT_DIR/dist" ]; then
+        chmod 755 "$PROJECT_DIR/dist"
+    fi
+fi
+
 # Ensure dist directory exists
 if [ ! -d "$PROJECT_DIR/dist" ]; then
     echo "Error: dist directory not found. Build failed?"
