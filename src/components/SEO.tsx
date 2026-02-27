@@ -10,12 +10,12 @@ interface SEOProps {
 
 const SEO = ({ 
   title, 
-  description = 'Профессиональная веб-разработка сайтов под ключ. Создание современных, быстрых и адаптивных сайтов для вашего бизнеса.', 
+  description = 'Wexa - профессиональная веб-разработка сайтов под ключ. Создание современных, быстрых и адаптивных сайтов для вашего бизнеса.', 
   keywords = 'веб-разработка, создание сайтов, заказать сайт, лендинг, интернет-магазин, корпоративный сайт, разработка под ключ',
   image = '/og-image.jpg',
   url 
 }: SEOProps) => {
-  const siteTitle = 'Mainsite | Веб-студия';
+  const siteTitle = 'Wexa';
   const fullTitle = `${title} | ${siteTitle}`;
   const currentUrl = url || window.location.href;
 

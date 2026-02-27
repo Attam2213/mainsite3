@@ -46,7 +46,7 @@ const Register = () => {
     <Layout>
       <SEO 
         title="Регистрация" 
-        description="Создание аккаунта для доступа к личному кабинету." 
+        description="Wexa - создание аккаунта для доступа к личному кабинету." 
       />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <motion.div 

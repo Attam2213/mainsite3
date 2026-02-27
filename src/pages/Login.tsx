@@ -36,7 +36,7 @@ const Login = () => {
     <Layout>
       <SEO 
         title="Вход" 
-        description="Вход в личный кабинет для управления проектами и услугами." 
+        description="Wexa - вход в личный кабинет для управления проектами и услугами." 
       />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <motion.div 
