@@ -87,17 +87,35 @@ const Home = () => {
           </div>
         </section>
 
-        {/* Tech Stack Marquee (Simplified visual representation) */}
-        <section className="py-10 border-y border-gray-100 bg-white">
-          <div className="container mx-auto px-4">
-            <p className="text-center text-gray-500 text-sm font-medium mb-6 uppercase tracking-wider">Технологический стек</p>
-            <div className="flex flex-wrap justify-center gap-4 md:gap-8 opacity-70">
-              {technologies.map((tech, index) => (
-                <span key={index} className="text-xl md:text-2xl font-bold text-gray-400 hover:text-indigo-600 transition-colors cursor-default">
+        {/* Tech Stack Marquee */}
+        <section className="py-12 border-y border-gray-100 bg-white overflow-hidden relative">
+          <div className="container mx-auto px-4 mb-10">
+            <p className="text-center text-gray-500 text-sm font-medium uppercase tracking-wider">Технологический стек</p>
+          </div>
+          
+          {/* Gradient Masks */}
+          <div className="absolute inset-y-0 left-0 w-20 md:w-40 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-20 md:w-40 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+          <div className="flex overflow-hidden">
+            <motion.div
+              className="flex gap-12 md:gap-24 whitespace-nowrap px-6 md:px-12"
+              animate={{ x: "-50%" }}
+              transition={{ 
+                repeat: Infinity, 
+                ease: "linear", 
+                duration: 25 
+              }}
+            >
+              {[...technologies, ...technologies, ...technologies, ...technologies].map((tech, index) => (
+                <span 
+                  key={index} 
+                  className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-gray-400 hover:from-indigo-500 hover:to-purple-600 transition-all duration-300 cursor-default transform hover:scale-110"
+                >
                   {tech}
                 </span>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
