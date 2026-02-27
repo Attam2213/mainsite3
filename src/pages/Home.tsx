@@ -44,40 +44,54 @@ const Home = () => {
       />
       <div className="bg-white overflow-hidden">
         {/* Hero Section */}
-        <section className="relative pt-20 pb-32 lg:pt-32 lg:pb-40">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-50 via-white to-purple-50 -z-10" />
-          <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-[500px] h-[500px] bg-purple-200 rounded-full blur-3xl opacity-30" />
-          <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-[500px] h-[500px] bg-indigo-200 rounded-full blur-3xl opacity-30" />
+        <section className="relative pt-20 pb-32 lg:pt-32 lg:pb-40 overflow-hidden">
+          {/* Background Image & Overlay */}
+          <div className="absolute inset-0 z-0">
+            <motion.div 
+              initial={{ scale: 1.1 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 10, repeat: Infinity, repeatType: "reverse" }}
+              className="w-full h-full"
+            >
+              <img 
+                src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2070&auto=format&fit=crop" 
+                alt="Background" 
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+            <div className="absolute inset-0 bg-gray-900/80" />
+            <div className="absolute inset-0 bg-gradient-to-b from-gray-900/50 via-gray-900/80 to-white" />
+          </div>
 
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-4xl mx-auto text-center">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <span className="inline-block py-1 px-3 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold mb-6">
+                <span className="inline-block py-1 px-3 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-sm font-semibold mb-6 backdrop-blur-sm">
                   Available for Hire
                 </span>
-                <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 mb-8 leading-tight">
+                <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-8 leading-tight">
                   Превращаю идеи в <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                     цифровую реальность
                   </span>
                 </h1>
-                <p className="mt-6 text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
+                <p className="mt-6 text-xl text-gray-300 leading-relaxed max-w-2xl mx-auto">
                   Full-stack разработчик, специализирующийся на создании быстрых, красивых и функциональных веб-приложений для бизнеса.
                 </p>
                 <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                   <Link
                     to="/services"
-                    className="w-full sm:w-auto px-8 py-4 rounded-full bg-indigo-600 text-white font-bold text-lg shadow-lg hover:bg-indigo-700 hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-8 py-4 rounded-full bg-indigo-600 text-white font-bold text-lg shadow-lg hover:bg-indigo-500 hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
                   >
                     Обсудить проект <ArrowRight size={20} />
                   </Link>
                   <Link
                     to="/portfolio"
-                    className="w-full sm:w-auto px-8 py-4 rounded-full bg-white text-gray-900 font-bold text-lg border-2 border-gray-200 hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center"
+                    className="w-full sm:w-auto px-8 py-4 rounded-full bg-white/10 text-white font-bold text-lg border-2 border-white/20 hover:bg-white/20 hover:border-white/40 transition-all flex items-center justify-center backdrop-blur-sm"
                   >
                     Смотреть работы
                   </Link>
