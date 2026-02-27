@@ -62,12 +62,24 @@ systemctl start postgresql
 
 # Create user and database if they don't exist
 # We use sudo -u postgres to run psql commands as the postgres superuser
+# Switch to /tmp to avoid "could not change directory" permission errors when running as postgres user
+CURRENT_DIR=$(pwd)
+cd /tmp
+
 sudo -u postgres psql -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'mainsite_user') THEN CREATE USER mainsite_user WITH PASSWORD '$DB_PASSWORD'; END IF; END \$\$;"
 sudo -u postgres psql -c "ALTER USER mainsite_user WITH PASSWORD '$DB_PASSWORD';"
-sudo -u postgres psql -c "SELECT 'CREATE DATABASE mainsite_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mainsite_db')\gexec"
+
+# Create DB if not exists (safer method without \gexec)
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='mainsite_db'" | grep -q 1; then
+    sudo -u postgres psql -c "CREATE DATABASE mainsite_db OWNER mainsite_user;"
+fi
+
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE mainsite_db TO mainsite_user;"
 # Grant schema usage explicitly just in case
 sudo -u postgres psql -d mainsite_db -c "GRANT ALL ON SCHEMA public TO mainsite_user;"
+
+# Return to project directory
+cd $CURRENT_DIR
 
 # 6. Setup Project
 echo "[6/10] Setting up project..."
