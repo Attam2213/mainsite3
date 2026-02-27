@@ -529,7 +529,7 @@ const AdminDashboard = () => {
 
           {/* Navigation Tabs */}
           <div className="mb-8 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {[
                 { id: 'dashboard', label: 'Обзор' },
                 { id: 'services', label: 'Услуги' },
@@ -540,20 +540,38 @@ const AdminDashboard = () => {
                 { id: 'websites', label: 'Сайты' },
                 { id: 'invoices', label: 'Счета' },
                 { id: 'projects', label: 'Проекты' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`
-                    whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium
-                    ${activeTab === tab.id
-                      ? 'border-indigo-500 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}
-                  `}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ].map((tab) => {
+                let badgeCount = 0;
+                let badgeColor = 'bg-red-500';
+
+                if (tab.id === 'orders') {
+                  badgeCount = orders.filter(o => o.service && o.status === 'pending').length;
+                } else if (tab.id === 'discussions') {
+                  badgeCount = orders.filter(o => !o.service).reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
+                } else if (tab.id === 'websites') {
+                  badgeCount = projects.filter(p => p.siteStatus === 'down').length;
+                }
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`
+                      whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium relative flex items-center
+                      ${activeTab === tab.id
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}
+                    `}
+                  >
+                    {tab.label}
+                    {badgeCount > 0 && (
+                      <span className={`ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white rounded-full ${badgeColor}`}>
+                        {badgeCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
