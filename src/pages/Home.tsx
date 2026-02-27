@@ -102,29 +102,37 @@ const Home = () => {
         </section>
 
         {/* Tech Stack Marquee */}
-        <section className="py-12 border-y border-gray-800 bg-gray-900 overflow-hidden relative">
-          <div className="container mx-auto px-4 mb-10">
-            <p className="text-center text-indigo-400 text-sm font-medium uppercase tracking-wider">Технологический стек</p>
+        <section className="py-16 border-y border-indigo-50 bg-white overflow-hidden relative">
+          {/* Decorative Background Pattern */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+          
+          <div className="container mx-auto px-4 mb-12 relative z-10">
+            <div className="flex items-center justify-center gap-4">
+              <div className="h-px w-12 bg-indigo-200"></div>
+              <p className="text-center text-indigo-600 text-sm font-bold uppercase tracking-[0.2em]">Технологический стек</p>
+              <div className="h-px w-12 bg-indigo-200"></div>
+            </div>
           </div>
           
           {/* Gradient Masks */}
-          <div className="absolute inset-y-0 left-0 w-20 md:w-40 bg-gradient-to-r from-gray-900 to-transparent z-10 pointer-events-none" />
-          <div className="absolute inset-y-0 right-0 w-20 md:w-40 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
-          <div className="flex overflow-hidden">
+          <div className="flex overflow-hidden relative z-0">
             <motion.div
-              className="flex gap-12 md:gap-24 whitespace-nowrap px-6 md:px-12"
+              className="flex gap-16 md:gap-32 whitespace-nowrap px-8"
               animate={{ x: "-50%" }}
               transition={{ 
                 repeat: Infinity, 
                 ease: "linear", 
-                duration: 25 
+                duration: 30 
               }}
             >
               {[...technologies, ...technologies, ...technologies, ...technologies].map((tech, index) => (
                 <span 
                   key={index} 
-                  className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-600 to-gray-300 hover:from-indigo-400 hover:to-purple-400 transition-all duration-300 cursor-default transform hover:scale-110"
+                  className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-200 via-indigo-200 to-gray-200 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-500 cursor-default transform hover:scale-105 select-none"
+                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.02)' }}
                 >
                   {tech}
                 </span>
