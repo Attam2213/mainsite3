@@ -91,10 +91,7 @@ interface Order {
   service?: {
     title: string;
   };
-  user?: {
-    name: string;
-    email: string;
-  };
+  user?: Partial<User>;
 }
 
 const AdminDashboard = () => {
@@ -137,7 +134,7 @@ const AdminDashboard = () => {
   
   // User Profile Modal State
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
-  const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
+  const [selectedUserProfile, setSelectedUserProfile] = useState<Partial<User> | null>(null);
 
   const [websiteFilters, setWebsiteFilters] = useState({
     status: 'all', // all, up, down
@@ -378,7 +375,7 @@ const AdminDashboard = () => {
   };
 
   // Project Handlers
-  const handleOpenUserProfile = (user: User) => {
+  const handleOpenUserProfile = (user: Partial<User>) => {
     setSelectedUserProfile(user);
     setIsUserProfileOpen(true);
   };
