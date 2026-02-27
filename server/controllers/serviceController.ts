@@ -28,6 +28,7 @@ export const createService = async (req: Request, res: Response): Promise<void> 
     const service = await Service.create(req.body);
     res.status(201).json(service);
   } catch (error) {
+    console.error('Error creating service:', error);
     res.status(500).json({ message: 'Ошибка при создании услуги' });
   }
 };
