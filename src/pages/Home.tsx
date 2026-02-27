@@ -102,14 +102,14 @@ const Home = () => {
         </section>
 
         {/* Tech Stack Marquee */}
-        <section className="py-12 border-y border-gray-100 bg-white overflow-hidden relative">
+        <section className="py-12 border-y border-gray-800 bg-gray-900 overflow-hidden relative">
           <div className="container mx-auto px-4 mb-10">
-            <p className="text-center text-gray-500 text-sm font-medium uppercase tracking-wider">Технологический стек</p>
+            <p className="text-center text-indigo-400 text-sm font-medium uppercase tracking-wider">Технологический стек</p>
           </div>
           
           {/* Gradient Masks */}
-          <div className="absolute inset-y-0 left-0 w-20 md:w-40 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-          <div className="absolute inset-y-0 right-0 w-20 md:w-40 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 left-0 w-20 md:w-40 bg-gradient-to-r from-gray-900 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-20 md:w-40 bg-gradient-to-l from-gray-900 to-transparent z-10 pointer-events-none" />
 
           <div className="flex overflow-hidden">
             <motion.div
@@ -124,7 +124,7 @@ const Home = () => {
               {[...technologies, ...technologies, ...technologies, ...technologies].map((tech, index) => (
                 <span 
                   key={index} 
-                  className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-gray-400 hover:from-indigo-500 hover:to-purple-600 transition-all duration-300 cursor-default transform hover:scale-110"
+                  className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-600 to-gray-300 hover:from-indigo-400 hover:to-purple-400 transition-all duration-300 cursor-default transform hover:scale-110"
                 >
                   {tech}
                 </span>
