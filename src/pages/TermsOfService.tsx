@@ -1,9 +1,15 @@
 import Layout from '../components/Layout';
+import SEO from '../components/SEO';
 import { motion } from 'framer-motion';
 
 const TermsOfService = () => {
   return (
     <Layout>
+      <SEO 
+        title="Пользовательское соглашение" 
+        description="Условия использования сервиса Mainsite. Правила, ответственность, интеллектуальная собственность." 
+        keywords="пользовательское соглашение, условия использования, правила сервиса"
+      />
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

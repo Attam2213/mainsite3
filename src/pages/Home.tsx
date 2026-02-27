@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
+import SEO from '../components/SEO';
 import { ArrowRight, Code2, Monitor, Shield, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -37,6 +38,10 @@ const Home = () => {
 
   return (
     <Layout>
+      <SEO 
+        title="Главная" 
+        description="Mainsite - профессиональная веб-разработка сайтов под ключ. Создание современных, быстрых и адаптивных сайтов для вашего бизнеса." 
+      />
       <div className="bg-white overflow-hidden">
         {/* Hero Section */}
         <section className="relative pt-20 pb-32 lg:pt-32 lg:pb-40">

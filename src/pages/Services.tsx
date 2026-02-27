@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import SEO from '../components/SEO';
 import { motion } from 'framer-motion';
 import { Code2, Monitor, Database, Shield, Check, Loader, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -105,6 +106,11 @@ const Services = () => {
 
   return (
     <Layout>
+      <SEO 
+        title="Услуги и Цены" 
+        description="Разработка сайтов, интернет-магазинов, корпоративных порталов. Доступные цены и высокое качество." 
+        keywords="цены на сайты, заказать сайт цена, стоимость разработки сайта, услуги веб-студии"
+      />
       <div className="bg-gray-50 min-h-screen py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
+import SEO from '../components/SEO';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, ArrowRight, User } from 'lucide-react';
@@ -33,6 +34,10 @@ const Login = () => {
 
   return (
     <Layout>
+      <SEO 
+        title="Вход" 
+        description="Вход в личный кабинет для управления проектами и услугами." 
+      />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

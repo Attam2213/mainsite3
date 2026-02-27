@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import SEO from '../components/SEO';
 import { motion } from 'framer-motion';
 import { ExternalLink, Github, Loader } from 'lucide-react';
 
@@ -73,6 +74,11 @@ const Portfolio = () => {
 
   return (
     <Layout>
+      <SEO 
+        title="Портфолио" 
+        description="Примеры наших работ: лендинги, интернет-магазины, веб-приложения. Качественная разработка и современный дизайн." 
+        keywords="портфолио веб-студии, примеры сайтов, наши работы, кейсы разработки"
+      />
       <div className="bg-gray-50 min-h-screen py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-12">
