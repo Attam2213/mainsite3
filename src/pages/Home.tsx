@@ -298,12 +298,7 @@ const Home = () => {
                   >
                     Написать в Telegram <ArrowRight size={24} />
                   </a>
-                  <Link
-                    to="/contacts"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-indigo-700/50 text-white px-10 py-5 rounded-full font-bold text-xl hover:bg-indigo-700/70 transition-colors border border-indigo-500/30 backdrop-blur-sm"
-                  >
-                    Контакты
-                  </Link>
+
                 </div>
               </div>
             </div>
