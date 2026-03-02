@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 const Footer = () => {
   return (
     <footer className="bg-white border-t border-gray-100 py-12">
@@ -10,8 +12,18 @@ const Footer = () => {
             </p>
           </div>
         </div>
-        <div className="border-t border-gray-100 mt-12 pt-8 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} Wexa.su. Все права защищены.
+        <div className="border-t border-gray-100 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
+          <div className="mb-4 md:mb-0">
+            © {new Date().getFullYear()} Wexa.su. Все права защищены.
+          </div>
+          <div className="flex space-x-6">
+            <Link to="/privacy" className="hover:text-indigo-600 transition-colors">
+              Политика конфиденциальности
+            </Link>
+            <Link to="/terms" className="hover:text-indigo-600 transition-colors">
+              Пользовательское соглашение
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
