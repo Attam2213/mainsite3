@@ -17,10 +17,10 @@ const Footer = () => {
             © {new Date().getFullYear()} Wexa.su. Все права защищены.
           </div>
           <div className="flex space-x-6">
-            <Link to="/privacy" className="hover:text-indigo-600 transition-colors">
+            <Link to="/privacy-policy" className="hover:text-indigo-600 transition-colors">
               Политика конфиденциальности
             </Link>
-            <Link to="/terms" className="hover:text-indigo-600 transition-colors">
+            <Link to="/terms-of-service" className="hover:text-indigo-600 transition-colors">
               Пользовательское соглашение
             </Link>
           </div>
