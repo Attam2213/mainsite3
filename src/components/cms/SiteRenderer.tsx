@@ -1249,7 +1249,7 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
 
   return (
     <div className="min-h-screen bg-white">
-      {settings.sections.map((section, index) => renderSection(section, index))}
+      {settings.sections.map((section) => renderSection(section))}
     </div>
   );
 };

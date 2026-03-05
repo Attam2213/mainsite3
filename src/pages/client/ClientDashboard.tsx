@@ -296,13 +296,6 @@ const ClientDashboard = () => {
           const data = await invoicesRes.json();
           if (Array.isArray(data)) {
             setInvoices(data);
-            
-            // Filter active services (paid services or pending monthly subscriptions)
-            const active = data.filter((inv: Invoice) => 
-              (inv.status === 'paid' && inv.type === 'monthly') || 
-              (inv.status === 'paid' && inv.type === 'one_time' && new Date(inv.dueDate) > new Date())
-            );
-            setActiveServices(active);
           }
         }
 
