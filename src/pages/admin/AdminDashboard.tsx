@@ -1990,16 +1990,7 @@ const AdminDashboard = () => {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Дедлайн</label>
-                    <input
-                      type="date"
-                      required
-                      value={currentProject.deadline ? currentProject.deadline.toString().split('T')[0] : ''}
-                      onChange={e => setCurrentProject({...currentProject, deadline: e.target.value})}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                    />
-                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Статус</label>
                     <select
@@ -2013,17 +2004,7 @@ const AdminDashboard = () => {
                       <option value="cancelled">Отменен</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Прогресс (%)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={currentProject.progress || 0}
-                      onChange={e => setCurrentProject({...currentProject, progress: parseInt(e.target.value)})}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                    />
-                  </div>
+
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Ссылка на сайт</label>
