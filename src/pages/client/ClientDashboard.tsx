@@ -888,9 +888,91 @@ const ClientDashboard = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="rounded-xl bg-white p-6 shadow-sm border border-gray-100"
                       >
-                        {/* Project details similar to overview but more detailed */}
-                        <h3 className="text-lg font-medium text-gray-900">{project.title}</h3>
-                        {/* ... */}
+                        <div className="mb-4 flex items-center justify-between">
+                          <h3 className="text-lg font-medium text-gray-900">{project.title}</h3>
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
+                            project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            project.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {project.status === 'pending' ? 'Ожидает' :
+                             project.status === 'in_progress' ? 'В работе' : 'Отменен'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <div className="mb-2 flex justify-between text-sm font-medium text-gray-900">
+                              <span>Прогресс выполнения</span>
+                              <span>{project.progress}%</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                              <div 
+                                className="h-full bg-indigo-600 transition-all duration-500"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Clock className="mr-2 h-4 w-4" />
+                            <span>Дедлайн: {formatDate(project.deadline)}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
+                          {project.serverIp && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">IP Сервера</span>
+                              <span className="font-mono">{project.serverIp}</span>
+                            </div>
+                          )}
+                          {project.websiteUrl && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">Домен</span>
+                              <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                {project.websiteUrl}
+                              </a>
+                            </div>
+                          )}
+                          {project.siteStatus && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">Статус сайта</span>
+                              <span className={`font-medium ${
+                                project.siteStatus === 'up' ? 'text-green-600' : 
+                                project.siteStatus === 'down' ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {project.siteStatus === 'up' ? 'Работает' : 
+                                 project.siteStatus === 'down' ? 'Не работает' : 'Неизвестно'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {project.paidUntil && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm text-gray-500">Оплачено до:</span>
+                                    <span className={`font-medium ${new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
+                                        {formatDate(project.paidUntil)}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleExtend(project.id, 1)}
+                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
+                                    >
+                                        Продлить (1 мес)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleExtend(project.id, 3)}
+                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
+                                    >
+                                        Продлить (3 мес)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                       </motion.div>
                     ))
                   )}
