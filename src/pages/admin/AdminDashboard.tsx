@@ -14,8 +14,32 @@ import {
   CreditCard,
   CheckCircle,
   Send,
-  Loader
+  Loader,
+  Server,
+  Terminal,
+  Copy,
+  Globe,
+  RefreshCw
 } from 'lucide-react';
+
+interface ServerNode {
+  id: string;
+  name: string;
+  ipAddress: string;
+  status: 'active' | 'inactive' | 'provisioning';
+  token: string;
+  capacity: number;
+  currentLoad: number;
+  createdAt: string;
+}
+
+interface Site {
+  id: string;
+  domain: string;
+  status: string;
+  cmsVersion: string;
+  createdAt: string;
+}
 
 interface Service {
   id: string;
@@ -94,14 +118,24 @@ interface Order {
   user?: Partial<User>;
 }
 
+const formatDate = (date: string | Date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit'
+  });
+};
+
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [servers, setServers] = useState<ServerNode[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Chat State
@@ -131,10 +165,66 @@ const AdminDashboard = () => {
     serverIp: '',
     websiteUrl: ''
   });
+  const [projectFromOrder, setProjectFromOrder] = useState<Order | null>(null); // For creating project from order
   
   // User Profile Modal State
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserProfile, setSelectedUserProfile] = useState<Partial<User> | null>(null);
+
+  // Server Modal State
+  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
+  const [newServer, setNewServer] = useState({ name: '', ipAddress: '', capacity: 10 });
+  const [showToken, setShowToken] = useState<string | null>(null);
+  
+  // Server Sites Modal
+  const [viewServerSites, setViewServerSites] = useState<string | null>(null);
+  const [serverSites, setServerSites] = useState<Site[]>([]);
+  const [loadingServerSites, setLoadingServerSites] = useState(false);
+
+  const fetchServerSites = async (serverId: string) => {
+    try {
+      setLoadingServerSites(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/servers/${serverId}/sites`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setServerSites(data);
+        setViewServerSites(serverId);
+      }
+    } catch (error) {
+      console.error('Error fetching server sites:', error);
+    } finally {
+      setLoadingServerSites(false);
+    }
+  };
+
+  const handleDeleteSite = async (siteId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот сайт? Это действие нельзя отменить.')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setServerSites(serverSites.filter(s => s.id !== siteId));
+        // Update server load locally
+        if (viewServerSites) {
+            setServers(prev => prev.map(s => 
+                s.id === viewServerSites 
+                ? { ...s, currentLoad: Math.max(0, s.currentLoad - 1) } 
+                : s
+            ));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting site:', error);
+    }
+  };
 
   const [websiteFilters, setWebsiteFilters] = useState({
     status: 'all', // all, up, down
@@ -184,13 +274,14 @@ const AdminDashboard = () => {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       };
 
-      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes] = await Promise.all([
+      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes] = await Promise.all([
         fetch('/api/services'),
         fetch('/api/portfolio'),
         fetch('/api/users', { headers }),
         fetch('/api/invoices/all', { headers }),
         fetch('/api/projects', { headers }),
-        fetch('/api/orders', { headers })
+        fetch('/api/orders', { headers }),
+        fetch('/api/servers', { headers })
       ]);
       
       const servicesData = servicesRes.ok ? await servicesRes.json() : [];
@@ -219,10 +310,51 @@ const AdminDashboard = () => {
         if (Array.isArray(ordersData)) setOrders(ordersData);
       }
 
+      if (serversRes.ok) {
+        const serversData = await serversRes.json();
+        if (Array.isArray(serversData)) setServers(serversData);
+      }
+
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch('/api/servers', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(newServer),
+      });
+
+      if (response.ok) {
+        const createdServer = await response.json();
+        setServers([createdServer, ...servers]);
+        setNewServer({ name: '', ipAddress: '', capacity: 10 });
+        setIsServerModalOpen(false);
+        setShowToken(createdServer.token);
+      }
+    } catch (error) {
+      console.error('Error creating server:', error);
+    }
+  };
+
+  const handleDeleteServer = async (id: string) => {
+    if (!window.confirm('Are you sure you want to remove this server? This cannot be undone.')) return;
+    try {
+      const headers = getAuthHeaders();
+      await fetch(`/api/servers/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      setServers(servers.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Error deleting server:', error);
     }
   };
 
@@ -536,7 +668,8 @@ const AdminDashboard = () => {
                 { id: 'users', label: 'Пользователи' },
                 { id: 'websites', label: 'Сайты' },
                 { id: 'invoices', label: 'Счета' },
-                { id: 'projects', label: 'Проекты' }
+                { id: 'projects', label: 'Проекты' },
+                { id: 'servers', label: 'Серверы' }
               ].map((tab) => {
                 let badgeCount = 0;
                 let badgeColor = 'bg-red-500';
@@ -709,7 +842,7 @@ const AdminDashboard = () => {
                             {order.id.slice(0, 8)}...
                           </div>
                           <div className="text-sm text-gray-500">
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            {formatDate(order.createdAt)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -744,7 +877,7 @@ const AdminDashboard = () => {
                               setSelectedOrder(order);
                               setIsChatOpen(true);
                             }}
-                            className="text-indigo-600 hover:text-indigo-900 relative"
+                            className="text-indigo-600 hover:text-indigo-900 relative mr-4"
                           >
                             Чат
                             {order.unreadCount ? (
@@ -753,6 +886,25 @@ const AdminDashboard = () => {
                               </span>
                             ) : null}
                           </button>
+                          
+                          {order.status !== 'pending' && (
+                            <button
+                              onClick={() => {
+                                setProjectFromOrder(order);
+                                setCurrentProject({
+                                  title: `Проект: ${order.service?.title || 'Новый проект'}`,
+                                  clientId: order.userId,
+                                  budget: order.service ? parseFloat(order.service.price) : 0,
+                                  status: 'pending',
+                                  progress: 0
+                                });
+                                setIsProjectModalOpen(true);
+                              }}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Создать проект
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -782,7 +934,7 @@ const AdminDashboard = () => {
                             {order.id.slice(0, 8)}...
                           </div>
                           <div className="text-sm text-gray-500">
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            {formatDate(order.createdAt)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -830,6 +982,239 @@ const AdminDashboard = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+
+
+          {activeTab === 'servers' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-900">Управление VDS серверами</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={fetchData}
+                    className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    title="Обновить данные"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setIsServerModalOpen(true)}
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Добавить сервер
+                  </button>
+                </div>
+              </div>
+              
+              {showToken && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-green-800">Токен сервера создан!</h3>
+                      <p className="mt-1 text-sm text-green-700">
+                        Сохраните этот токен. Он показывается только один раз.
+                      </p>
+                      <code className="mt-2 block bg-white px-3 py-1 rounded border border-green-200 font-mono text-sm">
+                        {showToken}
+                      </code>
+                    </div>
+                    <button onClick={() => setShowToken(null)} className="text-green-600 hover:text-green-800">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {servers.map((server) => (
+                  <div key={server.id} className="bg-white overflow-hidden shadow rounded-lg border border-gray-200">
+                    <div className="px-4 py-5 sm:p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                          <Server className="h-6 w-6 text-indigo-600 mr-2" />
+                          <h3 className="text-lg leading-6 font-medium text-gray-900">{server.name}</h3>
+                        </div>
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          server.status === 'active' ? 'bg-green-100 text-green-800' :
+                          server.status === 'provisioning' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {server.status === 'active' ? 'Активен' : 
+                           server.status === 'provisioning' ? 'Настройка' : 'Неактивен'}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div className="flex justify-between">
+                          <span>IP Адрес:</span>
+                          <span className="font-mono">{server.ipAddress || 'Ожидание...'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Нагрузка:</span>
+                          <span>{server.currentLoad} / {server.capacity} сайтов</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Создан:</span>
+                          <span>{formatDate(server.createdAt)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                        <button
+                          onClick={() => setShowToken(server.token)}
+                          className="text-indigo-600 hover:text-indigo-900 text-sm font-medium flex items-center"
+                        >
+                          <Terminal className="w-4 h-4 mr-1" />
+                          Токен настройки
+                        </button>
+                        <button
+                          onClick={() => fetchServerSites(server.id)}
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium flex items-center"
+                        >
+                          <Globe className="w-4 h-4 mr-1" />
+                          Сайты
+                        </button>
+                        <button
+                          onClick={() => handleDeleteServer(server.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {servers.length === 0 && (
+                  <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <Server className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Нет серверов</h3>
+                    <p className="mt-1 text-sm text-gray-500">Добавьте первый VDS сервер для начала работы.</p>
+                    <div className="mt-6">
+                      <button
+                        onClick={() => setIsServerModalOpen(true)}
+                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                        Добавить сервер
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Server Modal */}
+          {isServerModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Добавить VDS сервер</h2>
+                  <button onClick={() => setIsServerModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <form onSubmit={handleAddServer} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Название сервера</label>
+                    <input
+                      type="text"
+                      required
+                      value={newServer.name}
+                      onChange={e => setNewServer({...newServer, name: e.target.value})}
+                      placeholder="My VDS 1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">IP Адрес (необязательно)</label>
+                    <input
+                      type="text"
+                      value={newServer.ipAddress}
+                      onChange={e => setNewServer({...newServer, ipAddress: e.target.value})}
+                      placeholder="192.168.1.1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Вместимость (сайтов)</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newServer.capacity}
+                      onChange={e => setNewServer({...newServer, capacity: parseInt(e.target.value)})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsServerModalOpen(false)}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Server Sites Modal */}
+          {viewServerSites && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl max-h-[80vh] flex flex-col">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Сайты на сервере</h2>
+                  <button onClick={() => setViewServerSites(null)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                  {loadingServerSites ? (
+                    <div className="flex justify-center py-10">
+                      <Loader className="animate-spin text-indigo-600 h-8 w-8" />
+                    </div>
+                  ) : serverSites.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500">
+                      На этом сервере нет сайтов.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {serverSites.map(site => (
+                        <div key={site.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{site.domain}</h3>
+                            <p className="text-xs text-gray-500">Создан: {formatDate(site.createdAt)}</p>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              site.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {site.status === 'active' ? 'Активен' : 'Настройка'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteSite(site.id)}
+                            className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-full transition-colors"
+                            title="Удалить сайт"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1048,7 +1433,7 @@ const AdminDashboard = () => {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(invoice.dueDate).toLocaleDateString()}
+                          {formatDate(invoice.dueDate)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
@@ -1098,7 +1483,7 @@ const AdminDashboard = () => {
                         <tr key={project.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{project.title}</div>
-                            <div className="text-xs text-gray-500">До: {new Date(project.deadline).toLocaleDateString()}</div>
+                            <div className="text-xs text-gray-500">До: {formatDate(project.deadline)}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {project.client?.name || 'Unknown'}
@@ -1296,7 +1681,7 @@ const AdminDashboard = () => {
                               <tr key={order.id}>
                                 <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
                                   {order.id.slice(0, 8)}... <br/>
-                                  <span className="text-gray-500 font-normal">{new Date(order.createdAt).toLocaleDateString()}</span>
+                                  <span className="text-gray-500 font-normal">{formatDate(order.createdAt)}</span>
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                   {order.service?.title || 'Чат с менеджером'}

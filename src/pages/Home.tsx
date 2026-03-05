@@ -94,14 +94,7 @@ const Home = () => {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="max-w-4xl mx-auto"
             >
-              <motion.span 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="inline-block py-1.5 px-4 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-sm font-semibold mb-8 backdrop-blur-md hover:bg-indigo-500/20 transition-colors cursor-default"
-              >
-                Available for Hire
-              </motion.span>
+              {/* Available for Hire badge removed */}
               
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-tight">
                 Создаю <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">Цифровые</span> <br className="hidden md:block" />

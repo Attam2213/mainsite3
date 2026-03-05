@@ -81,3 +81,23 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ message: 'Ошибка при обновлении заказа' });
   }
 };
+
+export const cancelOrder = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    // @ts-ignore
+    const userId = req.user.id;
+
+    const order = await Order.findOne({ where: { id, userId } });
+    if (!order) {
+      res.status(404).json({ message: 'Заказ не найден' });
+      return;
+    }
+
+    await order.update({ status: 'cancelled' });
+    res.json(order);
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(500).json({ message: 'Ошибка при отмене заказа' });
+  }
+};

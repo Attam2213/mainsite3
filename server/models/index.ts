@@ -5,6 +5,9 @@ import Project from './Project';
 import Invoice from './Invoice';
 import Order from './Order';
 import Message from './Message';
+import Server from './Server';
+import Site from './Site';
+import Lead from './Lead';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -30,6 +33,16 @@ Message.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 User.hasMany(Message, { foreignKey: 'senderId', as: 'sentMessages' });
 Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
 
+// Site Associations
+User.hasMany(Site, { foreignKey: 'userId', as: 'sites' });
+Site.belongsTo(User, { foreignKey: 'userId', as: 'owner' });
+
+Server.hasMany(Site, { foreignKey: 'serverId', as: 'sites' });
+Site.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
+
+Site.hasMany(Lead, { foreignKey: 'siteId', as: 'leads' });
+Lead.belongsTo(Site, { foreignKey: 'siteId', as: 'site' });
+
 export {
   User,
   Service,
@@ -38,4 +51,7 @@ export {
   Invoice,
   Order,
   Message,
+  Server,
+  Site,
+  Lead
 };

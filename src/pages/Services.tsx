@@ -51,7 +51,6 @@ const Services = () => {
       });
 
       if (response.ok) {
-        alert('Заказ успешно создан! Переходим в личный кабинет.');
         navigate('/dashboard');
       } else {
         alert('Ошибка при создании заказа');
@@ -144,10 +143,18 @@ const Services = () => {
                   transition={{ delay: index * 0.1 }}
                   className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 flex flex-col hover:shadow-xl transition-shadow duration-300"
                 >
-                  <div className={`p-6 ${service.color} text-white`}>
+                  <div className={`p-6 ${service.color} ${
+                    service.color.includes('orange') || service.color.includes('yellow') || service.color.includes('green') 
+                      ? 'text-gray-900' 
+                      : 'text-white'
+                  }`}>
                     <IconComponent size={32} className="mb-4" />
                     <h3 className="text-2xl font-bold">{service.title}</h3>
-                    <p className="text-white/80 mt-2 text-sm">{service.description}</p>
+                    <p className={`mt-2 text-sm ${
+                      service.color.includes('orange') || service.color.includes('yellow') || service.color.includes('green')
+                        ? 'text-gray-800'
+                        : 'text-white/80'
+                    }`}>{service.description}</p>
                   </div>
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="text-3xl font-bold text-gray-900 mb-6">{service.price}</div>
