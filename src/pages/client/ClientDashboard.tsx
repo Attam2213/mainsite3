@@ -106,11 +106,12 @@ const formatDate = (date: string | Date) => {
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
-  // Debug projects
-  console.log('Client Projects:', projects);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
+  
+  // Debug projects
+  console.log('Client Projects:', projects);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
