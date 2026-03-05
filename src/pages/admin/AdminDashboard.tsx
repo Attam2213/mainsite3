@@ -2082,15 +2082,7 @@ const AdminDashboard = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Оплачено до</label>
-                    <input
-                      type="date"
-                      value={currentProject.paidUntil ? new Date(currentProject.paidUntil).toISOString().split('T')[0] : ''}
-                      onChange={e => setCurrentProject({...currentProject, paidUntil: e.target.value})}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                    />
-                  </div>
+
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Статус</label>
