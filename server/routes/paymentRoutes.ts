@@ -48,20 +48,39 @@ router.post('/create', authenticateToken, async (req: any, res: any) => {
 // Webhook
 router.post('/webhook', async (req, res) => {
   try {
-    // Verify signature if needed (Platega docs usually specify how)
-    // For now, trust payload
-    const { transactionId, status, payload } = req.body;
-    
-    // payload contains invoiceId
-    const invoiceId = payload;
+    console.log('Webhook received:', JSON.stringify(req.body));
 
-    if (status === 'success' || status === 'paid') { // Check actual status values from docs
+    const { status, payload, transaction } = req.body;
+    
+    // Extract invoiceId from payload (sent during creation)
+    // If payload is not at top level, check if it's inside transaction
+    let invoiceId = payload;
+    if (!invoiceId && transaction && transaction.payload) {
+        invoiceId = transaction.payload;
+    }
+
+    // Check status
+    // Docs say: PENDING, CANCELED, CONFIRMED, CHARGEBACKED
+    let isPaid = false;
+    const currentStatus = status || (transaction && transaction.status);
+    
+    if (currentStatus === 'CONFIRMED' || currentStatus === 'paid' || currentStatus === 'success') {
+      isPaid = true;
+    }
+
+    if (isPaid && invoiceId) {
       const invoice = await Invoice.findByPk(invoiceId);
       if (invoice && invoice.status !== 'paid') {
         invoice.status = 'paid';
         await invoice.save();
         console.log(`Invoice ${invoiceId} marked as paid via webhook`);
+      } else if (invoice) {
+        console.log(`Invoice ${invoiceId} is already paid`);
+      } else {
+        console.log(`Invoice ${invoiceId} not found`);
       }
+    } else {
+      console.log(`Webhook ignored: status=${currentStatus}, invoiceId=${invoiceId}`);
     }
 
     res.json({ success: true });
