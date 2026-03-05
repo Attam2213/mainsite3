@@ -23,6 +23,10 @@ npm install
 echo "[3/4] Rebuilding frontend..."
 npm run build
 
+# 3.5 Fix DB
+echo "[3.5/4] Fixing database schema..."
+npx tsx server/fix-db.ts
+
 # 4. Restart backend
 echo "[4/4] Restarting application..."
 pm2 restart mainsite

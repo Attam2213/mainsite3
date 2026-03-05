@@ -82,8 +82,8 @@ const startServer = async () => {
     // Sync models (alter: true updates tables if they exist, force: false prevents data loss)
     // In production, use migrations instead of sync({ alter: true })
     
-    // Enable alter: true to update schema (add new columns)
-    await sequelize.sync({ alter: true });
+    // Disable alter: true to avoid SQLite unique constraint errors during dev
+    await sequelize.sync({ alter: false });
     
     console.log('Database synced.');
 
