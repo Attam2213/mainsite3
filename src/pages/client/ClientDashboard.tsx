@@ -106,6 +106,8 @@ const formatDate = (date: string | Date) => {
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  // Debug projects
+  console.log('Client Projects:', projects);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -739,6 +741,18 @@ const ClientDashboard = () => {
                               <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
                                 {project.websiteUrl}
                               </a>
+                            </div>
+                          )}
+                          {project.siteStatus && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">Статус сайта</span>
+                              <span className={`font-medium ${
+                                project.siteStatus === 'up' ? 'text-green-600' : 
+                                project.siteStatus === 'down' ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {project.siteStatus === 'up' ? 'Работает' : 
+                                 project.siteStatus === 'down' ? 'Не работает' : 'Неизвестно'}
+                              </span>
                             </div>
                           )}
                         </div>
