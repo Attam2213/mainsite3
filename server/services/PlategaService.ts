@@ -31,12 +31,12 @@ export class PlategaService {
   constructor() {
     this.merchantId = process.env.PLATEGA_MERCHANT_ID || '';
     this.secret = process.env.PLATEGA_SECRET || '';
-    this.baseUrl = 'https://app.platega.io/api'; // Assuming /api prefix
+    this.baseUrl = 'https://api.platega.io'; 
   }
 
   public async createPayment(req: CreatePaymentRequest): Promise<CreatePaymentResponse> {
     try {
-      const response = await axios.post(`${this.baseUrl}/payment/create`, req, {
+      const response = await axios.post(`${this.baseUrl}/transaction/create`, req, {
         headers: {
           'X-MerchantId': this.merchantId,
           'X-Secret': this.secret,
@@ -66,7 +66,7 @@ export class PlategaService {
 
   public async checkStatus(transactionId: string) {
     try {
-      const response = await axios.get(`${this.baseUrl}/payment/status/${transactionId}`, {
+      const response = await axios.get(`${this.baseUrl}/transaction/status/${transactionId}`, {
         headers: {
           'X-MerchantId': this.merchantId,
           'X-Secret': this.secret
