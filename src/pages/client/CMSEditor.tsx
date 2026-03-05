@@ -15,9 +15,7 @@ import {
   Layers,
   MessageSquare,
   Grid,
-  X,
   GripVertical,
-  Link as LinkIcon,
   Eye,
   EyeOff,
   MapPin

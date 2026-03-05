@@ -1,21 +1,12 @@
 import React from 'react';
 import { 
-  Type, 
-  Image as ImageIcon, 
-  Layout, 
-  MessageSquare, 
-  Grid,
   Phone,
   Mail,
-  MapPin,
   CheckCircle,
-  ArrowRight,
   Menu,
   Facebook,
   Twitter,
-  Instagram,
-  Linkedin,
-  Github
+  Instagram
 } from 'lucide-react';
 
 export interface SiteButton {
@@ -1152,7 +1143,7 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
     return <div className="p-10 text-center text-gray-500">Нет контента для отображения</div>;
   }
 
-  const renderSection = (section: Section, index: number) => {
+  const renderSection = (section: Section) => {
     const isSelected = selectedSectionId === section.id;
     const commonProps = {
       key: section.id,

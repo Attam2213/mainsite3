@@ -17,7 +17,6 @@ import {
   Loader,
   Server,
   Terminal,
-  Copy,
   Globe,
   RefreshCw
 } from 'lucide-react';
@@ -114,6 +113,7 @@ interface Order {
   unreadCount?: number;
   service?: {
     title: string;
+    price?: string;
   };
   user?: Partial<User>;
 }
@@ -165,7 +165,6 @@ const AdminDashboard = () => {
     serverIp: '',
     websiteUrl: ''
   });
-  const [projectFromOrder, setProjectFromOrder] = useState<Order | null>(null); // For creating project from order
   
   // User Profile Modal State
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -890,11 +889,10 @@ const AdminDashboard = () => {
                           {order.status !== 'pending' && (
                             <button
                               onClick={() => {
-                                setProjectFromOrder(order);
                                 setCurrentProject({
                                   title: `Проект: ${order.service?.title || 'Новый проект'}`,
-                                  clientId: order.userId,
-                                  budget: order.service ? parseFloat(order.service.price) : 0,
+                                  clientId: order.user?.id || '',
+                                  budget: order.service?.price ? parseFloat(order.service.price) : 0,
                                   status: 'pending',
                                   progress: 0
                                 });

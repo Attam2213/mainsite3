@@ -16,7 +16,6 @@ import {
   Loader,
   Globe,
   Plus,
-  Server,
   Settings,
   Users,
   Search,
@@ -108,7 +107,6 @@ const ClientDashboard = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeServices, setActiveServices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -392,10 +390,6 @@ const ClientDashboard = () => {
     } catch (error) {
       console.error('Error sending message:', error);
     }
-  };
-
-  const handlePay = (invoice: Invoice) => {
-    alert(`Для оплаты счета "${invoice.title}" на сумму ${invoice.amount} ₽ свяжитесь с администратором.\n\nВ будущем здесь будет подключена платежная система.`);
   };
 
   const handleCreateSite = async (e: React.FormEvent) => {
