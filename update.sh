@@ -11,6 +11,8 @@ echo "=========================================="
 
 # 1. Pull latest changes
 echo "[1/4] Pulling latest changes from git..."
+# Discard local package-lock.json changes to avoid conflicts
+git checkout package-lock.json
 git pull
 
 # 2. Install dependencies
