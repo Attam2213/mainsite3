@@ -93,6 +93,7 @@ interface Project {
   serverIp?: string;
   websiteUrl?: string;
   siteStatus?: 'up' | 'down' | 'unknown';
+  paidUntil?: string;
 }
 
 interface Message {
@@ -156,6 +157,9 @@ const AdminDashboard = () => {
     type: 'one_time',
     status: 'pending'
   });
+  
+  const [isProjectInvoiceModalOpen, setIsProjectInvoiceModalOpen] = useState(false);
+  const [invoicePeriod, setInvoicePeriod] = useState(1);
   const [selectedUserForInvoice, setSelectedUserForInvoice] = useState<User | null>(null);
 
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -620,6 +624,30 @@ const AdminDashboard = () => {
       fetchData();
     } catch (error) {
       console.error('Error deleting invoice:', error);
+    }
+  };
+
+  const handleCreateProjectInvoice = async () => {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/invoices/subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ projectId: currentProject.id, months: invoicePeriod })
+        });
+        
+        if (res.ok) {
+            setIsProjectInvoiceModalOpen(false);
+            alert('Счет успешно создан!');
+        } else {
+            alert('Ошибка создания счета');
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Ошибка');
     }
   };
 
@@ -1127,6 +1155,8 @@ const AdminDashboard = () => {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
                   </div>
+
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700">IP Адрес (необязательно)</label>
                     <input
@@ -1471,6 +1501,7 @@ const AdminDashboard = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Проект</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бюджет</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Оплата</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                       </tr>
@@ -1488,6 +1519,15 @@ const AdminDashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {project.budget} ₽
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {project.paidUntil ? (
+                                <span className={new Date(project.paidUntil) < new Date() ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>
+                                {new Date(project.paidUntil).toLocaleDateString('ru-RU')}
+                                </span>
+                            ) : (
+                                <span className="text-gray-400">Не оплачено</span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               project.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -1501,6 +1541,17 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => {
+                                setCurrentProject(project);
+                                setInvoicePeriod(1);
+                                setIsProjectInvoiceModalOpen(true);
+                              }}
+                              className="text-green-600 hover:text-green-900 mr-3"
+                              title="Выставить счет"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </button>
                             <button
                               onClick={() => {
                                 setCurrentProject(project);
@@ -1936,6 +1987,53 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* Project Invoice Modal */}
+          {isProjectInvoiceModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Выставить счет</h2>
+                  <button onClick={() => setIsProjectInvoiceModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                    <p>Проект: <strong>{currentProject.title}</strong></p>
+                    <p>Бюджет (мес): {currentProject.budget} ₽</p>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Период (месяцев)</label>
+                        <select 
+                            value={invoicePeriod}
+                            onChange={(e) => setInvoicePeriod(Number(e.target.value))}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                        >
+                            <option value={1}>1 месяц</option>
+                            <option value={3}>3 месяца</option>
+                            <option value={6}>6 месяцев</option>
+                            <option value={12}>12 месяцев</option>
+                        </select>
+                    </div>
+                    
+                    <div className="pt-4 flex justify-end gap-2">
+                        <button
+                            onClick={() => setIsProjectInvoiceModalOpen(false)}
+                            className="px-4 py-2 border rounded hover:bg-gray-50"
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            onClick={handleCreateProjectInvoice}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                        >
+                            Создать счет на {(currentProject.budget || 0) * invoicePeriod} ₽
+                        </button>
+                    </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Project Modal */}
           {isProjectModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -1980,6 +2078,16 @@ const AdminDashboard = () => {
                       required
                       value={currentProject.budget || ''}
                       onChange={e => setCurrentProject({...currentProject, budget: parseFloat(e.target.value)})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Оплачено до</label>
+                    <input
+                      type="date"
+                      value={currentProject.paidUntil ? new Date(currentProject.paidUntil).toISOString().split('T')[0] : ''}
+                      onChange={e => setCurrentProject({...currentProject, paidUntil: e.target.value})}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
                   </div>
