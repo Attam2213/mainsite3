@@ -4,7 +4,8 @@ import {
   getUserInvoices,
   createInvoice,
   updateInvoice,
-  deleteInvoice
+  deleteInvoice,
+  createSubscriptionInvoice
 } from '../controllers/invoiceController';
 import { authenticateToken, isAdmin } from '../middleware/auth';
 
@@ -18,5 +19,6 @@ router.delete('/:id', authenticateToken, isAdmin, deleteInvoice);
 
 // Client routes
 router.get('/my', authenticateToken, getUserInvoices);
+router.post('/subscription', authenticateToken, createSubscriptionInvoice);
 
 export default router;

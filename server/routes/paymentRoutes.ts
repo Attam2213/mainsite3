@@ -1,5 +1,5 @@
 import express from 'express';
-import { Invoice, User } from '../models';
+import { Invoice, User, Project } from '../models';
 import { authenticateToken } from '../middleware/auth';
 import { plategaService } from '../services/PlategaService';
 
@@ -74,6 +74,27 @@ router.post('/webhook', async (req, res) => {
         invoice.status = 'paid';
         await invoice.save();
         console.log(`Invoice ${invoiceId} marked as paid via webhook`);
+
+        // Handle Subscription Logic
+        if (invoice.type === 'monthly' && invoice.projectId) {
+            const project = await Project.findByPk(invoice.projectId);
+            if (project) {
+                // Determine start date
+                let startDate = new Date();
+                if (project.paidUntil && new Date(project.paidUntil) > startDate) {
+                    startDate = new Date(project.paidUntil);
+                }
+                
+                // Add months
+                const monthsToAdd = invoice.periodMonths || 1;
+                const newPaidUntil = new Date(startDate);
+                newPaidUntil.setMonth(newPaidUntil.getMonth() + monthsToAdd);
+                
+                project.paidUntil = newPaidUntil;
+                await project.save();
+                console.log(`Project ${project.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
+            }
+        }
       } else if (invoice) {
         console.log(`Invoice ${invoiceId} is already paid`);
       } else {

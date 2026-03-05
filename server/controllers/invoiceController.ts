@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Invoice, User, Service } from '../models';
+import { Invoice, User, Service, Project } from '../models';
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -72,5 +72,39 @@ export const deleteInvoice = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     console.error('Delete invoice error:', error);
     res.status(500).json({ message: 'Ошибка при удалении счета' });
+  }
+};
+
+export const createSubscriptionInvoice = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId, months } = req.body;
+    const project = await Project.findByPk(projectId);
+    if (!project) {
+        res.status(404).json({ message: 'Project not found' });
+        return;
+    }
+    
+    // @ts-ignore
+    const userId = req.user.id;
+    
+    // Default to 500 if budget is 0?
+    const monthlyPrice = project.budget > 0 ? project.budget : 500;
+    const amount = monthlyPrice * months;
+    
+    const invoice = await Invoice.create({
+        title: `Продление подписки: ${project.title} (${months} мес.)`,
+        amount,
+        status: 'pending',
+        type: 'monthly',
+        dueDate: new Date(),
+        userId,
+        projectId: project.id,
+        periodMonths: months
+    });
+    
+    res.status(201).json(invoice);
+  } catch (error) {
+    console.error('Create subscription invoice error:', error);
+    res.status(500).json({ message: 'Ошибка при создании счета подписки' });
   }
 };

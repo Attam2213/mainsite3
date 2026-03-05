@@ -71,6 +71,7 @@ interface Project {
   websiteUrl?: string;
   siteStatus?: 'up' | 'down' | 'unknown';
   lastChecked?: string;
+  paidUntil?: string;
 }
 
 interface Message {
@@ -157,6 +158,29 @@ const ClientDashboard = () => {
     } catch (error) {
       console.error('Payment error:', error);
       alert('Ошибка соединения с сервером');
+    }
+  };
+
+  const handleExtend = async (projectId: string, months: number) => {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/invoices/subscription', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ projectId, months })
+        });
+        
+        if (res.ok) {
+            const invoice = await res.json();
+            handlePayInvoice(invoice.id);
+        } else {
+            alert('Ошибка создания счета');
+        }
+    } catch (error) {
+        console.error('Extend error:', error);
     }
   };
 
@@ -701,6 +725,48 @@ const ClientDashboard = () => {
                           <span>Дедлайн: {formatDate(project.deadline)}</span>
                         </div>
                       </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
+                          {project.serverIp && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">IP Сервера</span>
+                              <span className="font-mono">{project.serverIp}</span>
+                            </div>
+                          )}
+                          {project.websiteUrl && (
+                            <div>
+                              <span className="block text-gray-400 text-xs">Домен</span>
+                              <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                {project.websiteUrl}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {project.paidUntil && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm text-gray-500">Оплачено до:</span>
+                                    <span className={`font-medium ${new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
+                                        {formatDate(project.paidUntil)}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleExtend(project.id, 1)}
+                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
+                                    >
+                                        Продлить (1 мес)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleExtend(project.id, 3)}
+                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
+                                    >
+                                        Продлить (3 мес)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
                   ))}
                 </>

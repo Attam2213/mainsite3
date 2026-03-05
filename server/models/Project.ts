@@ -13,6 +13,7 @@ class Project extends Model {
   declare websiteUrl: string;
   declare siteStatus: 'up' | 'down' | 'unknown';
   declare lastChecked: Date;
+  declare paidUntil: Date;
 }
 
 Project.init(
@@ -57,6 +58,10 @@ Project.init(
     },
     lastChecked: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+    paidUntil: {
+      type: DataTypes.DATEONLY,
       allowNull: true,
     },
   },
