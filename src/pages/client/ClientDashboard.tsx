@@ -696,38 +696,22 @@ const ClientDashboard = () => {
                       <div className="mb-4 flex items-center justify-between">
                         <h2 className="text-xl font-semibold text-gray-900">Текущий проект</h2>
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                          project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                          project.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {project.status === 'pending' ? 'Ожидает' :
-                           project.status === 'in_progress' ? 'В работе' : 'Отменен'}
-                        </span>
+                            project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            project.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            project.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {project.status === 'pending' ? 'Ожидает' :
+                             project.status === 'in_progress' ? 'В работе' :
+                             project.status === 'completed' ? 'Готов' : 'Отменен'}
+                          </span>
                       </div>
                       
                       <div className="mb-6">
                         <h3 className="text-lg font-medium text-gray-900">{project.title}</h3>
                       </div>
 
-                      <div className="space-y-4">
-                        <div>
-                          <div className="mb-2 flex justify-between text-sm font-medium text-gray-900">
-                            <span>Прогресс выполнения</span>
-                            <span>{project.progress}%</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                            <div 
-                              className="h-full bg-indigo-600 transition-all duration-500"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Clock className="mr-2 h-4 w-4" />
-                          <span>Дедлайн: {formatDate(project.deadline)}</span>
-                        </div>
-                      </div>
+
 
                         <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
                           {project.serverIp && (
@@ -892,33 +876,17 @@ const ClientDashboard = () => {
                           <h3 className="text-lg font-medium text-gray-900">{project.title}</h3>
                           <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
                             project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            project.status === 'completed' ? 'bg-green-100 text-green-800' :
                             project.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
                             {project.status === 'pending' ? 'Ожидает' :
-                             project.status === 'in_progress' ? 'В работе' : 'Отменен'}
+                             project.status === 'in_progress' ? 'В работе' :
+                             project.status === 'completed' ? 'Готов' : 'Отменен'}
                           </span>
                         </div>
 
-                        <div className="space-y-4">
-                          <div>
-                            <div className="mb-2 flex justify-between text-sm font-medium text-gray-900">
-                              <span>Прогресс выполнения</span>
-                              <span>{project.progress}%</span>
-                            </div>
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                              <div 
-                                className="h-full bg-indigo-600 transition-all duration-500"
-                                style={{ width: `${project.progress}%` }}
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Clock className="mr-2 h-4 w-4" />
-                            <span>Дедлайн: {formatDate(project.deadline)}</span>
-                          </div>
-                        </div>
+
 
                         <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
                           {project.serverIp && (
