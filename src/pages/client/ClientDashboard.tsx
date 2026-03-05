@@ -4,8 +4,7 @@ import Layout from '../../components/Layout';
 import { motion } from 'framer-motion';
 import { 
   FileText, 
-  MessageCircle, 
-  Clock, 
+  MessageCircle,
   CheckCircle,
   AlertCircle,
   Download,
