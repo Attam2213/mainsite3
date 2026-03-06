@@ -71,6 +71,27 @@ interface Feedback {
   createdAt: string;
 }
 
+interface HostingNode {
+  id: string;
+  name: string;
+  ip: string;
+  sshPort: number;
+  totalRam: number;
+  status: string;
+}
+
+interface GameServerItem {
+  id: string;
+  name: string;
+  game: string;
+  port: number;
+  status: string;
+  userId: string;
+  nodeId: string;
+  user?: User;
+  node?: HostingNode;
+}
+
 interface User {
   id: string;
   name: string;
@@ -143,11 +164,13 @@ const formatDate = (date: string | Date) => {
 };
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers' | 'feedback'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [hostingNodes, setHostingNodes] = useState<HostingNode[]>([]);
+  const [gameServers, setGameServers] = useState<GameServerItem[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -184,6 +207,11 @@ const AdminDashboard = () => {
     serverIp: '',
     websiteUrl: ''
   });
+
+  const [isNodeModalOpen, setIsNodeModalOpen] = useState(false);
+  const [isGameServerModalOpen, setIsGameServerModalOpen] = useState(false);
+  const [currentNode, setCurrentNode] = useState<Partial<HostingNode>>({});
+  const [currentGameServer, setCurrentGameServer] = useState<Partial<GameServerItem>>({});
   
   // User Profile Modal State
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -292,7 +320,7 @@ const AdminDashboard = () => {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       };
 
-      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes] = await Promise.all([
+      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes, nodesRes, gameServersRes] = await Promise.all([
         fetch('/api/services'),
         fetch('/api/portfolio'),
         fetch('/api/users', { headers }),
@@ -300,7 +328,9 @@ const AdminDashboard = () => {
         fetch('/api/projects', { headers }),
         fetch('/api/orders', { headers }),
         fetch('/api/servers', { headers }),
-        fetch('/api/feedback', { headers })
+        fetch('/api/feedback', { headers }),
+        fetch('/api/nodes', { headers }),
+        fetch('/api/game-servers', { headers })
       ]);
       
       const servicesData = servicesRes.ok ? await servicesRes.json() : [];
@@ -337,6 +367,16 @@ const AdminDashboard = () => {
       if (feedbacksRes.ok) {
         const feedbacksData = await feedbacksRes.json();
         if (Array.isArray(feedbacksData)) setFeedbacks(feedbacksData);
+      }
+
+      if (nodesRes.ok) {
+          const nodesData = await nodesRes.json();
+          if (Array.isArray(nodesData)) setHostingNodes(nodesData);
+      }
+
+      if (gameServersRes.ok) {
+          const gsData = await gameServersRes.json();
+          if (Array.isArray(gsData)) setGameServers(gsData);
       }
 
     } catch (error) {
@@ -672,6 +712,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSaveNode = async () => {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/nodes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(currentNode)
+        });
+        if (res.ok) {
+            setIsNodeModalOpen(false);
+            fetchData();
+        }
+    } catch (error) {
+        console.error(error);
+    }
+  };
+
+  const handleSaveGameServer = async () => {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/game-servers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(currentGameServer)
+        });
+        if (res.ok) {
+            setIsGameServerModalOpen(false);
+            fetchData();
+        } else {
+            const err = await res.json();
+            alert('Ошибка: ' + err.message);
+        }
+    } catch (error) {
+        console.error(error);
+    }
+  };
+  
+  const handleControlGameServer = async (id: string, action: 'start' | 'stop' | 'restart') => {
+      try {
+          const token = localStorage.getItem('token');
+          await fetch(`/api/game-servers/${id}/control`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ action })
+          });
+          fetchData();
+      } catch (error) {
+          console.error(error);
+      }
+  };
+
   const stats = [
     { title: 'Активные услуги', value: services.length, icon: Briefcase, color: 'bg-blue-500' },
     { title: 'Работы в портфолио', value: portfolioItems.length, icon: ImageIcon, color: 'bg-purple-500' },
@@ -719,7 +810,9 @@ const AdminDashboard = () => {
                 { id: 'invoices', label: 'Счета' },
                 { id: 'projects', label: 'Проекты' },
                 { id: 'servers', label: 'Серверы' },
-                { id: 'feedback', label: 'Обратная связь' }
+                { id: 'feedback', label: 'Обратная связь' },
+                { id: 'hosting_nodes', label: 'Локации (VDS)' },
+                { id: 'game_servers', label: 'Игровые серверы' }
               ].map((tab) => {
                 let badgeCount = 0;
                 let badgeColor = 'bg-red-500';
@@ -1906,6 +1999,173 @@ const AdminDashboard = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'hosting_nodes' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-lg font-bold text-gray-900">VDS Ноды</h2>
+                <button
+                  onClick={() => {
+                    setCurrentNode({});
+                    setIsNodeModalOpen(true);
+                  }}
+                  className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Добавить ноду
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSH Port</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RAM</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {hostingNodes.map((node) => (
+                      <tr key={node.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{node.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.ip}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.sshPort}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.totalRam} MB</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            {node.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button onClick={async () => {
+                              if(confirm('Удалить?')) {
+                                  const token = localStorage.getItem('token');
+                                  await fetch(`/api/nodes/${node.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                  fetchData();
+                              }
+                          }} className="text-red-600 hover:text-red-900">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {isNodeModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Добавить Ноду</h2>
+                <div className="space-y-4">
+                    <input type="text" placeholder="Название (MSK-1)" className="w-full p-2 border rounded" value={currentNode.name || ''} onChange={e => setCurrentNode({...currentNode, name: e.target.value})} />
+                    <input type="text" placeholder="IP" className="w-full p-2 border rounded" value={currentNode.ip || ''} onChange={e => setCurrentNode({...currentNode, ip: e.target.value})} />
+                    <input type="number" placeholder="SSH Port (22)" className="w-full p-2 border rounded" value={currentNode.sshPort || 22} onChange={e => setCurrentNode({...currentNode, sshPort: parseInt(e.target.value)})} />
+                    <input type="text" placeholder="SSH User (root)" className="w-full p-2 border rounded" value={currentNode.sshUser || 'root'} onChange={e => setCurrentNode({...currentNode, sshUser: e.target.value})} />
+                    <input type="password" placeholder="SSH Password" className="w-full p-2 border rounded" value={currentNode.sshPassword || ''} onChange={e => setCurrentNode({...currentNode, sshPassword: e.target.value})} />
+                    <input type="number" placeholder="Total RAM (MB)" className="w-full p-2 border rounded" value={currentNode.totalRam || 0} onChange={e => setCurrentNode({...currentNode, totalRam: parseInt(e.target.value)})} />
+                    
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button onClick={() => setIsNodeModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
+                        <button onClick={handleSaveNode} className="px-4 py-2 bg-indigo-600 text-white rounded">Сохранить</button>
+                    </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'game_servers' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-lg font-bold text-gray-900">Игровые серверы</h2>
+                <button
+                  onClick={() => {
+                    setCurrentGameServer({ ram: 1024 });
+                    setIsGameServerModalOpen(true);
+                  }}
+                  className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Создать сервер
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Игра</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Порт</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Нода</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Управление</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {gameServers.map((gs) => (
+                      <tr key={gs.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{gs.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.game}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.port}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              gs.status === 'running' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {gs.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.node?.name || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button onClick={() => handleControlGameServer(gs.id, 'start')} className="text-green-600 hover:text-green-900 mr-2">Start</button>
+                          <button onClick={() => handleControlGameServer(gs.id, 'stop')} className="text-red-600 hover:text-red-900 mr-2">Stop</button>
+                          <button onClick={() => handleControlGameServer(gs.id, 'restart')} className="text-blue-600 hover:text-blue-900">Restart</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {isGameServerModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Создать Сервер</h2>
+                <div className="space-y-4">
+                    <input type="text" placeholder="Название" className="w-full p-2 border rounded" value={currentGameServer.name || ''} onChange={e => setCurrentGameServer({...currentGameServer, name: e.target.value})} />
+                    
+                    <select className="w-full p-2 border rounded" value={currentGameServer.game || ''} onChange={e => setCurrentGameServer({...currentGameServer, game: e.target.value})}>
+                        <option value="">Выберите игру</option>
+                        <option value="minecraft">Minecraft (Java)</option>
+                        <option value="cs2">Counter-Strike 2</option>
+                    </select>
+
+                    <select className="w-full p-2 border rounded" value={currentGameServer.nodeId || ''} onChange={e => setCurrentGameServer({...currentGameServer, nodeId: e.target.value})}>
+                        <option value="">Выберите ноду</option>
+                        {hostingNodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.ip})</option>)}
+                    </select>
+
+                    <select className="w-full p-2 border rounded" value={currentGameServer.userId || ''} onChange={e => setCurrentGameServer({...currentGameServer, userId: e.target.value})}>
+                        <option value="">Выберите владельца</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                    </select>
+
+                    <input type="number" placeholder="RAM (MB)" className="w-full p-2 border rounded" value={currentGameServer.ram || 1024} onChange={e => setCurrentGameServer({...currentGameServer, ram: parseInt(e.target.value)})} />
+                    
+                    <div className="flex justify-end gap-2 pt-4">
+                        <button onClick={() => setIsGameServerModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
+                        <button onClick={handleSaveGameServer} className="px-4 py-2 bg-indigo-600 text-white rounded">Создать</button>
+                    </div>
+                </div>
               </div>
             </div>
           )}

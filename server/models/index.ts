@@ -9,6 +9,8 @@ import Server from './Server';
 import Site from './Site';
 import Lead from './Lead';
 import Feedback from './Feedback';
+import ServerNode from './ServerNode';
+import GameServer from './GameServer';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -44,6 +46,9 @@ Site.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
 Site.hasMany(Lead, { foreignKey: 'siteId', as: 'leads' });
 Lead.belongsTo(Site, { foreignKey: 'siteId', as: 'site' });
 
+GameServer.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+GameServer.belongsTo(ServerNode, { foreignKey: 'nodeId', as: 'node' });
+
 export {
   User,
   Service,
@@ -55,5 +60,7 @@ export {
   Server,
   Site,
   Lead,
-  Feedback
+  Feedback,
+  ServerNode,
+  GameServer
 };
