@@ -1,4 +1,5 @@
 import { Client } from 'ssh2';
+import { decrypt } from '../utils/crypto';
 
 export const execCommand = (config: any, command: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -33,7 +34,7 @@ export const stopPM2Process = async (project: any) => {
             host: project.serverIp,
             port: 22,
             username: project.sshUsername,
-            password: project.sshPassword
+            password: project.sshPassword ? decrypt(project.sshPassword) : undefined
         };
         await execCommand(config, `pm2 stop ${project.pm2ProcessName}`);
         console.log(`Stopped PM2 process ${project.pm2ProcessName} on ${project.serverIp}`);
@@ -52,7 +53,7 @@ export const startPM2Process = async (project: any) => {
             host: project.serverIp,
             port: 22,
             username: project.sshUsername,
-            password: project.sshPassword
+            password: project.sshPassword ? decrypt(project.sshPassword) : undefined
         };
         await execCommand(config, `pm2 start ${project.pm2ProcessName} && pm2 save`);
         console.log(`Started PM2 process ${project.pm2ProcessName} on ${project.serverIp}`);

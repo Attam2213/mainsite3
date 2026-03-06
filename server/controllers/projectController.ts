@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Project, User } from '../models';
+import { encrypt } from '../utils/crypto';
 
 export const getAllProjects = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -52,7 +53,7 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
       siteStatus,
       monthlyRate: monthlyRate || 0,
       sshUsername,
-      sshPassword,
+      sshPassword: sshPassword ? encrypt(sshPassword) : null,
       pm2ProcessName
     });
     
@@ -75,7 +76,12 @@ export const updateProject = async (req: Request, res: Response): Promise<void> 
       return;
     }
     
-    await project.update(req.body);
+    const updateData = { ...req.body };
+    if (updateData.sshPassword) {
+        updateData.sshPassword = encrypt(updateData.sshPassword);
+    }
+    
+    await project.update(updateData);
     
     const updatedProject = await Project.findByPk(project.id, {
       include: [{ model: User, as: 'client', attributes: ['id', 'name', 'email'] }]
