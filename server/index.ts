@@ -26,6 +26,7 @@ import siteRoutes from './routes/siteRoutes';
 import agentRoutes from './routes/agentRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import feedbackRoutes from './routes/feedbackRoutes';
 import { startMonitoring } from './services/monitorService';
 
 // Prevent unused variable errors for now (will use them in routes later)
@@ -67,6 +68,7 @@ app.use('/api/sites', siteRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Basic health check
 app.get('/api/health', (req, res) => {

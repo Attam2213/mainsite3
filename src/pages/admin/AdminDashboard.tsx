@@ -18,7 +18,8 @@ import {
   Server,
   Terminal,
   Globe,
-  RefreshCw
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react';
 
 interface ServerNode {
@@ -59,6 +60,15 @@ interface PortfolioItem {
   github: string;
   category: string;
   tags: string[];
+}
+
+interface Feedback {
+  id: string;
+  email: string;
+  telegram?: string;
+  message: string;
+  status: 'new' | 'read' | 'contacted';
+  createdAt: string;
 }
 
 interface User {
@@ -130,10 +140,11 @@ const formatDate = (date: string | Date) => {
 };
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers' | 'feedback'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -278,14 +289,15 @@ const AdminDashboard = () => {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       };
 
-      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes] = await Promise.all([
+      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes] = await Promise.all([
         fetch('/api/services'),
         fetch('/api/portfolio'),
         fetch('/api/users', { headers }),
         fetch('/api/invoices/all', { headers }),
         fetch('/api/projects', { headers }),
         fetch('/api/orders', { headers }),
-        fetch('/api/servers', { headers })
+        fetch('/api/servers', { headers }),
+        fetch('/api/feedback', { headers })
       ]);
       
       const servicesData = servicesRes.ok ? await servicesRes.json() : [];
@@ -317,6 +329,11 @@ const AdminDashboard = () => {
       if (serversRes.ok) {
         const serversData = await serversRes.json();
         if (Array.isArray(serversData)) setServers(serversData);
+      }
+
+      if (feedbacksRes.ok) {
+        const feedbacksData = await feedbacksRes.json();
+        if (Array.isArray(feedbacksData)) setFeedbacks(feedbacksData);
       }
 
     } catch (error) {
@@ -697,7 +714,8 @@ const AdminDashboard = () => {
                 { id: 'websites', label: 'Сайты' },
                 { id: 'invoices', label: 'Счета' },
                 { id: 'projects', label: 'Проекты' },
-                { id: 'servers', label: 'Серверы' }
+                { id: 'servers', label: 'Серверы' },
+                { id: 'feedback', label: 'Обратная связь' }
               ].map((tab) => {
                 let badgeCount = 0;
                 let badgeColor = 'bg-red-500';
@@ -708,6 +726,8 @@ const AdminDashboard = () => {
                   badgeCount = orders.filter(o => !o.service).reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
                 } else if (tab.id === 'websites') {
                   badgeCount = projects.filter(p => p.siteStatus === 'down').length;
+                } else if (tab.id === 'feedback') {
+                  badgeCount = feedbacks.filter(f => f.status === 'new').length;
                 }
 
                 return (
@@ -1798,6 +1818,90 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'feedback' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telegram</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сообщение</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {feedbacks.map((feedback) => (
+                      <tr key={feedback.id} className={feedback.status === 'new' ? 'bg-blue-50' : ''}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(feedback.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {feedback.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {feedback.telegram || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={feedback.message}>
+                          {feedback.message}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            feedback.status === 'new' ? 'bg-green-100 text-green-800' :
+                            feedback.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {feedback.status === 'new' ? 'Новое' :
+                             feedback.status === 'contacted' ? 'Связались' : 'Прочитано'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {feedback.status === 'new' && (
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem('token');
+                                await fetch(`/api/feedback/${feedback.id}`, {
+                                    method: 'PUT',
+                                    headers: { 
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}` 
+                                    },
+                                    body: JSON.stringify({ status: 'read' })
+                                });
+                                setFeedbacks(feedbacks.map(f => f.id === feedback.id ? { ...f, status: 'read' } : f));
+                              }}
+                              className="text-indigo-600 hover:text-indigo-900 mr-3"
+                              title="Отметить как прочитанное"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={async () => {
+                                if (!confirm('Удалить?')) return;
+                                const token = localStorage.getItem('token');
+                                await fetch(`/api/feedback/${feedback.id}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                setFeedbacks(feedbacks.filter(f => f.id !== feedback.id));
+                            }}
+                            className="text-red-600 hover:text-red-900"
+                            title="Удалить"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

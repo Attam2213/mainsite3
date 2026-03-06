@@ -9,7 +9,8 @@ const run = async () => {
         "ALTER TABLE projects ADD COLUMN siteStatus TEXT DEFAULT 'unknown';",
         "ALTER TABLE invoices ADD COLUMN periodMonths INTEGER DEFAULT 1;",
         "ALTER TABLE invoices ADD COLUMN projectId UUID;",
-        "ALTER TABLE projects ADD COLUMN monthlyRate INTEGER DEFAULT 0;"
+        "ALTER TABLE projects ADD COLUMN monthlyRate INTEGER DEFAULT 0;",
+        "CREATE TABLE IF NOT EXISTS feedbacks (id UUID PRIMARY KEY, email VARCHAR(255) NOT NULL, telegram VARCHAR(255), message TEXT NOT NULL, status VARCHAR(255) DEFAULT 'new', createdAt DATETIME, updatedAt DATETIME);"
     ];
 
     for (const q of queries) {

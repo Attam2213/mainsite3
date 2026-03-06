@@ -8,6 +8,7 @@ import Message from './Message';
 import Server from './Server';
 import Site from './Site';
 import Lead from './Lead';
+import Feedback from './Feedback';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -53,5 +54,6 @@ export {
   Message,
   Server,
   Site,
-  Lead
+  Lead,
+  Feedback
 };

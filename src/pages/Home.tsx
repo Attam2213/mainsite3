@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
+import ContactForm from '../components/ContactForm';
 import { ArrowRight, Code2, Monitor, Shield, Zap, CheckCircle, Globe, PenTool } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -282,17 +283,7 @@ const Home = () => {
                   Давайте обсудим вашу идею и найдем лучшее техническое решение. 
                   Первая консультация и оценка проекта — бесплатно.
                 </p>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                  <a
-                    href="https://t.me/iljes222"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-white text-indigo-600 px-10 py-5 rounded-full font-bold text-xl hover:bg-gray-50 transition-colors shadow-lg hover:shadow-xl"
-                  >
-                    Написать в Telegram <ArrowRight size={24} />
-                  </a>
-
-                </div>
+                <ContactForm />
               </div>
             </div>
           </div>
