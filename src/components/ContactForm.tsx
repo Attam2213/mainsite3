@@ -58,7 +58,7 @@ const ContactForm = () => {
               required
               value={formData.email}
               onChange={e => setFormData({...formData, email: e.target.value})}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors text-gray-900 bg-white placeholder-gray-400"
               placeholder="your@email.com"
             />
           </div>
@@ -69,7 +69,7 @@ const ContactForm = () => {
               type="text"
               value={formData.telegram}
               onChange={e => setFormData({...formData, telegram: e.target.value})}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors text-gray-900 bg-white placeholder-gray-400"
               placeholder="@username"
             />
           </div>
@@ -81,7 +81,7 @@ const ContactForm = () => {
               rows={4}
               value={formData.message}
               onChange={e => setFormData({...formData, message: e.target.value})}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors text-gray-900 bg-white placeholder-gray-400"
               placeholder="Опишите ваш проект или вопрос..."
             />
           </div>
