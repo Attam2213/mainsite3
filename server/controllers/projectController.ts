@@ -37,7 +37,7 @@ export const getMyProject = async (req: Request, res: Response): Promise<void> =
 export const createProject = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('Creating project:', req.body);
-    const { title, budget, deadline, clientId, status, progress, serverIp, websiteUrl, paidUntil, siteStatus, monthlyRate } = req.body;
+    const { title, budget, deadline, clientId, status, progress, serverIp, websiteUrl, paidUntil, siteStatus, monthlyRate, sshUsername, sshPassword, pm2ProcessName } = req.body;
     
     const project = await Project.create({
       title,
@@ -50,7 +50,10 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
       websiteUrl,
       paidUntil,
       siteStatus,
-      monthlyRate: monthlyRate || 0
+      monthlyRate: monthlyRate || 0,
+      sshUsername,
+      sshPassword,
+      pm2ProcessName
     });
     
     const projectWithClient = await Project.findByPk(project.id, {

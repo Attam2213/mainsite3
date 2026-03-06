@@ -28,6 +28,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import feedbackRoutes from './routes/feedbackRoutes';
 import { startMonitoring } from './services/monitorService';
+import { startSubscriptionService } from './services/subscriptionService';
 
 // Prevent unused variable errors for now (will use them in routes later)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -91,6 +92,7 @@ const startServer = async () => {
 
     // Start website monitoring service
     startMonitoring();
+    startSubscriptionService();
 
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);

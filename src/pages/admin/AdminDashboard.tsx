@@ -105,6 +105,9 @@ interface Project {
   siteStatus?: 'up' | 'down' | 'unknown';
   paidUntil?: string;
   monthlyRate?: number;
+  sshUsername?: string;
+  sshPassword?: string;
+  pm2ProcessName?: string;
 }
 
 interface Message {
@@ -2241,6 +2244,42 @@ const AdminDashboard = () => {
                       placeholder="192.168.1.1"
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium text-gray-900 mt-4 mb-2">Настройки сервера (PM2)</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">SSH User</label>
+                            <input
+                                type="text"
+                                value={currentProject.sshUsername || ''}
+                                onChange={e => setCurrentProject({...currentProject, sshUsername: e.target.value})}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                                placeholder="root"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">SSH Password</label>
+                            <input
+                                type="password"
+                                value={currentProject.sshPassword || ''}
+                                onChange={e => setCurrentProject({...currentProject, sshPassword: e.target.value})}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                                placeholder="******"
+                            />
+                        </div>
+                    </div>
+                    <div className="mt-2">
+                        <label className="block text-sm font-medium text-gray-700">PM2 Process Name</label>
+                        <input
+                            type="text"
+                            value={currentProject.pm2ProcessName || ''}
+                            onChange={e => setCurrentProject({...currentProject, pm2ProcessName: e.target.value})}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                            placeholder="my-app"
+                        />
+                    </div>
                   </div>
                   
                   <div className="flex justify-end space-x-3 pt-4">

@@ -2,6 +2,7 @@ import express from 'express';
 import { Invoice, User, Project } from '../models';
 import { authenticateToken } from '../middleware/auth';
 import { plategaService } from '../services/PlategaService';
+import { startPM2Process } from '../services/sshService';
 
 const router = express.Router();
 
@@ -93,6 +94,9 @@ router.post('/webhook', async (req, res) => {
                 project.paidUntil = newPaidUntil;
                 await project.save();
                 console.log(`Project ${project.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
+                
+                // Restart PM2 process
+                await startPM2Process(project);
             }
         }
       } else if (invoice) {

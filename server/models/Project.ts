@@ -12,6 +12,9 @@ class Project extends Model {
   declare serverIp: string;
   declare monthlyRate: number;
   declare websiteUrl: string;
+  declare sshUsername?: string;
+  declare sshPassword?: string;
+  declare pm2ProcessName?: string;
   declare siteStatus: 'up' | 'down' | 'unknown';
   declare lastChecked: Date;
   declare paidUntil: Date;
@@ -54,6 +57,18 @@ Project.init(
       allowNull: true,
     },
     websiteUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    sshUsername: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    sshPassword: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    pm2ProcessName: {
       type: DataTypes.STRING,
       allowNull: true,
     },
