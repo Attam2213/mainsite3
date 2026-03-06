@@ -95,6 +95,24 @@ interface Order {
   };
 }
 
+interface HostingNode {
+  id: string;
+  name: string;
+  ip: string;
+}
+
+interface GameServer {
+  id: string;
+  name: string;
+  game: string;
+  port: number;
+  status: string;
+  ram: number;
+  node?: HostingNode;
+  containerId?: string;
+  rconPassword?: string;
+}
+
 const formatDate = (date: string | Date) => {
   if (!date) return '';
   return new Date(date).toLocaleDateString('ru-RU', {
@@ -117,9 +135,19 @@ const ClientDashboard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'sites' | 'billing' | 'leads' | 'requests'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'sites' | 'billing' | 'leads' | 'requests' | 'game_hosting' | 'my_servers'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
+  
+  // Game Hosting State
+  const [nodes, setNodes] = useState<HostingNode[]>([]);
+  const [gameServers, setGameServers] = useState<GameServer[]>([]);
+  const [orderConfig, setOrderConfig] = useState({
+      game: 'minecraft',
+      nodeId: '',
+      ram: 1024,
+      slots: 10
+  });
   const [isCreateSiteModalOpen, setIsCreateSiteModalOpen] = useState(false);
   const [createSiteStep, setCreateSiteStep] = useState(1);
   const [selectedTemplate, setSelectedTemplate] = useState('empty');
@@ -310,11 +338,13 @@ const ClientDashboard = () => {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
       try {
-        const [invoicesRes, projectRes, ordersRes, sitesRes] = await Promise.all([
+        const [invoicesRes, projectRes, ordersRes, sitesRes, nodesRes, gsRes] = await Promise.all([
           fetch('/api/invoices/my', { headers, signal: controller.signal }),
           fetch('/api/projects/my', { headers, signal: controller.signal }),
           fetch('/api/orders', { headers, signal: controller.signal }),
-          fetch('/api/sites', { headers, signal: controller.signal })
+          fetch('/api/sites', { headers, signal: controller.signal }),
+          fetch('/api/nodes/public', { headers, signal: controller.signal }),
+          fetch('/api/game-servers', { headers, signal: controller.signal })
         ]);
         
         clearTimeout(timeoutId);
@@ -350,6 +380,15 @@ const ClientDashboard = () => {
         }
         throw err;
       }
+
+        if (nodesRes.ok) {
+            const data = await nodesRes.json();
+            if (Array.isArray(data)) setNodes(data);
+        }
+        if (gsRes.ok) {
+            const data = await gsRes.json();
+            if (Array.isArray(data)) setGameServers(data);
+        }
 
       // Fetch leads
       const leadsRes = await fetch('/api/leads', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -1190,6 +1229,178 @@ const ClientDashboard = () => {
                 </motion.div>
               )}
 
+              {activeTab === 'game_hosting' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                    <h2 className="text-2xl font-bold mb-6">Заказать игровой сервер</h2>
+                    
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Игра</label>
+                            <select 
+                                className="w-full p-3 border rounded-lg"
+                                value={orderConfig.game}
+                                onChange={e => setOrderConfig({...orderConfig, game: e.target.value})}
+                            >
+                                <option value="minecraft">Minecraft (Java Edition)</option>
+                                <option value="cs2">Counter-Strike 2</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Локация</label>
+                            <select 
+                                className="w-full p-3 border rounded-lg"
+                                value={orderConfig.nodeId}
+                                onChange={e => setOrderConfig({...orderConfig, nodeId: e.target.value})}
+                            >
+                                <option value="">Выберите локацию</option>
+                                {nodes.map(n => (
+                                    <option key={n.id} value={n.id}>{n.name} ({n.ip})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">RAM (MB)</label>
+                            <input 
+                                type="number" 
+                                className="w-full p-3 border rounded-lg"
+                                value={orderConfig.ram}
+                                onChange={e => setOrderConfig({...orderConfig, ram: parseInt(e.target.value)})}
+                                min="1024"
+                                step="1024"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">100 ₽ / 1024 MB</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Слоты</label>
+                            <input 
+                                type="number" 
+                                className="w-full p-3 border rounded-lg"
+                                value={orderConfig.slots}
+                                onChange={e => setOrderConfig({...orderConfig, slots: parseInt(e.target.value)})}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-8 border-t pt-6 flex justify-between items-center">
+                        <div className="text-xl font-bold">
+                            Итого: {Math.ceil(orderConfig.ram / 1024 * 100)} ₽ / мес
+                        </div>
+                        <button 
+                            onClick={async () => {
+                                if (!orderConfig.nodeId) return alert('Выберите локацию');
+                                try {
+                                    const token = localStorage.getItem('token');
+                                    const res = await fetch('/api/game-servers/order', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                        body: JSON.stringify({
+                                            ...orderConfig,
+                                            name: `${orderConfig.game} server`
+                                        })
+                                    });
+                                    if (res.ok) {
+                                        alert('Сервер создан! Идет установка...');
+                                        setActiveTab('my_servers');
+                                        const gsRes = await fetch('/api/game-servers', { headers: { 'Authorization': `Bearer ${token}` } });
+                                        if (gsRes.ok) setGameServers(await gsRes.json());
+                                    } else {
+                                        alert('Ошибка создания');
+                                    }
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                            }}
+                            className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 font-medium"
+                        >
+                            Заказать и оплатить
+                        </button>
+                    </div>
+                </div>
+              )}
+
+              {activeTab === 'my_servers' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900">Мои игровые серверы</h2>
+                    <Terminal className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {gameServers.length === 0 ? (
+                        <div className="p-12 text-center text-gray-500">
+                            У вас нет активных серверов
+                        </div>
+                    ) : (
+                        gameServers.map(gs => (
+                            <div key={gs.id} className="p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold">{gs.name}</h3>
+                                        <p className="text-sm text-gray-500">{gs.game} | Port: {gs.port}</p>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                        gs.status === 'running' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    }`}>
+                                        {gs.status}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={async () => {
+                                            const token = localStorage.getItem('token');
+                                            await fetch(`/api/game-servers/${gs.id}/control`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                body: JSON.stringify({ action: 'start' })
+                                            });
+                                            alert('Команда отправлена');
+                                        }}
+                                        className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+                                    >
+                                        Start
+                                    </button>
+                                    <button 
+                                        onClick={async () => {
+                                            const token = localStorage.getItem('token');
+                                            await fetch(`/api/game-servers/${gs.id}/control`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                body: JSON.stringify({ action: 'stop' })
+                                            });
+                                            alert('Команда отправлена');
+                                        }}
+                                        className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                                    >
+                                        Stop
+                                    </button>
+                                    <button 
+                                        onClick={async () => {
+                                            const token = localStorage.getItem('token');
+                                            await fetch(`/api/game-servers/${gs.id}/control`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                body: JSON.stringify({ action: 'restart' })
+                                            });
+                                            alert('Команда отправлена');
+                                        }}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                                    >
+                                        Restart
+                                    </button>
+                                </div>
+                                <div className="mt-4 p-4 bg-gray-900 text-gray-100 rounded text-sm font-mono">
+                                    <p>IP: {nodes.find(n => n.id === gs.node?.id || (gs.node as any)?.id === n.id)?.ip}:{gs.port}</p>
+                                    {gs.rconPassword && <p>RCON: {gs.rconPassword}</p>}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Sidebar - Navigation */}
@@ -1250,6 +1461,28 @@ const ClientDashboard = () => {
                   >
                     <Users className="mr-3 h-5 w-5" />
                     Заявки
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('game_hosting')}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'game_hosting' 
+                        ? 'bg-indigo-50 text-indigo-700' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Server className="mr-3 h-5 w-5" />
+                    Заказать сервер
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('my_servers')}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'my_servers' 
+                        ? 'bg-indigo-50 text-indigo-700' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Terminal className="mr-3 h-5 w-5" />
+                    Мои серверы
                   </button>
                   <button
                     onClick={() => setActiveTab('requests')}

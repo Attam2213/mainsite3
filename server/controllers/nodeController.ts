@@ -59,6 +59,17 @@ export const getNodes = async (req: Request, res: Response) => {
     }
 };
 
+export const getPublicNodes = async (req: Request, res: Response) => {
+    try {
+        const nodes = await ServerNode.findAll({
+            attributes: ['id', 'name', 'ip', 'totalRam', 'status']
+        });
+        res.json(nodes);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching nodes' });
+    }
+};
+
 export const deleteNode = async (req: Request, res: Response) => {
     try {
         await ServerNode.destroy({ where: { id: req.params.id } });

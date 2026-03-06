@@ -2085,17 +2085,7 @@ const AdminDashboard = () => {
           {activeTab === 'game_servers' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-gray-900">Игровые серверы</h2>
-                <button
-                  onClick={() => {
-                    setCurrentGameServer({ ram: 1024 });
-                    setIsGameServerModalOpen(true);
-                  }}
-                  className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Создать сервер
-                </button>
+                <h2 className="text-lg font-bold text-gray-900">Игровые серверы (Все клиенты)</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
