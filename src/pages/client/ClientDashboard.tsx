@@ -742,12 +742,12 @@ const ClientDashboard = () => {
                           )}
                         </div>
 
-                        {project.paidUntil && (
+                        {(project.paidUntil || (project.monthlyRate && project.monthlyRate > 0)) && (
                             <div className="mt-4 pt-4 border-t border-gray-100">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className="text-sm text-gray-500">Оплачено до:</span>
-                                    <span className={`font-medium ${new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
-                                        {formatDate(project.paidUntil)}
+                                    <span className={`font-medium ${project.paidUntil && new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
+                                        {project.paidUntil ? formatDate(project.paidUntil) : 'Не оплачено'}
                                     </span>
                                 </div>
                                 <div className="flex gap-2">
@@ -917,12 +917,12 @@ const ClientDashboard = () => {
                           )}
                         </div>
 
-                        {project.paidUntil && (
+                        {(project.paidUntil || (project.monthlyRate && project.monthlyRate > 0)) && (
                             <div className="mt-4 pt-4 border-t border-gray-100">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className="text-sm text-gray-500">Оплачено до:</span>
-                                    <span className={`font-medium ${new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
-                                        {formatDate(project.paidUntil)}
+                                    <span className={`font-medium ${project.paidUntil && new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
+                                        {project.paidUntil ? formatDate(project.paidUntil) : 'Не оплачено'}
                                     </span>
                                 </div>
                                 <div className="flex gap-2">
