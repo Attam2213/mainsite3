@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import Project from '../models/Project';
 import https from 'https';
 
-const CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const CHECK_INTERVAL = 60 * 1000; // 1 minute (for testing)
 
 const agent = new https.Agent({  
   rejectUnauthorized: false
