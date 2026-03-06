@@ -23,8 +23,8 @@ export const checkSubscriptions = async () => {
 };
 
 export const startSubscriptionService = () => {
-    // Check every hour
-    setInterval(checkSubscriptions, 60 * 60 * 1000);
+    // Check every 1 minute (for testing)
+    setInterval(checkSubscriptions, 60 * 1000);
     // Initial check
     checkSubscriptions();
 };
