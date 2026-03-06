@@ -18,7 +18,9 @@ import {
   Settings,
   Users,
   Search,
-  MessageSquare
+  MessageSquare,
+  Server,
+  Terminal
 } from 'lucide-react';
 
 interface Lead {
