@@ -676,6 +676,7 @@ const AdminDashboard = () => {
     { title: 'Заказы', value: orders.length, icon: CheckCircle, color: 'bg-indigo-500' },
     { title: 'Выставлено счетов', value: invoices.length, icon: FileText, color: 'bg-yellow-500' },
     { title: 'Активные проекты', value: projects.length, icon: TrendingUp, color: 'bg-red-500' },
+    { title: 'Новые сообщения', value: feedbacks.filter(f => f.status === 'new').length, icon: MessageCircle, color: 'bg-pink-500' },
   ];
 
   if (loading) {
