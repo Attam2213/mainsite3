@@ -87,8 +87,8 @@ export const createSubscriptionInvoice = async (req: Request, res: Response): Pr
     // @ts-ignore
     const userId = req.user.id;
     
-    // Default to 500 if budget is 0?
-    const monthlyPrice = project.budget > 0 ? project.budget : 500;
+    // Use monthlyRate if available, otherwise budget (fallback)
+    const monthlyPrice = project.monthlyRate > 0 ? project.monthlyRate : project.budget;
     const amount = monthlyPrice * months;
     
     const invoice = await Invoice.create({

@@ -71,6 +71,7 @@ interface Project {
   siteStatus?: 'up' | 'down' | 'unknown';
   lastChecked?: string;
   paidUntil?: string;
+  monthlyRate?: number;
 }
 
 interface Message {
@@ -754,13 +755,13 @@ const ClientDashboard = () => {
                                         onClick={() => handleExtend(project.id, 1)}
                                         className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
                                     >
-                                        Продлить (1 мес)
+                                        Продлить (1 мес) - {project.monthlyRate || 0} ₽
                                     </button>
                                     <button 
                                         onClick={() => handleExtend(project.id, 3)}
                                         className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
                                     >
-                                        Продлить (3 мес)
+                                        Продлить (3 мес) - {(project.monthlyRate || 0) * 3} ₽
                                     </button>
                                 </div>
                             </div>

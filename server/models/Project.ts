@@ -10,6 +10,7 @@ class Project extends Model {
   declare progress: number;
   declare clientId: string;
   declare serverIp: string;
+  declare monthlyRate: number;
   declare websiteUrl: string;
   declare siteStatus: 'up' | 'down' | 'unknown';
   declare lastChecked: Date;
@@ -43,6 +44,10 @@ Project.init(
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: { min: 0, max: 100 },
+    },
+    monthlyRate: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
     },
     serverIp: {
       type: DataTypes.STRING,

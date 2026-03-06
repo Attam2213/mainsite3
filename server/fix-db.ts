@@ -8,7 +8,8 @@ const run = async () => {
         "ALTER TABLE projects ADD COLUMN paidUntil DATE;",
         "ALTER TABLE projects ADD COLUMN siteStatus TEXT DEFAULT 'unknown';",
         "ALTER TABLE invoices ADD COLUMN periodMonths INTEGER DEFAULT 1;",
-        "ALTER TABLE invoices ADD COLUMN projectId UUID;"
+        "ALTER TABLE invoices ADD COLUMN projectId UUID;",
+        "ALTER TABLE projects ADD COLUMN monthlyRate INTEGER DEFAULT 0;"
     ];
 
     for (const q of queries) {

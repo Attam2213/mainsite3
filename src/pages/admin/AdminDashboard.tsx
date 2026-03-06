@@ -94,6 +94,7 @@ interface Project {
   websiteUrl?: string;
   siteStatus?: 'up' | 'down' | 'unknown';
   paidUntil?: string;
+  monthlyRate?: number;
 }
 
 interface Message {
@@ -1998,11 +1999,11 @@ const AdminDashboard = () => {
                   </button>
                 </div>
                 <div className="space-y-4">
-                    <p>Проект: <strong>{currentProject.title}</strong></p>
-                    <p>Бюджет (мес): {currentProject.budget} ₽</p>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Период (месяцев)</label>
+                     <p>Проект: <strong>{currentProject.title}</strong></p>
+                     <p>Тариф: {currentProject.monthlyRate || currentProject.budget} ₽ / мес</p>
+                     
+                     <div>
+                         <label className="block text-sm font-medium text-gray-700">Период (месяцев)</label>
                         <select 
                             value={invoicePeriod}
                             onChange={(e) => setInvoicePeriod(Number(e.target.value))}
@@ -2023,11 +2024,11 @@ const AdminDashboard = () => {
                             Отмена
                         </button>
                         <button
-                            onClick={handleCreateProjectInvoice}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                        >
-                            Создать счет на {(currentProject.budget || 0) * invoicePeriod} ₽
-                        </button>
+                             onClick={handleCreateProjectInvoice}
+                             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                         >
+                             Создать счет на {((currentProject.monthlyRate || currentProject.budget) || 0) * invoicePeriod} ₽
+                         </button>
                     </div>
                 </div>
               </div>
@@ -2072,12 +2073,21 @@ const AdminDashboard = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Бюджет (₽)</label>
+                    <label className="block text-sm font-medium text-gray-700">Бюджет (разовый)</label>
                     <input
                       type="number"
                       required
                       value={currentProject.budget || ''}
                       onChange={e => setCurrentProject({...currentProject, budget: parseFloat(e.target.value)})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Ежемесячный платеж</label>
+                    <input
+                      type="number"
+                      value={currentProject.monthlyRate || ''}
+                      onChange={e => setCurrentProject({...currentProject, monthlyRate: parseFloat(e.target.value)})}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
                   </div>
