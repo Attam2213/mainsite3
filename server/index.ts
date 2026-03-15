@@ -90,6 +90,35 @@ const startServer = async () => {
     // In production, use migrations instead of sync({ alter: true })
     
     // Disable alter: true to avoid SQLite unique constraint errors during dev
+    try {
+      await sequelize.query("ALTER TABLE services ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT false;");
+    } catch (e) {
+      void e;
+    }
+    try {
+      if (sequelize.getDialect() === 'postgres') {
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"supportedGames\" JSONB NOT NULL DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]'::jsonb;");
+      } else {
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN supportedGames TEXT DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]';");
+      }
+    } catch (e) {
+      void e;
+    }
+    try {
+      if (sequelize.getDialect() === 'postgres') {
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS \"paidUntil\" TIMESTAMP WITH TIME ZONE;");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS \"monthlyPrice\" INTEGER DEFAULT 0;");
+        await sequelize.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS \"gameServerId\" UUID;");
+        await sequelize.query("UPDATE game_servers SET \"paidUntil\" = NOW() + INTERVAL '30 days' WHERE \"paidUntil\" IS NULL;");
+      } else {
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN paidUntil DATETIME;");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN monthlyPrice INTEGER DEFAULT 0;");
+        await sequelize.query("ALTER TABLE invoices ADD COLUMN gameServerId UUID;");
+        await sequelize.query("UPDATE game_servers SET paidUntil = datetime('now', '+30 days') WHERE paidUntil IS NULL;");
+      }
+    } catch (e) {
+      void e;
+    }
     await sequelize.sync({ alter: false });
     
     console.log('Database synced.');

@@ -2,18 +2,22 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
 
 class GameServer extends Model {
-  public id!: string;
-  public userId!: string;
-  public nodeId!: string;
-  public game!: string; // minecraft, cs2
-  public name!: string;
-  public port!: number;
-  public ram!: number;
-  public status!: string; // installing, running, stopped, error
-  public containerId?: string;
-  public rconPassword?: string;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare id: string;
+  declare userId: string;
+  declare nodeId: string;
+  declare game: string;
+  declare name: string;
+  declare port: number;
+  declare ram: number;
+  declare slots: number;
+  declare core: string;
+  declare status: string;
+  declare monthlyPrice: number;
+  declare paidUntil: Date | null;
+  declare containerId?: string;
+  declare rconPassword?: string;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 }
 
 GameServer.init(
@@ -29,7 +33,11 @@ GameServer.init(
     name: { type: DataTypes.STRING, allowNull: false },
     port: { type: DataTypes.INTEGER, allowNull: true },
     ram: { type: DataTypes.INTEGER, defaultValue: 1024 },
+    slots: { type: DataTypes.INTEGER, defaultValue: 10 },
+    core: { type: DataTypes.STRING, defaultValue: 'vanilla' },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
+    monthlyPrice: { type: DataTypes.INTEGER, defaultValue: 0 },
+    paidUntil: { type: DataTypes.DATE, allowNull: true },
     containerId: { type: DataTypes.STRING, allowNull: true },
     rconPassword: { type: DataTypes.STRING, allowNull: true },
   },

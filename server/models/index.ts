@@ -22,6 +22,9 @@ Invoice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Service.hasMany(Invoice, { foreignKey: 'serviceId', as: 'invoices' });
 Invoice.belongsTo(Service, { foreignKey: 'serviceId', as: 'service' });
 
+Project.hasMany(Invoice, { foreignKey: 'projectId', as: 'invoices' });
+Invoice.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
 // Order Associations
 User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
 Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -48,6 +51,9 @@ Lead.belongsTo(Site, { foreignKey: 'siteId', as: 'site' });
 
 GameServer.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 GameServer.belongsTo(ServerNode, { foreignKey: 'nodeId', as: 'node' });
+
+GameServer.hasMany(Invoice, { foreignKey: 'gameServerId', as: 'invoices' });
+Invoice.belongsTo(GameServer, { foreignKey: 'gameServerId', as: 'gameServer' });
 
 export {
   User,

@@ -26,6 +26,30 @@ export const execCommand = (config: any, command: string): Promise<string> => {
   });
 };
 
+export const uploadStream = (config: any, command: string, inputStream: NodeJS.ReadableStream): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn.on('ready', () => {
+      conn.exec(command, (err, stream) => {
+        if (err) {
+            conn.end();
+            return reject(err);
+        }
+        inputStream.pipe(stream);
+        stream.on('close', (code: any, signal: any) => {
+          conn.end();
+          if (code !== 0) reject(new Error(`Exit code: ${code}`));
+          else resolve();
+        }).on('data', () => {}).stderr.on('data', (data: any) => {
+            console.error('STDERR: ' + data);
+        });
+      });
+    }).on('error', (err) => {
+        reject(err);
+    }).connect(config);
+  });
+};
+
 export const stopPM2Process = async (project: any) => {
     if (!project.serverIp || !project.sshUsername || !project.pm2ProcessName) return;
     

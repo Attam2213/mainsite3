@@ -11,6 +11,7 @@ class Invoice extends Model {
   declare userId: string;
   declare serviceId: string | null;
   declare projectId: string | null;
+  declare gameServerId: string | null;
   declare periodMonths: number;
 }
 
@@ -50,6 +51,10 @@ Invoice.init(
       allowNull: true,
     },
     projectId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    gameServerId: {
       type: DataTypes.UUID,
       allowNull: true,
     },

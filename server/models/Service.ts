@@ -9,6 +9,7 @@ class Service extends Model {
   declare features: string[];
   declare icon: string;
   declare color: string;
+  declare hidden: boolean;
 }
 
 Service.init(
@@ -41,6 +42,11 @@ Service.init(
     color: {
       type: DataTypes.STRING,
       defaultValue: 'bg-indigo-500',
+    },
+    hidden: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {

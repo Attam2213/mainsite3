@@ -2,17 +2,18 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
 
 class ServerNode extends Model {
-  public id!: string;
-  public name!: string;
-  public ip!: string;
-  public sshPort!: number;
-  public sshUser!: string;
-  public sshPassword!: string; // Encrypted
-  public totalRam!: number;
-  public usedRam!: number;
-  public status!: string;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare id: string;
+  declare name: string;
+  declare ip: string;
+  declare sshPort: number;
+  declare sshUser: string;
+  declare sshPassword: string | null; // Encrypted
+  declare totalRam: number;
+  declare usedRam: number;
+  declare status: string;
+  declare supportedGames: string[];
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 }
 
 ServerNode.init(
@@ -30,6 +31,11 @@ ServerNode.init(
     totalRam: { type: DataTypes.INTEGER, defaultValue: 0 },
     usedRam: { type: DataTypes.INTEGER, defaultValue: 0 },
     status: { type: DataTypes.STRING, defaultValue: 'active' },
+    supportedGames: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: ['minecraft', 'cs2', 'cs16'],
+    },
   },
   {
     sequelize,

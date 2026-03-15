@@ -19,7 +19,8 @@ import {
   Terminal,
   Globe,
   RefreshCw,
-  MessageCircle
+  MessageCircle,
+  Settings
 } from 'lucide-react';
 
 interface ServerNode {
@@ -49,6 +50,7 @@ interface Service {
   features: string[];
   icon: string;
   color: string;
+  hidden?: boolean;
 }
 
 interface PortfolioItem {
@@ -76,7 +78,10 @@ interface HostingNode {
   name: string;
   ip: string;
   sshPort: number;
+  sshUser?: string;
+  sshPassword?: string;
   totalRam: number;
+  supportedGames?: string[];
   status: string;
 }
 
@@ -85,6 +90,7 @@ interface GameServerItem {
   name: string;
   game: string;
   port: number;
+  ram?: number;
   status: string;
   userId: string;
   nodeId: string;
@@ -209,6 +215,7 @@ const AdminDashboard = () => {
   });
 
   const [isNodeModalOpen, setIsNodeModalOpen] = useState(false);
+  const [isNodeGamesModalOpen, setIsNodeGamesModalOpen] = useState(false);
   const [isGameServerModalOpen, setIsGameServerModalOpen] = useState(false);
   const [currentNode, setCurrentNode] = useState<Partial<HostingNode>>({});
   const [currentGameServer, setCurrentGameServer] = useState<Partial<GameServerItem>>({});
@@ -321,7 +328,7 @@ const AdminDashboard = () => {
       };
 
       const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes, nodesRes, gameServersRes] = await Promise.all([
-        fetch('/api/services'),
+        fetch('/api/services/admin', { headers }),
         fetch('/api/portfolio'),
         fetch('/api/users', { headers }),
         fetch('/api/invoices/all', { headers }),
@@ -726,6 +733,28 @@ const AdminDashboard = () => {
         }
     } catch (error) {
         console.error(error);
+    }
+  };
+
+  const handleSaveNodeGames = async () => {
+    if (!currentNode.id) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/nodes/${currentNode.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ supportedGames: currentNode.supportedGames || [] })
+      });
+      if (res.ok) {
+        setIsNodeGamesModalOpen(false);
+        fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка сохранения');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Ошибка сохранения');
     }
   };
 
@@ -1766,6 +1795,18 @@ const AdminDashboard = () => {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="service-hidden"
+                      type="checkbox"
+                      checked={Boolean(currentService.hidden)}
+                      onChange={e => setCurrentService({ ...currentService, hidden: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="service-hidden" className="text-sm font-medium text-gray-700">
+                      Скрыть услугу
+                    </label>
+                  </div>
                   <div className="flex justify-end space-x-3 pt-4 col-span-2">
                     <button
                       type="button"
@@ -2043,15 +2084,30 @@ const AdminDashboard = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={async () => {
-                              if(confirm('Удалить?')) {
-                                  const token = localStorage.getItem('token');
-                                  await fetch(`/api/nodes/${node.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                                  fetchData();
-                              }
-                          }} className="text-red-600 hover:text-red-900">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex justify-end items-center gap-3">
+                            <button
+                              onClick={() => {
+                                setCurrentNode({
+                                  ...node,
+                                  supportedGames: Array.isArray(node.supportedGames) ? node.supportedGames : ['minecraft', 'cs2', 'cs16']
+                                });
+                                setIsNodeGamesModalOpen(true);
+                              }}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Доступные игры"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </button>
+                            <button onClick={async () => {
+                                if(confirm('Удалить?')) {
+                                    const token = localStorage.getItem('token');
+                                    await fetch(`/api/nodes/${node.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                    fetchData();
+                                }
+                            }} className="text-red-600 hover:text-red-900">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2077,6 +2133,44 @@ const AdminDashboard = () => {
                         <button onClick={() => setIsNodeModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
                         <button onClick={handleSaveNode} className="px-4 py-2 bg-indigo-600 text-white rounded">Сохранить</button>
                     </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isNodeGamesModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">Доступные игры</h2>
+                  <button onClick={() => setIsNodeGamesModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { id: 'minecraft', label: 'Minecraft (Java)' },
+                    { id: 'cs2', label: 'CS 2' },
+                    { id: 'cs16', label: 'CS 1.6' }
+                  ].map(g => (
+                    <label key={g.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Array.isArray(currentNode.supportedGames) ? currentNode.supportedGames.includes(g.id) : false}
+                        onChange={(e) => {
+                          const current = Array.isArray(currentNode.supportedGames) ? currentNode.supportedGames : [];
+                          const next = e.target.checked ? Array.from(new Set([...current, g.id])) : current.filter(x => x !== g.id);
+                          setCurrentNode({ ...currentNode, supportedGames: next });
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700">{g.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2 pt-6">
+                  <button onClick={() => setIsNodeGamesModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
+                  <button onClick={handleSaveNodeGames} className="px-4 py-2 bg-indigo-600 text-white rounded">Сохранить</button>
                 </div>
               </div>
             </div>

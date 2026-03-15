@@ -3,9 +3,18 @@ import Service from '../models/Service';
 
 export const getAllServices = async (req: Request, res: Response): Promise<void> => {
   try {
+    const services = await Service.findAll({ where: { hidden: false } });
+    res.json(services);
+  } catch {
+    res.status(500).json({ message: 'Ошибка при получении услуг' });
+  }
+};
+
+export const getAllServicesAdmin = async (_req: Request, res: Response): Promise<void> => {
+  try {
     const services = await Service.findAll();
     res.json(services);
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Ошибка при получении услуг' });
   }
 };
@@ -18,7 +27,7 @@ export const getServiceById = async (req: Request, res: Response): Promise<void>
       return;
     }
     res.json(service);
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Ошибка при получении услуги' });
   }
 };
@@ -42,7 +51,7 @@ export const updateService = async (req: Request, res: Response): Promise<void> 
     }
     await service.update(req.body);
     res.json(service);
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Ошибка при обновлении услуги' });
   }
 };
@@ -56,7 +65,7 @@ export const deleteService = async (req: Request, res: Response): Promise<void> 
     }
     await service.destroy();
     res.json({ message: 'Услуга удалена' });
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Ошибка при удалении услуги' });
   }
 };

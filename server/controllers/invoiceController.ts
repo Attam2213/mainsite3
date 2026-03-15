@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
-import { Invoice, User, Service, Project } from '../models';
+import { Invoice, User, Service, Project, GameServer } from '../models';
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
     const invoices = await Invoice.findAll({
       include: [
         { model: User, as: 'user', attributes: ['id', 'name', 'email'] },
-        { model: Service, as: 'service', attributes: ['id', 'title'] }
+        { model: Service, as: 'service', attributes: ['id', 'title'] },
+        { model: Project, as: 'project', attributes: ['id', 'title'] },
+        { model: GameServer, as: 'gameServer', attributes: ['id', 'name', 'game', 'port'] }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -24,7 +26,9 @@ export const getUserInvoices = async (req: Request, res: Response): Promise<void
     const invoices = await Invoice.findAll({
       where: { userId },
       include: [
-        { model: Service, as: 'service', attributes: ['id', 'title'] }
+        { model: Service, as: 'service', attributes: ['id', 'title'] },
+        { model: Project, as: 'project', attributes: ['id', 'title'] },
+        { model: GameServer, as: 'gameServer', attributes: ['id', 'name', 'game', 'port'] }
       ],
       order: [['createdAt', 'DESC']]
     });
