@@ -20,10 +20,19 @@ const GAME_IMAGES: Record<string, string> = {
     'cs16': 'archont94/counter-strike1.6:latest'
 };
 
-const calculateMonthlyPrice = (ramMb: number, slots: number) => {
+const calculateMonthlyPrice = (ramMb: number, slots: number, slotPrice: number) => {
     const ramPart = (ramMb / 1024) * 100;
-    const slotsPart = slots * 10;
+    const slotsPart = slots * slotPrice;
     return Math.ceil(ramPart + slotsPart);
+};
+
+const getSlotPriceForNodeGame = (node: any, game: string) => {
+    const slotPrices = node?.slotPrices;
+    if (slotPrices && typeof slotPrices === 'object' && !Array.isArray(slotPrices) && Number.isFinite(Number(slotPrices[game]))) {
+        return Number(slotPrices[game]);
+    }
+    const fallback = Number(node?.slotPrice);
+    return Number.isFinite(fallback) ? fallback : 10;
 };
 
 const addMonths = (date: Date, months: number) => {
@@ -440,7 +449,7 @@ export const createGameServer = async (req: Request, res: Response) => {
 
         const now = new Date();
         const paidUntil = addMonths(now, 1);
-        const monthlyPrice = calculateMonthlyPrice(ram || 1024, slots || 10);
+        const monthlyPrice = calculateMonthlyPrice(ram || 1024, slots || 10, getSlotPriceForNodeGame(node as any, game));
 
         const server = await GameServer.create({
             userId,
@@ -560,7 +569,7 @@ export const orderGameServer = async (req: Request, res: Response) => {
         }
 
         const now = new Date();
-        const monthlyPrice = calculateMonthlyPrice(ram || 1024, slots || 10);
+        const monthlyPrice = calculateMonthlyPrice(ram || 1024, slots || 10, getSlotPriceForNodeGame(node as any, game));
 
         const server = await GameServer.create({
             userId,
@@ -1306,7 +1315,16 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
             return;
         }
 
-        const monthlyPrice = Number(server.monthlyPrice) || calculateMonthlyPrice(server.ram || 1024, server.slots || 10);
+        let fallbackMonthly = calculateMonthlyPrice(server.ram || 1024, server.slots || 10, 10);
+        try {
+            const node = await ServerNode.findByPk((server as any).nodeId);
+            if (node) {
+                fallbackMonthly = calculateMonthlyPrice((server as any).ram || 1024, (server as any).slots || 10, getSlotPriceForNodeGame(node as any, (server as any).game));
+            }
+        } catch (e) {
+            void e;
+        }
+        const monthlyPrice = Number(server.monthlyPrice) || fallbackMonthly;
         const amount = Math.max(0, Math.round(monthlyPrice * periodMonths));
 
         const invoice = await Invoice.create({

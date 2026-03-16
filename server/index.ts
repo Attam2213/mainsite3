@@ -98,8 +98,12 @@ const startServer = async () => {
     try {
       if (sequelize.getDialect() === 'postgres') {
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"supportedGames\" JSONB NOT NULL DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]'::jsonb;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"slotPrice\" INTEGER NOT NULL DEFAULT 10;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"slotPrices\" JSONB NOT NULL DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}'::jsonb;");
       } else {
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN supportedGames TEXT DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]';");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN slotPrice INTEGER DEFAULT 10;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN slotPrices TEXT DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}';");
       }
     } catch (e) {
       void e;

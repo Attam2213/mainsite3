@@ -476,6 +476,31 @@ const CMSEditor = () => {
     updateSection(sectionId, { buttons: newButtons });
   };
 
+  const inferButtonLinkType = (btn: SiteButton) => {
+    if (btn.linkType) return btn.linkType;
+    if (btn.url?.startsWith('#')) return 'block';
+    if (btn.url?.startsWith('tel:')) return 'phone';
+    if (btn.url?.startsWith('mailto:')) return 'email';
+    return 'url';
+  };
+
+  const inferButtonTarget = (btn: SiteButton, linkType: 'url' | 'block' | 'phone' | 'email') => {
+    if (btn.target) return btn.target;
+    if (linkType === 'block' && btn.url?.startsWith('#')) return btn.url.slice(1);
+    if (linkType === 'phone' && btn.url?.startsWith('tel:')) return btn.url.slice(4);
+    if (linkType === 'email' && btn.url?.startsWith('mailto:')) return btn.url.slice(7);
+    if (linkType === 'url') return btn.url || '';
+    return '';
+  };
+
+  const buildButtonUrl = (linkType: 'url' | 'block' | 'phone' | 'email', target: string) => {
+    const t = (target || '').trim();
+    if (linkType === 'block') return t ? `#${t}` : '#';
+    if (linkType === 'phone') return t ? `tel:${t}` : 'tel:';
+    if (linkType === 'email') return t ? `mailto:${t}` : 'mailto:';
+    return t || '#';
+  };
+
   const removeButton = (sectionId: string, buttonId: string) => {
     const section = settings.sections.find(s => s.id === sectionId);
     if (!section || !section.buttons) return;
@@ -772,13 +797,71 @@ const CMSEditor = () => {
                                 placeholder="Текст кнопки"
                                 className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
                               />
-                              <input
-                                type="text"
-                                value={btn.url}
-                                onChange={(e) => updateButton(selectedSection.id, btn.id, { url: e.target.value })}
-                                placeholder="Ссылка (URL)"
+                              <select
+                                value={inferButtonLinkType(btn)}
+                                onChange={(e) => {
+                                  const nextType = e.target.value as 'url' | 'block' | 'phone' | 'email';
+                                  const currentTarget = inferButtonTarget(btn, inferButtonLinkType(btn));
+                                  const url = buildButtonUrl(nextType, currentTarget);
+                                  updateButton(selectedSection.id, btn.id, { linkType: nextType, target: currentTarget, url });
+                                }}
                                 className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
-                              />
+                              >
+                                <option value="block">Переход к блоку</option>
+                                <option value="url">Ссылка (URL)</option>
+                                <option value="phone">Позвонить</option>
+                                <option value="email">Email</option>
+                              </select>
+                              {inferButtonLinkType(btn) === 'block' ? (
+                                <select
+                                  value={inferButtonTarget(btn, 'block')}
+                                  onChange={(e) => {
+                                    const target = e.target.value;
+                                    updateButton(selectedSection.id, btn.id, { linkType: 'block', target, url: buildButtonUrl('block', target) });
+                                  }}
+                                  className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
+                                >
+                                  <option value="">Выберите блок</option>
+                                  {settings.sections.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {`${s.type}${s.title ? `: ${s.title}` : ''} (${s.id})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : inferButtonLinkType(btn) === 'phone' ? (
+                                <input
+                                  type="tel"
+                                  value={inferButtonTarget(btn, 'phone')}
+                                  onChange={(e) => {
+                                    const target = e.target.value;
+                                    updateButton(selectedSection.id, btn.id, { linkType: 'phone', target, url: buildButtonUrl('phone', target) });
+                                  }}
+                                  placeholder="+79990000000"
+                                  className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
+                                />
+                              ) : inferButtonLinkType(btn) === 'email' ? (
+                                <input
+                                  type="email"
+                                  value={inferButtonTarget(btn, 'email')}
+                                  onChange={(e) => {
+                                    const target = e.target.value;
+                                    updateButton(selectedSection.id, btn.id, { linkType: 'email', target, url: buildButtonUrl('email', target) });
+                                  }}
+                                  placeholder="info@example.com"
+                                  className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={inferButtonTarget(btn, 'url')}
+                                  onChange={(e) => {
+                                    const target = e.target.value;
+                                    updateButton(selectedSection.id, btn.id, { linkType: 'url', target, url: buildButtonUrl('url', target) });
+                                  }}
+                                  placeholder="https://example.com или /page"
+                                  className="block w-full border-gray-300 rounded-md shadow-sm sm:text-xs p-1 border"
+                                />
+                              )}
                               <select
                                 value={btn.style}
                                 onChange={(e) => updateButton(selectedSection.id, btn.id, { style: e.target.value as any })}

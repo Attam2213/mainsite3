@@ -14,6 +14,8 @@ export interface SiteButton {
   text: string;
   url: string;
   style: 'primary' | 'secondary' | 'outline';
+  linkType?: 'url' | 'block' | 'phone' | 'email';
+  target?: string;
 }
 
 export interface Section {
@@ -65,6 +67,11 @@ const RenderButtons = ({ buttons, settings }: { buttons?: SiteButton[], settings
   return (
     <div className="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start gap-3">
       {buttons.map((btn) => {
+        const href =
+          btn.linkType === 'block' && btn.target ? `#${btn.target}` :
+          btn.linkType === 'phone' && btn.target ? `tel:${btn.target}` :
+          btn.linkType === 'email' && btn.target ? `mailto:${btn.target}` :
+          btn.url;
         const baseClass = "w-full flex items-center justify-center px-8 py-3 border text-base font-medium rounded-md md:py-4 md:text-lg md:px-10 transition-colors";
         let style: React.CSSProperties = { borderRadius: settings.borderRadius || '0.375rem' }; // Default md (6px)
         let className = baseClass;
@@ -84,7 +91,7 @@ const RenderButtons = ({ buttons, settings }: { buttons?: SiteButton[], settings
         
         return (
           <div key={btn.id} className="mt-3 sm:mt-0">
-            <a href={btn.url} className={className} style={style}>
+            <a href={href} className={className} style={style}>
               {btn.text}
             </a>
           </div>
@@ -1234,6 +1241,7 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
     return (
       <div 
         key={section.id}
+        id={section.id}
         onClick={() => onSelectSection && onSelectSection(section.id)}
         className={`relative transition-all duration-200 border-2 ${isSelected ? 'border-indigo-600 shadow-lg z-10' : 'border-transparent hover:border-indigo-300 hover:border-dashed'}`}
       >

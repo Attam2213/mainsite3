@@ -12,6 +12,8 @@ class ServerNode extends Model {
   declare usedRam: number;
   declare status: string;
   declare supportedGames: string[];
+  declare slotPrice: number;
+  declare slotPrices: Record<string, number>;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -35,6 +37,16 @@ ServerNode.init(
       type: DataTypes.JSON,
       allowNull: false,
       defaultValue: ['minecraft', 'cs2', 'cs16'],
+    },
+    slotPrice: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 10,
+    },
+    slotPrices: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: { minecraft: 10, cs2: 10, cs16: 10 },
     },
   },
   {

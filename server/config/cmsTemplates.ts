@@ -122,6 +122,8 @@ export const cmsTemplates = {
         showTitle: true,
         subtitle: 'Мы предоставляем первоклассные услуги консалтинга и разработки.',
         showSubtitle: true,
+        image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80',
+        showImage: true,
         buttons: [
           { id: 'btn-1', text: 'Наши услуги', url: '#services', style: 'primary' }
         ]
@@ -195,6 +197,8 @@ export const cmsTemplates = {
         showTitle: true,
         subtitle: 'Фотография, Дизайн, Искусство',
         showSubtitle: true,
+        image: 'https://images.unsplash.com/photo-1493863641943-9b68992a8d07?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80',
+        showImage: true,
         buttons: [
           { id: 'btn-1', text: 'Смотреть работы', url: '#gallery', style: 'outline' }
         ]

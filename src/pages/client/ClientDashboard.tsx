@@ -107,6 +107,8 @@ interface HostingNode {
   name: string;
   ip: string;
   supportedGames?: string[];
+  slotPrice?: number;
+  slotPrices?: Record<string, number>;
 }
 
 interface GameServer {
@@ -207,6 +209,11 @@ const ClientDashboard = () => {
     ? selectedOrderNode.supportedGames
     : gameOptions.map(g => g.id);
   const availableOrderGames = gameOptions.filter(g => supportedGamesForOrderNode.includes(g.id));
+  const slotPricesForOrderNode = selectedOrderNode?.slotPrices && typeof selectedOrderNode.slotPrices === 'object' ? selectedOrderNode.slotPrices : null;
+  const slotPriceForOrderNodeGame = Number.isFinite(Number(slotPricesForOrderNode?.[orderConfig.game]))
+    ? Number(slotPricesForOrderNode?.[orderConfig.game])
+    : (Number.isFinite(Number(selectedOrderNode?.slotPrice)) ? Number(selectedOrderNode?.slotPrice) : 10);
+  const monthlyOrderPrice = Math.ceil((orderConfig.ram / 1024 * 100) + (orderConfig.slots * slotPriceForOrderNodeGame));
 
   // Payment action
   const handlePayInvoice = async (invoiceId: string) => {
@@ -2028,7 +2035,7 @@ const ClientDashboard = () => {
                         
                         <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-center mt-4">
                              <span className="text-gray-700 font-medium">Ежемесячный платеж:</span>
-                             <span className="text-xl font-bold text-indigo-600">{Math.ceil((orderConfig.ram / 1024 * 100) + (orderConfig.slots * 10))} ₽</span>
+                             <span className="text-xl font-bold text-indigo-600">{monthlyOrderPrice} ₽</span>
                          </div>
                      </div>
 

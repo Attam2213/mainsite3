@@ -82,6 +82,8 @@ interface HostingNode {
   sshPassword?: string;
   totalRam: number;
   supportedGames?: string[];
+  slotPrice?: number;
+  slotPrices?: Record<string, number>;
   status: string;
 }
 
@@ -743,7 +745,11 @@ const AdminDashboard = () => {
       const res = await fetch(`/api/nodes/${currentNode.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ supportedGames: currentNode.supportedGames || [] })
+        body: JSON.stringify({
+          supportedGames: currentNode.supportedGames || [],
+          slotPrices: currentNode.slotPrices || {},
+          slotPrice: Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10
+        })
       });
       if (res.ok) {
         setIsNodeGamesModalOpen(false);
@@ -2067,6 +2073,7 @@ const AdminDashboard = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSH Port</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RAM</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Цена/слот</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
                     </tr>
@@ -2078,6 +2085,9 @@ const AdminDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.ip}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.sshPort}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.totalRam} MB</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {`MC:${Number.isFinite(Number(node.slotPrices?.minecraft)) ? Number(node.slotPrices?.minecraft) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS2:${Number.isFinite(Number(node.slotPrices?.cs2)) ? Number(node.slotPrices?.cs2) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS16:${Number.isFinite(Number(node.slotPrices?.cs16)) ? Number(node.slotPrices?.cs16) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽`}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                             {node.status}
@@ -2089,7 +2099,9 @@ const AdminDashboard = () => {
                               onClick={() => {
                                 setCurrentNode({
                                   ...node,
-                                  supportedGames: Array.isArray(node.supportedGames) ? node.supportedGames : ['minecraft', 'cs2', 'cs16']
+                                  supportedGames: Array.isArray(node.supportedGames) ? node.supportedGames : ['minecraft', 'cs2', 'cs16'],
+                                  slotPrice: Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10,
+                                  slotPrices: (node.slotPrices && typeof node.slotPrices === 'object') ? node.slotPrices : undefined
                                 });
                                 setIsNodeGamesModalOpen(true);
                               }}
@@ -2167,6 +2179,38 @@ const AdminDashboard = () => {
                       <span className="text-sm text-gray-700">{g.label}</span>
                     </label>
                   ))}
+                </div>
+                <div className="pt-5 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: Minecraft (₽)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full p-2 border rounded"
+                      value={Number.isFinite(Number(currentNode.slotPrices?.minecraft)) ? Number(currentNode.slotPrices?.minecraft) : (Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10)}
+                      onChange={e => setCurrentNode({ ...currentNode, slotPrices: { ...(currentNode.slotPrices || {}), minecraft: Number(e.target.value) } })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: CS 2 (₽)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full p-2 border rounded"
+                      value={Number.isFinite(Number(currentNode.slotPrices?.cs2)) ? Number(currentNode.slotPrices?.cs2) : (Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10)}
+                      onChange={e => setCurrentNode({ ...currentNode, slotPrices: { ...(currentNode.slotPrices || {}), cs2: Number(e.target.value) } })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: CS 1.6 (₽)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full p-2 border rounded"
+                      value={Number.isFinite(Number(currentNode.slotPrices?.cs16)) ? Number(currentNode.slotPrices?.cs16) : (Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10)}
+                      onChange={e => setCurrentNode({ ...currentNode, slotPrices: { ...(currentNode.slotPrices || {}), cs16: Number(e.target.value) } })}
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-6">
                   <button onClick={() => setIsNodeGamesModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
