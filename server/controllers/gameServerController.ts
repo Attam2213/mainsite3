@@ -20,10 +20,8 @@ const GAME_IMAGES: Record<string, string> = {
     'cs16': 'archont94/counter-strike1.6:latest'
 };
 
-const calculateMonthlyPrice = (ramMb: number, slots: number, slotPrice: number) => {
-    const ramPart = (ramMb / 1024) * 100;
-    const slotsPart = slots * slotPrice;
-    return Math.ceil(ramPart + slotsPart);
+const calculateMonthlyPrice = (_ramMb: number, slots: number, slotPrice: number) => {
+    return Math.ceil(slots * slotPrice);
 };
 
 const getSlotPriceForNodeGame = (node: any, game: string) => {

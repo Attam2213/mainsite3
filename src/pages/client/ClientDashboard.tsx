@@ -213,7 +213,7 @@ const ClientDashboard = () => {
   const slotPriceForOrderNodeGame = Number.isFinite(Number(slotPricesForOrderNode?.[orderConfig.game]))
     ? Number(slotPricesForOrderNode?.[orderConfig.game])
     : (Number.isFinite(Number(selectedOrderNode?.slotPrice)) ? Number(selectedOrderNode?.slotPrice) : 10);
-  const monthlyOrderPrice = Math.ceil((orderConfig.ram / 1024 * 100) + (orderConfig.slots * slotPriceForOrderNodeGame));
+  const monthlyOrderPrice = Math.ceil(orderConfig.slots * slotPriceForOrderNodeGame);
 
   // Payment action
   const handlePayInvoice = async (invoiceId: string) => {
