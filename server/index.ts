@@ -89,31 +89,57 @@ const startServer = async () => {
     // Sync models (alter: true updates tables if they exist, force: false prevents data loss)
     // In production, use migrations instead of sync({ alter: true })
     
-    // Disable alter: true to avoid SQLite unique constraint errors during dev
+    const ensureSqliteColumn = async (tableName: string, columnName: string, columnDefSql: string) => {
+      const [rows] = await sequelize.query(`PRAGMA table_info(${tableName});`);
+      const columns = Array.isArray(rows) ? rows.map((r: any) => r?.name).filter(Boolean) : [];
+      if (!columns.includes(columnName)) {
+        await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefSql};`);
+      }
+    };
+
+    const dialect = sequelize.getDialect();
+
     try {
-      await sequelize.query("ALTER TABLE services ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT false;");
+      if (dialect === 'sqlite') {
+        await ensureSqliteColumn('services', 'hidden', 'BOOLEAN NOT NULL DEFAULT 0');
+      } else if (dialect === 'postgres') {
+        await sequelize.query("ALTER TABLE services ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false;");
+      } else {
+        await sequelize.query("ALTER TABLE services ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT false;");
+      }
     } catch (e) {
-      console.error('[DB] ALTER TABLE services hidden failed:', e);
+      console.error('[DB] ensure services.hidden failed:', e);
     }
+
     try {
-      if (sequelize.getDialect() === 'postgres') {
+      if (dialect === 'postgres') {
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"supportedGames\" JSONB NOT NULL DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]'::jsonb;");
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"slotPrice\" INTEGER NOT NULL DEFAULT 10;");
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS \"slotPrices\" JSONB NOT NULL DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}'::jsonb;");
+      } else if (dialect === 'sqlite') {
+        await ensureSqliteColumn('server_nodes', 'supportedGames', "TEXT DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]'");
+        await ensureSqliteColumn('server_nodes', 'slotPrice', 'INTEGER DEFAULT 10');
+        await ensureSqliteColumn('server_nodes', 'slotPrices', "TEXT DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}'");
       } else {
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN supportedGames TEXT DEFAULT '[\"minecraft\",\"cs2\",\"cs16\"]';");
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN slotPrice INTEGER DEFAULT 10;");
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN slotPrices TEXT DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}';");
       }
     } catch (e) {
-      console.error('[DB] ALTER TABLE server_nodes failed:', e);
+      console.error('[DB] ensure server_nodes columns failed:', e);
     }
+
     try {
-      if (sequelize.getDialect() === 'postgres') {
+      if (dialect === 'postgres') {
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS \"paidUntil\" TIMESTAMP WITH TIME ZONE;");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS \"monthlyPrice\" INTEGER DEFAULT 0;");
         await sequelize.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS \"gameServerId\" UUID;");
         await sequelize.query("UPDATE game_servers SET \"paidUntil\" = NOW() + INTERVAL '30 days' WHERE \"paidUntil\" IS NULL;");
+      } else if (dialect === 'sqlite') {
+        await ensureSqliteColumn('game_servers', 'paidUntil', 'DATETIME');
+        await ensureSqliteColumn('game_servers', 'monthlyPrice', 'INTEGER DEFAULT 0');
+        await ensureSqliteColumn('invoices', 'gameServerId', 'UUID');
+        await sequelize.query("UPDATE game_servers SET paidUntil = datetime('now', '+30 days') WHERE paidUntil IS NULL;");
       } else {
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN paidUntil DATETIME;");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN monthlyPrice INTEGER DEFAULT 0;");
@@ -121,7 +147,7 @@ const startServer = async () => {
         await sequelize.query("UPDATE game_servers SET paidUntil = datetime('now', '+30 days') WHERE paidUntil IS NULL;");
       }
     } catch (e) {
-      console.error('[DB] ALTER TABLE game_servers/invoices failed:', e);
+      console.error('[DB] ensure game_servers/invoices columns failed:', e);
     }
     await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });
     
