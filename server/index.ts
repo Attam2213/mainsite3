@@ -93,7 +93,7 @@ const startServer = async () => {
     try {
       await sequelize.query("ALTER TABLE services ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT false;");
     } catch (e) {
-      void e;
+      console.error('[DB] ALTER TABLE services hidden failed:', e);
     }
     try {
       if (sequelize.getDialect() === 'postgres') {
@@ -106,7 +106,7 @@ const startServer = async () => {
         await sequelize.query("ALTER TABLE server_nodes ADD COLUMN slotPrices TEXT DEFAULT '{\"minecraft\":10,\"cs2\":10,\"cs16\":10}';");
       }
     } catch (e) {
-      void e;
+      console.error('[DB] ALTER TABLE server_nodes failed:', e);
     }
     try {
       if (sequelize.getDialect() === 'postgres') {
@@ -121,9 +121,9 @@ const startServer = async () => {
         await sequelize.query("UPDATE game_servers SET paidUntil = datetime('now', '+30 days') WHERE paidUntil IS NULL;");
       }
     } catch (e) {
-      void e;
+      console.error('[DB] ALTER TABLE game_servers/invoices failed:', e);
     }
-    await sequelize.sync({ alter: false });
+    await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });
     
     console.log('Database synced.');
 

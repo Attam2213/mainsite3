@@ -81,7 +81,7 @@ export const createNode = async (req: Request, res: Response) => {
         res.status(201).json(node);
     } catch (error) {
         console.error('Create node error:', error);
-        res.status(500).json({ message: 'Error creating node' });
+        res.status(500).json({ message: 'Error creating node', detail: error instanceof Error ? error.message : String(error) });
     }
 };
 
@@ -148,7 +148,7 @@ export const updateNode = async (req: Request, res: Response) => {
         res.json(node);
     } catch (error) {
         console.error('Update node error:', error);
-        res.status(500).json({ message: 'Error updating node' });
+        res.status(500).json({ message: 'Error updating node', detail: error instanceof Error ? error.message : String(error) });
     }
 };
 
