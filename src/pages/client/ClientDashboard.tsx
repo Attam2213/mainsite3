@@ -13,7 +13,6 @@ import {
   Send,
   X,
   Loader,
-  Globe,
   Plus,
   Settings,
   Users,
@@ -39,18 +38,6 @@ interface Lead {
   site?: {
     domain: string;
   };
-}
-
-interface Site {
-  id: string;
-  domain: string;
-  status: 'pending' | 'active' | 'suspended';
-  server?: {
-    name: string;
-    ipAddress: string;
-  };
-  cmsVersion: string;
-  createdAt: string;
 }
 
 interface Invoice {
@@ -148,9 +135,8 @@ const ClientDashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sites, setSites] = useState<Site[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'sites' | 'billing' | 'leads' | 'requests' | 'game_servers'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
   
@@ -190,19 +176,10 @@ const ClientDashboard = () => {
     { id: 'cs2', label: 'CS 2' },
     { id: 'cs16', label: 'CS 1.6' }
   ] as const;
-  const [isCreateSiteModalOpen, setIsCreateSiteModalOpen] = useState(false);
-  const [createSiteStep, setCreateSiteStep] = useState(1);
-  const [selectedTemplate, setSelectedTemplate] = useState('empty');
-  const [newSiteDomain, setNewSiteDomain] = useState('');
-  const [registerDomain, setRegisterDomain] = useState(false);
-  const [skipDomain, setSkipDomain] = useState(false);
-  const [useSubdomain, setUseSubdomain] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
-
-  const [templates, setTemplates] = useState<any[]>([]);
 
   const selectedOrderNode = nodes.find(n => n.id === orderConfig.nodeId);
   const supportedGamesForOrderNode = Array.isArray(selectedOrderNode?.supportedGames)
@@ -457,21 +434,17 @@ const ClientDashboard = () => {
           fetch('/api/invoices/my', { headers }),
           fetch('/api/projects/my', { headers }),
           fetch('/api/orders', { headers }),
-          fetch('/api/sites', { headers }),
           fetch('/api/nodes/public', { headers }),
           fetch('/api/game-servers', { headers }),
-          fetch('/api/leads', { headers }),
-          fetch('/api/sites/templates', { headers })
+          fetch('/api/leads', { headers })
         ]);
 
         const invoicesRes = results[0].status === 'fulfilled' ? results[0].value : null;
         const projectRes = results[1].status === 'fulfilled' ? results[1].value : null;
         const ordersRes = results[2].status === 'fulfilled' ? results[2].value : null;
-        const sitesRes = results[3].status === 'fulfilled' ? results[3].value : null;
-        const nodesRes = results[4].status === 'fulfilled' ? results[4].value : null;
-        const gsRes = results[5].status === 'fulfilled' ? results[5].value : null;
-        const leadsRes = results[6].status === 'fulfilled' ? results[6].value : null;
-        const templatesRes = results[7].status === 'fulfilled' ? results[7].value : null;
+        const nodesRes = results[3].status === 'fulfilled' ? results[3].value : null;
+        const gsRes = results[4].status === 'fulfilled' ? results[4].value : null;
+        const leadsRes = results[5].status === 'fulfilled' ? results[5].value : null;
 
         if (invoicesRes?.ok) {
           const data = await invoicesRes.json();
@@ -488,11 +461,6 @@ const ClientDashboard = () => {
           if (Array.isArray(data)) setOrders(data);
         }
 
-        if (sitesRes?.ok) {
-          const data = await sitesRes.json();
-          if (Array.isArray(data)) setSites(data);
-        }
-
         if (nodesRes?.ok) {
           const data = await nodesRes.json();
           if (Array.isArray(data)) setNodes(data);
@@ -506,11 +474,6 @@ const ClientDashboard = () => {
         if (leadsRes?.ok) {
           const data = await leadsRes.json();
           if (Array.isArray(data)) setLeads(data);
-        }
-
-        if (templatesRes?.ok) {
-          const data = await templatesRes.json();
-          setTemplates(data);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -667,60 +630,6 @@ const ClientDashboard = () => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-    }
-  };
-
-  const handleCreateSite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!skipDomain && !newSiteDomain.trim()) return;
-
-    let finalDomain = newSiteDomain;
-    if (useSubdomain) {
-      finalDomain = `${newSiteDomain.toLowerCase()}.wexa.su`;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/sites', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          domain: skipDomain ? undefined : finalDomain,
-          registerDomain: registerDomain,
-          skipDomain: skipDomain,
-          template: selectedTemplate
-        })
-      });
-
-      if (res.ok) {
-        const siteData = await res.json();
-        setNewSiteDomain('');
-        setRegisterDomain(false);
-        setSkipDomain(false);
-        setUseSubdomain(false);
-        setIsCreateSiteModalOpen(false);
-        setCreateSiteStep(1); // Reset step
-        fetchData();
-        
-        if (useSubdomain) {
-          alert(`Сайт успешно создан! Доступен по адресу: ${siteData.domain}`);
-        } else if (!skipDomain && !registerDomain && siteData.server?.ipAddress) {
-          alert(`Сайт успешно создан!\n\nВАЖНО: Пожалуйста, направьте A-запись вашего домена ${siteData.domain} на IP-адрес сервера: ${siteData.server.ipAddress}\n\nКак только DNS обновятся, сайт станет доступен.`);
-        } else if (skipDomain) {
-          alert(`Сайт успешно создан! Ему присвоен временный адрес: ${siteData.domain}\n\nВы сможете привязать свой домен позже в настройках.`);
-        } else {
-          alert('Сайт успешно создан! Идет настройка VDS...');
-        }
-      } else {
-        const error = await res.json();
-        alert(`Ошибка: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Error creating site:', error);
-      alert('Ошибка при создании сайта');
     }
   };
 
@@ -1052,9 +961,18 @@ const ClientDashboard = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden mb-6"
                   >
-                    <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                    <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center gap-4">
                       <h2 className="text-xl font-semibold text-gray-900">Активные заказы</h2>
-                      <Briefcase className="h-5 w-5 text-indigo-600" />
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/services')}
+                          className="inline-flex items-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                        >
+                          Перейти к услугам
+                        </button>
+                        <Briefcase className="h-5 w-5 text-indigo-600" />
+                      </div>
                     </div>
                     
                     <div className="divide-y divide-gray-100">
@@ -1113,61 +1031,6 @@ const ClientDashboard = () => {
                         ))
                       )}
                     </div>
-                  </motion.div>
-
-                  {/* CMS Sites Summary */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
-                  >
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-xl font-semibold text-gray-900">Мои CMS Сайты</h2>
-                      <button
-                        onClick={() => setIsCreateSiteModalOpen(true)}
-                        className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Создать сайт
-                      </button>
-                    </div>
-
-                    {sites.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                        <Globe className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                        <p>У вас пока нет созданных сайтов</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {sites.slice(0, 4).map((site) => (
-                          <div key={site.id} className="rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-medium text-gray-900 flex items-center">
-                                <Globe className="w-4 h-4 mr-2 text-indigo-500" />
-                                {site.domain}
-                              </h3>
-                              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                site.status === 'active' ? 'bg-green-100 text-green-800' :
-                                site.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {site.status === 'active' ? 'Активен' : 
-                                 site.status === 'pending' ? 'Настройка' : 'Остановлен'}
-                              </span>
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-                               <button 
-                                 onClick={() => navigate(`/cms/${site.id}`)}
-                                 className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center"
-                               >
-                                 <Settings className="w-3 h-3 mr-1" />
-                                 Управление
-                               </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </motion.div>
 
                   {/* Game Servers Summary */}
@@ -1318,89 +1181,6 @@ const ClientDashboard = () => {
                     </motion.div>
                   ))}
                 </>
-              )}
-
-              {/* Sites Tab */}
-              {activeTab === 'sites' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl bg-white p-6 shadow-sm border border-gray-100"
-                >
-                  <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">Все сайты</h2>
-                    <button
-                      onClick={() => setIsCreateSiteModalOpen(true)}
-                      className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Создать сайт
-                    </button>
-                  </div>
-
-                  {sites.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">
-                      <Globe className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                      <p className="text-lg font-medium">У вас нет сайтов</p>
-                      <p className="text-sm">Создайте свой первый сайт прямо сейчас!</p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-6 sm:grid-cols-2">
-                      {sites.map((site) => (
-                        <div key={site.id} className="rounded-xl border border-gray-200 bg-white p-6 hover:shadow-lg transition-all duration-200">
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                              <Globe className="w-5 h-5 mr-2 text-indigo-500" />
-                              {site.domain}
-                            </h3>
-                            <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
-                              site.status === 'active' ? 'bg-green-100 text-green-800' :
-                              site.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {site.status === 'active' ? 'Активен' : 
-                               site.status === 'pending' ? 'Настройка' : 'Остановлен'}
-                            </span>
-                          </div>
-                          
-                          <div className="text-sm text-gray-500 space-y-2 mb-6">
-                            <div className="flex justify-between border-b border-gray-50 pb-2">
-                              <span>Сервер</span>
-                              <span className="font-mono text-gray-700">{site.server?.name || 'VDS-1'}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-gray-50 pb-2">
-                              <span>IP Адрес</span>
-                              <span className="font-mono text-gray-700">{site.server?.ipAddress || '192.168.1.1'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Версия CMS</span>
-                              <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-700">{site.cmsVersion}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-3">
-                             <button 
-                               onClick={() => navigate(`/cms/${site.id}`)}
-                               className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
-                             >
-                               <Settings className="w-4 h-4 mr-2" />
-                               Редактор
-                             </button>
-                             <a 
-                               href={`http://localhost:5174/preview/${site.id}`}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               className="flex-1 border border-gray-200 text-gray-700 hover:bg-gray-50 py-2 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
-                             >
-                               <Globe className="w-4 h-4 mr-2" />
-                               Просмотр
-                             </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
               )}
 
               {/* Projects Tab */}
@@ -1895,17 +1675,6 @@ const ClientDashboard = () => {
                   >
                     <FileText className="mr-3 h-5 w-5" />
                     Проекты
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('sites')}
-                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
-                      activeTab === 'sites' 
-                        ? 'bg-indigo-50 text-indigo-700' 
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Globe className="mr-3 h-5 w-5" />
-                    Сайты
                   </button>
                   <button
                     onClick={() => setActiveTab('game_servers')}
@@ -2767,176 +2536,6 @@ const ClientDashboard = () => {
           </div>
         )}
 
-        {/* Create Site Modal */}
-        {isCreateSiteModalOpen && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div 
-                className="fixed inset-0 transition-opacity" 
-                aria-hidden="true"
-                onClick={() => setIsCreateSiteModalOpen(false)}
-              >
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-              </div>
-
-              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
-
-              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle">
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <Globe className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">
-                        {createSiteStep === 1 ? 'Создание нового сайта - Шаг 1: Домен' : 'Создание нового сайта - Шаг 2: Шаблон'}
-                      </h3>
-                      
-                      {createSiteStep === 1 && (
-                        <div className="mt-4 space-y-4">
-                          <p className="text-sm text-gray-500">
-                            Введите доменное имя для вашего нового сайта. Вы сможете настроить DNS позже.
-                          </p>
-                          
-                          {!skipDomain && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Домен</label>
-                              <div className="mt-1 flex rounded-md shadow-sm">
-                                <input
-                                  type="text"
-                                  value={newSiteDomain}
-                                  onChange={(e) => setNewSiteDomain(e.target.value)}
-                                  className="block w-full min-w-0 flex-1 rounded-none rounded-l-md border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border"
-                                  placeholder={useSubdomain ? "mysite" : "example.com"}
-                                />
-                                {useSubdomain && (
-                                  <span className="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-gray-50 px-3 text-gray-500 sm:text-sm">
-                                    .wexa.su
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <div className="flex items-center">
-                              <input
-                                id="use-subdomain"
-                                type="checkbox"
-                                checked={useSubdomain}
-                                onChange={(e) => {
-                                  setUseSubdomain(e.target.checked);
-                                  if (e.target.checked) {
-                                    setSkipDomain(false);
-                                    setRegisterDomain(false);
-                                  }
-                                }}
-                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              />
-                              <label htmlFor="use-subdomain" className="ml-2 block text-sm text-gray-900">
-                                Использовать бесплатный поддомен (.wexa.su)
-                              </label>
-                            </div>
-
-                            <div className="flex items-center">
-                              <input
-                                id="skip-domain"
-                                type="checkbox"
-                                checked={skipDomain}
-                                onChange={(e) => {
-                                  setSkipDomain(e.target.checked);
-                                  if (e.target.checked) {
-                                    setUseSubdomain(false);
-                                    setRegisterDomain(false);
-                                    setNewSiteDomain('');
-                                  }
-                                }}
-                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              />
-                              <label htmlFor="skip-domain" className="ml-2 block text-sm text-gray-900">
-                                Настроить домен позже
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {createSiteStep === 2 && (
-                        <div className="mt-4">
-                           <p className="text-sm text-gray-500 mb-4">
-                            Выберите шаблон для вашего сайта. Вы сможете изменить содержимое позже.
-                          </p>
-                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto pr-2">
-                            {templates.map(template => (
-                              <div 
-                                key={template.id}
-                                onClick={() => setSelectedTemplate(template.id)}
-                                className={`cursor-pointer rounded-lg border p-4 hover:shadow-md transition-all ${selectedTemplate === template.id ? 'border-indigo-500 ring-2 ring-indigo-500 bg-indigo-50' : 'border-gray-200'}`}
-                              >
-                                <div className="aspect-w-16 aspect-h-9 bg-gray-100 rounded mb-3 overflow-hidden flex items-center justify-center">
-                                  {template.preview ? (
-                                    <img src={template.preview} alt={template.title} className="object-cover w-full h-32" />
-                                  ) : (
-                                    <span className="text-gray-400">Нет превью</span>
-                                  )}
-                                </div>
-                                <h4 className="font-medium text-gray-900">{template.title}</h4>
-                                <p className="text-xs text-gray-500 mt-1">{template.description}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                  {createSiteStep === 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!skipDomain && !newSiteDomain.trim()) return;
-                        setCreateSiteStep(2);
-                      }}
-                      className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
-                    >
-                      Далее
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleCreateSite}
-                      className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
-                    >
-                      Создать сайт
-                    </button>
-                  )}
-                  
-                  {createSiteStep === 2 && (
-                     <button
-                       type="button"
-                       onClick={() => setCreateSiteStep(1)}
-                       className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                     >
-                       Назад
-                     </button>
-                  )}
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCreateSiteModalOpen(false);
-                      setCreateSiteStep(1);
-                    }}
-                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Chat Modal */}
         {isChatOpen && selectedOrder && (

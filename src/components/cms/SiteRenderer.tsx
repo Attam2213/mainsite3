@@ -20,7 +20,7 @@ export interface SiteButton {
 
 export interface Section {
   id: string;
-  type: 'header' | 'hero' | 'features' | 'text' | 'contact' | 'gallery' | 'footer' | 'reviews' | 'news' | 'about' | 'pricing' | 'faq' | 'map' | 'video' | 'partners';
+  type: 'header' | 'hero' | 'features' | 'text' | 'contact' | 'gallery' | 'footer' | 'reviews' | 'news' | 'about' | 'pricing' | 'faq' | 'map' | 'video' | 'partners' | 'banner' | 'steps';
   variant: string;
   title?: string;
   showTitle?: boolean;
@@ -57,12 +57,16 @@ interface SectionProps {
   settings: SiteSettings;
   isSelected?: boolean;
   onClick?: () => void;
+  onUpdateSection?: (id: string, updates: Partial<Section>) => void;
 }
 
 // --- Helper Components ---
 
-const RenderButtons = ({ buttons, settings }: { buttons?: SiteButton[], settings: SiteSettings }) => {
+const DragDeviceContext = React.createContext<'desktop' | 'mobile'>('desktop');
+
+const RenderButtons = ({ buttons, settings, section }: { buttons?: SiteButton[], settings: SiteSettings, section?: Section }) => {
   if (!buttons || buttons.length === 0) return null;
+  const typographyFont = section?.settings?.typography?.buttonFont;
   
   return (
     <div className="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start gap-3">
@@ -72,19 +76,20 @@ const RenderButtons = ({ buttons, settings }: { buttons?: SiteButton[], settings
           btn.linkType === 'phone' && btn.target ? `tel:${btn.target}` :
           btn.linkType === 'email' && btn.target ? `mailto:${btn.target}` :
           btn.url;
-        const baseClass = "w-full flex items-center justify-center px-8 py-3 border text-base font-medium rounded-md md:py-4 md:text-lg md:px-10 transition-colors";
+        const baseClass = "w-full flex items-center justify-center px-8 py-3 border text-base font-semibold rounded-xl md:py-4 md:text-lg md:px-10 transition-all shadow-sm ring-1 ring-black/5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2";
         let style: React.CSSProperties = { borderRadius: settings.borderRadius || '0.375rem' }; // Default md (6px)
         let className = baseClass;
+        if (typographyFont) style.fontFamily = typographyFont;
         
         if (btn.style === 'primary') {
-          className += " text-white border-transparent hover:opacity-90";
+          className += " text-white border-transparent hover:opacity-95";
           style.backgroundColor = settings.primaryColor;
         } else if (btn.style === 'secondary') {
-          className += " text-indigo-700 bg-indigo-100 hover:bg-indigo-200 border-transparent";
+          className += " text-indigo-700 bg-white/70 backdrop-blur hover:bg-white border-transparent";
           style.color = settings.primaryColor;
-          style.backgroundColor = `${settings.primaryColor}20`; // 20 hex = 12% opacity
+          style.backgroundColor = `${settings.primaryColor}20`;
         } else {
-          className += " text-indigo-700 bg-white border-indigo-200 hover:bg-gray-50";
+          className += " text-indigo-700 bg-white/70 backdrop-blur border-indigo-200 hover:bg-white";
           style.color = settings.primaryColor;
           style.borderColor = settings.primaryColor;
         }
@@ -102,7 +107,7 @@ const RenderButtons = ({ buttons, settings }: { buttons?: SiteButton[], settings
 };
 
 const SectionWrapper = ({ children, section, settings, className = "" }: { children: React.ReactNode, section: Section, settings: SiteSettings, className?: string }) => {
-  const style: React.CSSProperties = { fontFamily: settings.fontFamily };
+  const style: React.CSSProperties = { fontFamily: section.settings?.typography?.textFont || settings.fontFamily };
   
   if (section.backgroundImage) {
     style.backgroundImage = `url(${section.backgroundImage})`;
@@ -122,22 +127,181 @@ const SectionWrapper = ({ children, section, settings, className = "" }: { child
   );
 };
 
+const getSectionEffectsClassName = (section: Section) => {
+  const effects = section.settings?.effects;
+  if (effects?.enabled === false) return '';
+  let className = '';
+  if (effects?.animation === 'fade') className += ' cms-anim-fade';
+  if (effects?.animation === 'fade-up') className += ' cms-anim-fade-up';
+  if (effects?.hoverLift) className += ' cms-hover-lift';
+  return className.trim();
+};
+
+const getTitleFontFamily = (section: Section, settings: SiteSettings) => {
+  return section.settings?.typography?.titleFont || section.settings?.typography?.textFont || settings.fontFamily;
+};
+
+const DraggableElement = ({
+  section,
+  isSelected,
+  elementKey,
+  onUpdateSection,
+  children,
+  className,
+  style: styleProp
+}: {
+  section: Section;
+  isSelected?: boolean;
+  elementKey: string;
+  onUpdateSection?: (id: string, updates: Partial<Section>) => void;
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) => {
+  const device = React.useContext(DragDeviceContext);
+  const canEdit = !!onUpdateSection && !!isSelected;
+  const layout = section.settings?.layout || {};
+  const positionsByDevice = (layout as any).positionsByDevice || {};
+  const devicePositions = positionsByDevice[device];
+  const pos =
+    (devicePositions && typeof devicePositions === 'object' ? devicePositions[elementKey] : undefined) ||
+    (layout as any).positions?.[elementKey] ||
+    { x: 0, y: 0 };
+  const hasPos = pos.x !== 0 || pos.y !== 0;
+  const shouldTransform = hasPos || canEdit;
+
+  const dragRef = React.useRef<{
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    pointerId: number;
+    raf: number | null;
+    nextX: number;
+    nextY: number;
+    moved: boolean;
+  } | null>(null);
+
+  const applyUpdate = (x: number, y: number) => {
+    if (!onUpdateSection) return;
+    const prevLayout = section.settings?.layout || {};
+    const prevPositionsByDevice = (prevLayout as any).positionsByDevice || {};
+    const prevDevicePositions = prevPositionsByDevice[device] && typeof prevPositionsByDevice[device] === 'object' ? prevPositionsByDevice[device] : {};
+    onUpdateSection(section.id, {
+      settings: {
+        ...(section.settings || {}),
+        layout: {
+          ...prevLayout,
+          positionsByDevice: {
+            ...prevPositionsByDevice,
+            [device]: {
+              ...prevDevicePositions,
+              [elementKey]: { x, y }
+            }
+          },
+          positions: device === 'desktop' ? { ...((prevLayout as any).positions || {}), [elementKey]: { x, y } } : (prevLayout as any).positions
+        }
+      }
+    });
+  };
+
+  return (
+    <div
+      className={className}
+      draggable={false}
+      style={
+        shouldTransform
+          ? {
+              ...(styleProp || {}),
+              transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+              cursor: canEdit ? 'grab' : undefined,
+              touchAction: canEdit ? 'none' : undefined,
+              userSelect: canEdit ? 'none' : undefined,
+            }
+          : (styleProp || undefined)
+      }
+      onDragStart={(e) => {
+        if (!canEdit) return;
+        e.preventDefault();
+      }}
+      onClickCapture={(e) => {
+        const state = dragRef.current;
+        if (!canEdit || !state?.moved) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragRef.current = null;
+      }}
+      onPointerDown={(e) => {
+        if (!canEdit) return;
+        e.stopPropagation();
+        const current = section.settings?.layout?.positions?.[elementKey] || { x: 0, y: 0 };
+        dragRef.current = {
+          startX: e.clientX,
+          startY: e.clientY,
+          originX: current.x,
+          originY: current.y,
+          pointerId: e.pointerId,
+          raf: null,
+          nextX: current.x,
+          nextY: current.y,
+          moved: false
+        };
+        (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const state = dragRef.current;
+        if (!canEdit || !state || state.pointerId !== e.pointerId) return;
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        if (!state.moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) state.moved = true;
+        state.nextX = Math.round(state.originX + dx);
+        state.nextY = Math.round(state.originY + dy);
+        if (state.raf) return;
+        state.raf = requestAnimationFrame(() => {
+          const s = dragRef.current;
+          if (!s) return;
+          s.raf = null;
+          applyUpdate(s.nextX, s.nextY);
+        });
+      }}
+      onPointerUp={(e) => {
+        const state = dragRef.current;
+        if (!canEdit || !state || state.pointerId !== e.pointerId) return;
+        e.stopPropagation();
+        if (!state.moved) {
+          dragRef.current = null;
+        }
+      }}
+      onPointerCancel={(e) => {
+        const state = dragRef.current;
+        if (!canEdit || !state || state.pointerId !== e.pointerId) return;
+        e.stopPropagation();
+        dragRef.current = null;
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
 // --- Header Sections ---
 
-const HeaderSimple = ({ section, settings }: SectionProps) => (
-  <header className="bg-white shadow-sm" style={{ fontFamily: settings.fontFamily }}>
+const HeaderSimple = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <header className="bg-white/80 backdrop-blur border-b border-gray-200/60" style={{ fontFamily: settings.fontFamily }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-16">
         <div className="flex-shrink-0 flex items-center">
           {section.showTitle !== false && (
-            <span className="font-bold text-xl" style={{ color: settings.primaryColor }}>{section.title || settings.title}</span>
+            <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+              <span className="font-bold text-xl" style={{ color: settings.primaryColor, fontFamily: getTitleFontFamily(section, settings) }}>{section.title || settings.title}</span>
+            </DraggableElement>
           )}
         </div>
-        <div className="hidden md:flex space-x-8">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="nav" onUpdateSection={onUpdateSection} className="hidden md:flex space-x-8">
           {(section.items || []).map((item, i) => (
             <a key={i} href={item.url || '#'} className="text-gray-500 hover:text-gray-900">{item.text || `Menu ${i+1}`}</a>
           ))}
-        </div>
+        </DraggableElement>
         <div className="md:hidden">
           <Menu className="h-6 w-6 text-gray-500" />
         </div>
@@ -146,29 +310,31 @@ const HeaderSimple = ({ section, settings }: SectionProps) => (
   </header>
 );
 
-const HeaderCentered = ({ section, settings }: SectionProps) => (
-  <header className="bg-white shadow-sm" style={{ fontFamily: settings.fontFamily }}>
+const HeaderCentered = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <header className="bg-white/80 backdrop-blur border-b border-gray-200/60" style={{ fontFamily: settings.fontFamily }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
       <div className="flex flex-col items-center">
         {section.showTitle !== false && (
           <div className="flex-shrink-0 mb-4">
-            <span className="font-bold text-2xl" style={{ color: settings.primaryColor }}>{section.title || settings.title}</span>
+            <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+              <span className="font-bold text-2xl" style={{ color: settings.primaryColor, fontFamily: getTitleFontFamily(section, settings) }}>{section.title || settings.title}</span>
+            </DraggableElement>
           </div>
         )}
-        <div className="flex space-x-8">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="nav" onUpdateSection={onUpdateSection} className="flex space-x-8">
           {(section.items || []).map((item, i) => (
             <a key={i} href={item.url || '#'} className="text-gray-500 hover:text-gray-900 font-medium">{item.text || `Menu ${i+1}`}</a>
           ))}
-        </div>
+        </DraggableElement>
       </div>
     </div>
   </header>
 );
 
-const HeaderDouble = ({ section, settings }: SectionProps) => (
-  <header className="shadow-sm" style={{ fontFamily: settings.fontFamily }}>
+const HeaderDouble = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <header className="border-b border-gray-200/60 bg-white/80 backdrop-blur" style={{ fontFamily: settings.fontFamily }}>
     {/* Top Bar */}
-    <div className="bg-gray-900 text-white py-2 text-sm">
+    <div className="bg-gray-950 text-white py-2 text-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
         <div className="flex space-x-4">
           <div className="flex items-center">
@@ -193,14 +359,16 @@ const HeaderDouble = ({ section, settings }: SectionProps) => (
         <div className="flex justify-between items-center h-20">
           <div className="flex-shrink-0 flex items-center">
             {section.showTitle !== false && (
-              <span className="font-bold text-2xl" style={{ color: settings.primaryColor }}>{section.title || settings.title}</span>
+              <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+                <span className="font-bold text-2xl" style={{ color: settings.primaryColor, fontFamily: getTitleFontFamily(section, settings) }}>{section.title || settings.title}</span>
+              </DraggableElement>
             )}
           </div>
-          <div className="hidden md:flex space-x-8">
+          <DraggableElement section={section} isSelected={isSelected} elementKey="nav" onUpdateSection={onUpdateSection} className="hidden md:flex space-x-8">
             {(section.items || []).map((item, i) => (
               <a key={i} href={item.url || '#'} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">{item.text || `Menu ${i+1}`}</a>
             ))}
-          </div>
+          </DraggableElement>
           <div className="md:hidden">
             <Menu className="h-6 w-6 text-gray-700" />
           </div>
@@ -210,20 +378,22 @@ const HeaderDouble = ({ section, settings }: SectionProps) => (
   </header>
 );
 
-const HeaderMinimal = ({ section, settings }: SectionProps) => (
-  <header className="bg-white border-b border-gray-100" style={{ fontFamily: settings.fontFamily }}>
+const HeaderMinimal = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <header className="bg-white/80 backdrop-blur border-b border-gray-200/60" style={{ fontFamily: settings.fontFamily }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-14">
         <div className="flex-shrink-0">
            {section.showTitle !== false && (
-             <span className="font-bold text-lg tracking-tighter" style={{ color: settings.primaryColor }}>{section.title || settings.title}</span>
+             <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+               <span className="font-bold text-lg tracking-tighter" style={{ color: settings.primaryColor, fontFamily: getTitleFontFamily(section, settings) }}>{section.title || settings.title}</span>
+             </DraggableElement>
            )}
         </div>
-        <nav className="hidden md:flex space-x-6">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="nav" onUpdateSection={onUpdateSection} className="hidden md:flex space-x-6">
           {(section.items || []).map((item, i) => (
             <a key={i} href={item.url || '#'} className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">{item.text || `Link ${i+1}`}</a>
           ))}
-        </nav>
+        </DraggableElement>
         <div className="md:hidden">
           <Menu className="h-5 w-5 text-gray-500" />
         </div>
@@ -234,73 +404,85 @@ const HeaderMinimal = ({ section, settings }: SectionProps) => (
 
 // --- Hero Sections ---
 
-const HeroSplit = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-white overflow-hidden">
+const HeroSplit = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-gradient-to-b from-white to-gray-50 overflow-hidden">
     <div className="max-w-7xl mx-auto">
       <div className="relative z-10 pb-8 bg-transparent sm:pb-16 md:pb-20 lg:max-w-2xl lg:w-full lg:pb-28 xl:pb-32">
-        <main className="mt-10 mx-auto max-w-7xl px-4 sm:mt-12 sm:px-6 md:mt-16 lg:mt-20 lg:px-8 xl:mt-28">
+        <main className="mt-12 mx-auto max-w-7xl px-4 sm:mt-16 sm:px-6 md:mt-20 lg:mt-24 lg:px-8 xl:mt-28">
           <div className="sm:text-center lg:text-left">
             {section.showTitle !== false && (
-              <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-                <span className={`block xl:inline ${section.backgroundImage ? 'text-white' : ''}`}>{section.title || 'Добро пожаловать'}</span>{' '}
-                {section.showSubtitle !== false && (
-                  <span className="block text-indigo-600 xl:inline" style={{ color: settings.primaryColor }}>
-                    {section.subtitle || 'Создайте что-то удивительное'}
-                  </span>
-                )}
-              </h1>
+              <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+                <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                  <span className={`block xl:inline ${section.backgroundImage ? 'text-white' : ''}`}>{section.title || 'Добро пожаловать'}</span>{' '}
+                  {section.showSubtitle !== false && (
+                    <span className="block text-indigo-600 xl:inline" style={{ color: settings.primaryColor }}>
+                      {section.subtitle || 'Создайте что-то удивительное'}
+                    </span>
+                  )}
+                </h1>
+              </DraggableElement>
             )}
             {section.showContent !== false && (
-              <p className={`mt-3 text-base sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0 ${section.backgroundImage ? 'text-gray-100' : 'text-gray-500'}`}>
-                {section.content || 'Начните создавать сайт своей мечты уже сегодня.'}
-              </p>
+              <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+                <p className={`mt-5 text-base sm:text-lg sm:max-w-xl sm:mx-auto md:text-xl lg:mx-0 ${section.backgroundImage ? 'text-gray-100' : 'text-gray-600'}`}>
+                  {section.content || 'Начните создавать сайт своей мечты уже сегодня.'}
+                </p>
+              </DraggableElement>
             )}
-            <RenderButtons buttons={section.buttons} settings={settings} />
+            <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+              <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+            </DraggableElement>
           </div>
         </main>
       </div>
     </div>
     {!section.backgroundImage && section.showImage !== false && (
-      <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
+      <DraggableElement section={section} isSelected={isSelected} elementKey="image" onUpdateSection={onUpdateSection} className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
         <img
           className="h-56 w-full object-cover sm:h-72 md:h-96 lg:w-full lg:h-full"
           src={section.image || "https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80"}
           alt=""
         />
-      </div>
+      </DraggableElement>
     )}
   </SectionWrapper>
 );
 
-const HeroCenter = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-gray-50 py-20">
+const HeroCenter = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-gradient-to-b from-gray-50 to-white py-24">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
       {section.showTitle !== false && (
-        <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-          <span className={`block ${section.backgroundImage ? 'text-white' : ''}`}>{section.title || 'Добро пожаловать'}</span>
-          {section.showSubtitle !== false && (
-            <span className="block text-indigo-600 mt-2" style={{ color: settings.primaryColor }}>
-              {section.subtitle || 'Создайте что-то удивительное'}
-            </span>
-          )}
-        </h1>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+          <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+            <span className={`block ${section.backgroundImage ? 'text-white' : ''}`}>{section.title || 'Добро пожаловать'}</span>
+            {section.showSubtitle !== false && (
+              <span className="block text-indigo-600 mt-2" style={{ color: settings.primaryColor }}>
+                {section.subtitle || 'Создайте что-то удивительное'}
+              </span>
+            )}
+          </h1>
+        </DraggableElement>
       )}
       {section.showContent !== false && (
-        <p className={`mt-4 max-w-2xl mx-auto text-xl ${section.backgroundImage ? 'text-gray-100' : 'text-gray-500'}`}>
-          {section.content || 'Начните создавать сайт своей мечты уже сегодня.'}
-        </p>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+          <p className={`mt-6 max-w-2xl mx-auto text-xl ${section.backgroundImage ? 'text-gray-100' : 'text-gray-600'}`}>
+            {section.content || 'Начните создавать сайт своей мечты уже сегодня.'}
+          </p>
+        </DraggableElement>
       )}
       <div className="mt-8 flex justify-center">
-        <RenderButtons buttons={section.buttons} settings={settings} />
+        <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+          <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+        </DraggableElement>
       </div>
       {!section.backgroundImage && section.image && section.showImage !== false && (
-        <div className="mt-12 relative">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="image" onUpdateSection={onUpdateSection} className="mt-12 relative">
           <img
-            className="rounded-lg shadow-xl mx-auto"
+            className="rounded-3xl shadow-2xl ring-1 ring-black/10 mx-auto"
             src={section.image}
             alt="App screenshot"
           />
-        </div>
+        </DraggableElement>
       )}
     </div>
   </SectionWrapper>
@@ -308,43 +490,59 @@ const HeroCenter = ({ section, settings }: SectionProps) => (
 
 // --- Features Sections ---
 
-const FeaturesGrid = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-white">
+const FeaturesGrid = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-16 bg-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="lg:text-center mb-12">
         {section.showSubtitle !== false && (
-          <h2 className="text-base text-indigo-600 font-semibold tracking-wide uppercase" style={{ color: settings.primaryColor }}>
-            {section.subtitle || 'Преимущества'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="subtitle" onUpdateSection={onUpdateSection}>
+            <h2 className="text-base text-indigo-600 font-semibold tracking-wide uppercase" style={{ color: settings.primaryColor }}>
+              {section.subtitle || 'Преимущества'}
+            </h2>
+          </DraggableElement>
         )}
         {section.showTitle !== false && (
-          <p className={`mt-2 text-3xl leading-8 font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-            {section.title || 'Наши ключевые преимущества'}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <p className={`mt-2 text-3xl leading-8 font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Наши ключевые преимущества'}
+            </p>
+          </DraggableElement>
         )}
         {section.showContent !== false && (
-          <p className={`mt-4 max-w-2xl text-xl lg:mx-auto ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
-            {section.content}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+            <p className={`mt-4 max-w-2xl text-xl lg:mx-auto ${section.backgroundImage ? 'text-gray-200' : 'text-gray-600'}`}>
+              {section.content}
+            </p>
+          </DraggableElement>
         )}
       </div>
 
       <div className="mt-10">
-        <dl className="space-y-10 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
+        <dl className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {(section.items || [1, 2, 3, 4]).map((item, index) => (
-            <div key={index} className="relative">
-              <dt>
-                <div className="absolute flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white" style={{ backgroundColor: settings.primaryColor }}>
+            <DraggableElement
+              key={item?.id || index}
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item:${item?.id || index}`}
+              onUpdateSection={onUpdateSection}
+              className="rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur p-6 shadow-sm"
+              style={{ borderRadius: settings.borderRadius || '1rem' }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center h-12 w-12 rounded-xl text-white shadow-sm" style={{ backgroundColor: settings.primaryColor, borderRadius: settings.borderRadius || '0.75rem' }}>
                   <CheckCircle className="h-6 w-6" aria-hidden="true" />
                 </div>
-                <p className={`ml-16 text-lg leading-6 font-medium ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-                  {item.title || `Преимущество ${index + 1}`}
-                </p>
-              </dt>
-              <dd className={`mt-2 ml-16 text-base ${section.backgroundImage ? 'text-gray-300' : 'text-gray-500'}`}>
-                {item.description || 'Описание преимущества. Здесь вы можете подробно рассказать о том, чем полезен этот пункт.'}
-              </dd>
-            </div>
+                <div>
+                  <p className={`text-lg leading-6 font-semibold ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
+                    {item.title || `Преимущество ${index + 1}`}
+                  </p>
+                  <p className={`mt-2 text-base ${section.backgroundImage ? 'text-gray-200' : 'text-gray-600'}`}>
+                    {item.description || 'Описание преимущества. Здесь вы можете подробно рассказать о том, чем полезен этот пункт.'}
+                  </p>
+                </div>
+              </div>
+            </DraggableElement>
           ))}
         </dl>
       </div>
@@ -352,19 +550,29 @@ const FeaturesGrid = ({ section, settings }: SectionProps) => (
   </SectionWrapper>
 );
 
-const FeaturesCards = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-gray-50">
+const FeaturesCards = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-16 bg-gradient-to-b from-gray-50 to-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {section.showTitle !== false && (
         <div className="text-center mb-12">
-          <h2 className={`text-3xl font-extrabold ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-            {section.title || 'Почему выбирают нас'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className={`text-3xl font-extrabold ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Почему выбирают нас'}
+            </h2>
+          </DraggableElement>
         </div>
       )}
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {(section.items || [1, 2, 3]).map((item, index) => (
-          <div key={index} className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-300">
+          <DraggableElement
+            key={item?.id || index}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || index}`}
+            onUpdateSection={onUpdateSection}
+            className="bg-white/80 backdrop-blur overflow-hidden border border-gray-200/70 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300"
+            style={{ borderRadius: settings.borderRadius || '1rem' }}
+          >
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white mb-4" style={{ backgroundColor: settings.primaryColor }}>
                 <CheckCircle className="h-6 w-6" />
@@ -376,48 +584,66 @@ const FeaturesCards = ({ section, settings }: SectionProps) => (
                 <p>{item.description || 'Краткое описание карточки. Добавьте сюда полезную информацию.'}</p>
               </div>
             </div>
-          </div>
+          </DraggableElement>
         ))}
       </div>
     </div>
   </SectionWrapper>
 );
 
-const FeaturesZigZag = ({ section, settings }: SectionProps) => (
+const FeaturesZigZag = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
   <SectionWrapper section={section} settings={settings} className="py-16 bg-white overflow-hidden">
     <div className="relative max-w-xl mx-auto px-4 sm:px-6 lg:px-8 lg:max-w-7xl">
       {section.showTitle !== false && (
         <div className="relative mb-12 lg:mb-24 lg:text-center">
-          <h2 className={`text-3xl leading-8 font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-            {section.title || 'Как это работает'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className={`text-3xl leading-8 font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Как это работает'}
+            </h2>
+          </DraggableElement>
           {section.showContent !== false && (
-             <p className={`mt-4 max-w-2xl text-xl lg:mx-auto ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
-               {section.content || 'Пошаговый процесс достижения результата.'}
-             </p>
+            <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+              <p className={`mt-4 max-w-2xl text-xl lg:mx-auto ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
+                {section.content || 'Пошаговый процесс достижения результата.'}
+              </p>
+            </DraggableElement>
           )}
         </div>
       )}
 
       <div className="relative">
         {(section.items || [1, 2, 3]).map((item, index) => (
-          <div key={index} className={`lg:grid lg:grid-flow-row-dense lg:grid-cols-2 lg:gap-8 lg:items-center ${index > 0 ? 'mt-12 lg:mt-24' : ''}`}>
-            <div className={index % 2 === 1 ? 'lg:col-start-2' : ''}>
-              <h3 className={`text-2xl font-extrabold tracking-tight sm:text-3xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-                {item.title || `Этап ${index + 1}`}
-              </h3>
-              <p className={`mt-3 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
-                {item.description || 'Подробное описание этапа или особенности. Расскажите, как это помогает вашему клиенту.'}
-              </p>
-            </div>
-            <div className={`mt-10 -mx-4 relative lg:mt-0 ${index % 2 === 1 ? 'lg:col-start-1' : ''}`}>
+          <div key={item?.id || index} className={`lg:grid lg:grid-flow-row-dense lg:grid-cols-2 lg:gap-8 lg:items-center ${index > 0 ? 'mt-12 lg:mt-24' : ''}`}>
+            <DraggableElement
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item-text:${item?.id || index}`}
+              onUpdateSection={onUpdateSection}
+              className={index % 2 === 1 ? 'lg:col-start-2' : ''}
+            >
+              <div>
+                <h3 className={`text-2xl font-extrabold tracking-tight sm:text-3xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                  {item.title || `Этап ${index + 1}`}
+                </h3>
+                <p className={`mt-3 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
+                  {item.description || 'Подробное описание этапа или особенности. Расскажите, как это помогает вашему клиенту.'}
+                </p>
+              </div>
+            </DraggableElement>
+            <DraggableElement
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item-image:${item?.id || index}`}
+              onUpdateSection={onUpdateSection}
+              className={`mt-10 -mx-4 relative lg:mt-0 ${index % 2 === 1 ? 'lg:col-start-1' : ''}`}
+            >
               <img
                 className="relative mx-auto rounded-lg shadow-lg"
                 width={490}
                 src={item.image || `https://source.unsplash.com/random/490x300?sig=${index}`}
                 alt=""
               />
-            </div>
+            </DraggableElement>
           </div>
         ))}
       </div>
@@ -427,45 +653,170 @@ const FeaturesZigZag = ({ section, settings }: SectionProps) => (
 
 // --- Text Sections ---
 
-const TextSimple = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-white overflow-hidden py-16 px-4 sm:px-6 lg:px-8">
+const TextSimple = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white overflow-hidden py-20 px-4 sm:px-6 lg:px-8">
     <div className="relative max-w-xl mx-auto">
       <div className="text-center">
         {section.showTitle !== false && (
-          <h2 className={`text-3xl font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-            {section.title || 'О нас'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className={`text-3xl font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'О нас'}
+            </h2>
+          </DraggableElement>
         )}
         {section.showContent !== false && (
-          <p className={`mt-4 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
-            {section.content || 'Здесь вы можете разместить любой текстовый контент, статьи или новости вашей компании.'}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+            <p className={`mt-5 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-600'}`}>
+              {section.content || 'Здесь вы можете разместить любой текстовый контент, статьи или новости вашей компании.'}
+            </p>
+          </DraggableElement>
         )}
       </div>
       <div className="mt-8 flex justify-center">
-        <RenderButtons buttons={section.buttons} settings={settings} />
+        <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+          <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+        </DraggableElement>
       </div>
     </div>
   </SectionWrapper>
 );
 
-const TextCTA = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-indigo-700 py-16">
+const TextCTA = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between">
-      <div className="text-center lg:text-left mb-8 lg:mb-0">
+      <div
+        className="w-full rounded-3xl px-8 py-12 md:px-12 md:py-14 overflow-hidden"
+        style={{
+          borderRadius: settings.borderRadius || '1.5rem',
+          background: `linear-gradient(135deg, ${settings.primaryColor} 0%, #111827 100%)`
+        }}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div className="text-center lg:text-left">
         {section.showTitle !== false && (
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-            <span className="block">{section.title || 'Готовы начать?'}</span>
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold text-white sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              <span className="block">{section.title || 'Готовы начать?'}</span>
+            </h2>
+          </DraggableElement>
         )}
         {section.showContent !== false && (
-          <p className="mt-4 text-lg leading-6 text-indigo-200">
-            {section.content || 'Свяжитесь с нами сегодня и получите бесплатную консультацию.'}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+            <p className="mt-4 text-lg leading-6 text-indigo-200">
+              {section.content || 'Свяжитесь с нами сегодня и получите бесплатную консультацию.'}
+            </p>
+          </DraggableElement>
+        )}
+          </div>
+          <div className="flex justify-center lg:justify-end">
+            <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+              <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+            </DraggableElement>
+          </div>
+        </div>
+      </div>
+    </div>
+  </SectionWrapper>
+);
+
+const BannerAnnouncement = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white py-10 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto">
+      <div
+        className="rounded-2xl px-6 py-8 md:px-10 md:py-10 overflow-hidden"
+        style={{
+          borderRadius: settings.borderRadius || '1rem',
+          background: `linear-gradient(135deg, ${settings.primaryColor} 0%, #111827 100%)`
+        }}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-center">
+          <div>
+            {section.showTitle !== false && (
+              <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-white" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                  {section.title || 'Объявление'}
+                </h2>
+              </DraggableElement>
+            )}
+            {section.showContent !== false && (
+              <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+                <p className="mt-3 text-base md:text-lg text-white/80">
+                  {section.content || 'Добавьте короткое сообщение и кнопку действия.'}
+                </p>
+              </DraggableElement>
+            )}
+          </div>
+          <div className="md:justify-self-end">
+            <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+              <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+            </DraggableElement>
+          </div>
+        </div>
+      </div>
+    </div>
+  </SectionWrapper>
+);
+
+const StepsCards = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white py-16 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto">
+      <div className="text-center">
+        {section.showTitle !== false && (
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-gray-900" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Как это работает'}
+            </h2>
+          </DraggableElement>
+        )}
+        {section.showSubtitle !== false && (
+          <DraggableElement section={section} isSelected={isSelected} elementKey="subtitle" onUpdateSection={onUpdateSection}>
+            <p className="mt-4 text-lg text-gray-500">
+              {section.subtitle || '3 простых шага до результата'}
+            </p>
+          </DraggableElement>
         )}
       </div>
-      <div className="flex justify-center lg:justify-end">
-        <RenderButtons buttons={section.buttons} settings={settings} />
+
+      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {((section.items || []).length > 0 ? (section.items || []) : [
+          { title: 'Шаг 1', description: 'Опишите, что должен сделать пользователь.' },
+          { title: 'Шаг 2', description: 'Добавьте ценность и преимущества.' },
+          { title: 'Шаг 3', description: 'Завершите призывом к действию.' }
+        ]).map((item: any, idx: number) => (
+          <DraggableElement
+            key={item.id || idx}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item.id || idx}`}
+            onUpdateSection={onUpdateSection}
+            className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+            style={{ borderRadius: settings.borderRadius || '1rem' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="h-10 w-10 rounded-xl flex items-center justify-center text-white"
+                style={{
+                  borderRadius: settings.borderRadius || '0.75rem',
+                  backgroundColor: settings.primaryColor
+                }}
+              >
+                <span className="font-bold">{idx + 1}</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">{item.title || `Шаг ${idx + 1}`}</h3>
+            </div>
+            <p className="mt-3 text-sm text-gray-600">{item.description || ''}</p>
+            <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+              <CheckCircle className="h-4 w-4" style={{ color: settings.primaryColor }} />
+              <span>Готово</span>
+            </div>
+          </DraggableElement>
+        ))}
+      </div>
+
+      <div className="mt-10 flex justify-center">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+          <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+        </DraggableElement>
       </div>
     </div>
   </SectionWrapper>
@@ -473,7 +824,7 @@ const TextCTA = ({ section, settings }: SectionProps) => (
 
 // --- Contact Sections ---
 
-const ContactSplit = ({ section, settings }: SectionProps) => {
+const ContactSplit = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => {
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [formData, setFormData] = React.useState({ name: '', email: '', message: '' });
 
@@ -532,36 +883,57 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
   ];
 
   return (
-  <SectionWrapper section={section} settings={settings} className="bg-gray-50 py-16 px-4 sm:px-6 lg:px-8">
-    <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+  <SectionWrapper section={section} settings={settings} className="bg-gradient-to-b from-gray-50 to-white py-20 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
       <div>
         {section.showTitle !== false && (
-          <h2 className={`text-3xl font-extrabold sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`}>
-            {section.title || 'Свяжитесь с нами'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className={`text-3xl font-extrabold tracking-tight sm:text-4xl ${section.backgroundImage ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Свяжитесь с нами'}
+            </h2>
+          </DraggableElement>
         )}
         {section.showContent !== false && (
-          <p className={`mt-4 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
-            {section.content || 'Мы всегда рады помочь вам. Свяжитесь с нами любым удобным способом.'}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+            <p className={`mt-5 text-lg ${section.backgroundImage ? 'text-gray-200' : 'text-gray-600'}`}>
+              {section.content || 'Мы всегда рады помочь вам. Свяжитесь с нами любым удобным способом.'}
+            </p>
+          </DraggableElement>
         )}
-        <dl className={`mt-8 text-base ${section.backgroundImage ? 'text-gray-200' : 'text-gray-500'}`}>
+        <dl className={`mt-10 space-y-4 text-base ${section.backgroundImage ? 'text-gray-200' : 'text-gray-600'}`}>
           {contactItems.map((item: any, idx: number) => (
-            <div key={idx} className="mt-6">
+            <DraggableElement
+              key={item?.id || idx}
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item:${item?.id || idx}`}
+              onUpdateSection={onUpdateSection}
+              className="flex items-center gap-4 rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur px-5 py-4 shadow-sm"
+              style={{ borderRadius: settings.borderRadius || '1rem' }}
+            >
               <dt className="sr-only">{item.type === 'phone' ? 'Телефон' : 'Email'}</dt>
-              <dd className="flex">
-                {item.type === 'phone' ? (
-                  <Phone className="flex-shrink-0 h-6 w-6" aria-hidden="true" />
-                ) : (
-                  <Mail className="flex-shrink-0 h-6 w-6" aria-hidden="true" />
-                )}
-                <span className="ml-3">{item.text}</span>
+              <dd className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center text-white shadow-sm" style={{ borderRadius: settings.borderRadius || '0.75rem', backgroundColor: settings.primaryColor }}>
+                  {item.type === 'phone' ? (
+                    <Phone className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <Mail className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </div>
+                <span className="font-medium text-gray-900">{item.text}</span>
               </dd>
-            </div>
+            </DraggableElement>
           ))}
         </dl>
       </div>
-      <div className="bg-white py-10 px-6 shadow sm:rounded-lg sm:px-10" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
+      <DraggableElement
+        section={section}
+        isSelected={isSelected}
+        elementKey="form"
+        onUpdateSection={onUpdateSection}
+        className="bg-white/80 backdrop-blur py-10 px-6 shadow-sm border border-gray-200/70 sm:px-10"
+        style={{ borderRadius: settings.borderRadius || '1rem' }}
+      >
         {status === 'success' ? (
           <div className="h-full flex flex-col items-center justify-center text-center py-10">
             <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
@@ -582,8 +954,8 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
                     id="name" 
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border" 
-                    style={{ borderRadius: settings.borderRadius || '0.375rem' }} 
+                    className="block w-full bg-white/70 border border-gray-200 rounded-xl p-2.5 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                    style={{ borderRadius: settings.borderRadius || '0.75rem' }} 
                 />
               </div>
             </div>
@@ -597,8 +969,8 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
                     id="email" 
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border" 
-                    style={{ borderRadius: settings.borderRadius || '0.375rem' }} 
+                    className="block w-full bg-white/70 border border-gray-200 rounded-xl p-2.5 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                    style={{ borderRadius: settings.borderRadius || '0.75rem' }} 
                 />
               </div>
             </div>
@@ -612,8 +984,8 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
                     rows={4} 
                     value={formData.message}
                     onChange={(e) => setFormData({...formData, message: e.target.value})}
-                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border" 
-                    style={{ borderRadius: settings.borderRadius || '0.375rem' }}
+                    className="block w-full bg-white/70 border border-gray-200 rounded-xl p-2.5 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                    style={{ borderRadius: settings.borderRadius || '0.75rem' }}
                 ></textarea>
               </div>
             </div>
@@ -624,15 +996,15 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
               <button 
                 type="submit" 
                 disabled={status === 'loading'}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors" 
-                style={{ backgroundColor: settings.primaryColor, borderRadius: settings.borderRadius || '0.375rem' }}
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all" 
+                style={{ backgroundColor: settings.primaryColor, borderRadius: settings.borderRadius || '0.75rem' }}
               >
                 {status === 'loading' ? 'Отправка...' : 'Отправить сообщение'}
               </button>
             </div>
           </form>
         )}
-      </div>
+      </DraggableElement>
     </div>
   </SectionWrapper>
   );
@@ -640,19 +1012,31 @@ const ContactSplit = ({ section, settings }: SectionProps) => {
 
 // --- Reviews Sections ---
 
-const ReviewsGrid = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-gray-50">
+const ReviewsGrid = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-gradient-to-b from-gray-50 to-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {section.showTitle !== false && (
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-extrabold text-gray-900">{section.title || 'Отзывы клиентов'}</h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Отзывы клиентов'}
+            </h2>
+          </DraggableElement>
         </div>
       )}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
         {(section.items || [1, 2, 3]).map((item, i) => (
-          <div key={i} className="bg-white p-6 shadow-sm" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
+          <DraggableElement
+            key={item?.id || i}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || i}`}
+            onUpdateSection={onUpdateSection}
+            className="bg-white/80 backdrop-blur p-7 shadow-sm border border-gray-200/70"
+            style={{ borderRadius: settings.borderRadius || '1rem' }}
+          >
              <div className="flex items-center mb-4">
-               <div className="h-10 w-10 flex items-center justify-center text-gray-500 font-bold overflow-hidden" style={{ borderRadius: settings.borderRadius ? `calc(${settings.borderRadius} * 0.5)` : '50%' }}>
+               <div className="h-11 w-11 flex items-center justify-center text-gray-600 font-bold overflow-hidden ring-1 ring-black/5" style={{ borderRadius: settings.borderRadius || '0.75rem' }}>
                  {item.image ? (
                    <img src={item.image} alt={item.author} className="h-full w-full object-cover" />
                  ) : (
@@ -668,33 +1052,45 @@ const ReviewsGrid = ({ section, settings }: SectionProps) => (
                  </div>
                </div>
              </div>
-             <p className="text-gray-500 italic">"{item.text || 'Отличный сервис! Очень доволен результатом.'}"</p>
-          </div>
+             <p className="text-gray-700 italic leading-relaxed">“{item.text || 'Отличный сервис! Очень доволен результатом.'}”</p>
+          </DraggableElement>
         ))}
       </div>
     </div>
   </SectionWrapper>
 );
 
-const ReviewsSlider = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-16 bg-white">
+const ReviewsSlider = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {section.showTitle !== false && (
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-8">{section.title || 'Что говорят о нас'}</h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-10" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Что говорят о нас'}
+            </h2>
+          </DraggableElement>
         )}
         <div className="flex overflow-x-auto space-x-6 pb-4 snap-x">
           {(section.items || [1, 2, 3, 4]).map((item, i) => (
-            <div key={i} className="snap-center flex-shrink-0 w-80 bg-gray-50 p-8 rounded-xl flex flex-col justify-between">
+            <DraggableElement
+              key={item?.id || i}
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item:${item?.id || i}`}
+              onUpdateSection={onUpdateSection}
+              className="snap-center flex-shrink-0 w-80 bg-white/80 backdrop-blur p-8 rounded-2xl flex flex-col justify-between border border-gray-200/70 shadow-sm"
+              style={{ borderRadius: settings.borderRadius || '1rem' }}
+            >
                <div>
                  <div className="flex text-yellow-400 mb-4">
                    {[...Array(5)].map((_, star) => (
                      <span key={star} className={star < (item.rating || 5) ? "text-yellow-400" : "text-gray-300"}>★</span>
                    ))}
                  </div>
-                 <p className="text-lg text-gray-600 mb-6 italic">"{item.text || 'Профессиональный подход и качественная работа.'}"</p>
+                 <p className="text-lg text-gray-700 mb-6 italic leading-relaxed">“{item.text || 'Профессиональный подход и качественная работа.'}”</p>
                </div>
                <div className="flex items-center mt-auto">
-                 <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold overflow-hidden mr-3">
+                 <div className="h-11 w-11 bg-gray-200 flex items-center justify-center text-gray-600 font-bold overflow-hidden mr-3 ring-1 ring-black/5" style={{ borderRadius: settings.borderRadius || '0.75rem' }}>
                    {item.image ? (
                      <img src={item.image} alt={item.author} className="h-full w-full object-cover" />
                    ) : (
@@ -703,7 +1099,7 @@ const ReviewsSlider = ({ section, settings }: SectionProps) => (
                  </div>
                  <p className="font-bold text-gray-900">{item.author || 'Клиент Компании'}</p>
                </div>
-            </div>
+            </DraggableElement>
           ))}
         </div>
      </div>
@@ -712,47 +1108,73 @@ const ReviewsSlider = ({ section, settings }: SectionProps) => (
 
 // --- Gallery Sections ---
 
-const GalleryGrid = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-white">
+const GalleryGrid = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-10">
         {section.showTitle !== false && (
-          <h2 className="text-3xl font-extrabold text-gray-900">{section.title || 'Наша Галерея'}</h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Наша Галерея'}
+            </h2>
+          </DraggableElement>
         )}
         {section.showSubtitle !== false && (
-          <p className="mt-4 text-gray-500">{section.subtitle || 'Посмотрите наши лучшие работы'}</p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="subtitle" onUpdateSection={onUpdateSection}>
+            <p className="mt-4 text-gray-600">{section.subtitle || 'Посмотрите наши лучшие работы'}</p>
+          </DraggableElement>
         )}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {(section.items || [1, 2, 3, 4, 5, 6]).map((item, i) => (
-          <div key={i} className="relative aspect-w-1 aspect-h-1 group overflow-hidden bg-gray-100" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
+          <DraggableElement
+            key={item?.id || i}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || i}`}
+            onUpdateSection={onUpdateSection}
+            className="relative aspect-w-1 aspect-h-1 group overflow-hidden bg-gray-100 border border-gray-200/70 shadow-sm"
+            style={{ borderRadius: settings.borderRadius || '1rem' }}
+          >
              <img 
                src={item.image || `https://source.unsplash.com/random/800x600?sig=${i}`} 
                alt="" 
-               className="object-cover w-full h-full group-hover:opacity-75 transition-opacity"
+               className="object-cover w-full h-full transition-all duration-300 group-hover:scale-[1.03] group-hover:opacity-90"
              />
-          </div>
+          </DraggableElement>
         ))}
       </div>
     </div>
   </SectionWrapper>
 );
 
-const GalleryMasonry = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-gray-50">
+const GalleryMasonry = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-gradient-to-b from-gray-50 to-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
        {section.showTitle !== false && (
-         <h2 className="text-3xl font-extrabold text-gray-900 mb-8 text-center">{section.title || 'Портфолио'}</h2>
+         <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+           <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-10 text-center" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+             {section.title || 'Портфолио'}
+           </h2>
+         </DraggableElement>
        )}
        <div className="columns-1 md:columns-3 gap-4 space-y-4">
          {(section.items || [1, 2, 3, 4, 5, 6]).map((item, i) => (
-           <div key={i} className="break-inside-avoid overflow-hidden" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
+           <DraggableElement
+             key={item?.id || i}
+             section={section}
+             isSelected={isSelected}
+             elementKey={`item:${item?.id || i}`}
+             onUpdateSection={onUpdateSection}
+             className="break-inside-avoid overflow-hidden border border-gray-200/70 bg-white shadow-sm"
+             style={{ borderRadius: settings.borderRadius || '1rem' }}
+           >
              <img 
                src={item.image || `https://source.unsplash.com/random/600x${400 + (i % 3) * 200}?sig=${i}`} 
                alt="" 
                className="w-full h-auto"
              />
-           </div>
+           </DraggableElement>
          ))}
        </div>
     </div>
@@ -761,47 +1183,71 @@ const GalleryMasonry = ({ section, settings }: SectionProps) => (
 
 // --- News Sections ---
 
-const NewsList = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-white">
+const NewsList = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
        {section.showTitle !== false && (
-         <h2 className="text-3xl font-extrabold text-gray-900 mb-8">{section.title || 'Последние новости'}</h2>
+         <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+           <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-10" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+             {section.title || 'Последние новости'}
+           </h2>
+         </DraggableElement>
        )}
        <div className="space-y-8">
          {(section.items || [1, 2, 3]).map((item, i) => (
-           <div key={i} className="flex flex-col md:flex-row gap-6 border-b border-gray-100 pb-8 last:border-0">
-              <div className="md:w-1/4">
-                 <img src={item.image || `https://source.unsplash.com/random/400x300?sig=${i+10}`} className="w-full h-48 object-cover" style={{ borderRadius: settings.borderRadius || '0.5rem' }} alt="" />
+           <DraggableElement
+             key={item?.id || i}
+             section={section}
+             isSelected={isSelected}
+             elementKey={`item:${item?.id || i}`}
+             onUpdateSection={onUpdateSection}
+             className="flex flex-col md:flex-row gap-6 border border-gray-200/70 bg-white/80 backdrop-blur p-5 shadow-sm"
+             style={{ borderRadius: settings.borderRadius || '1rem' }}
+           >
+              <div className="md:w-1/3">
+                 <img src={item.image || `https://source.unsplash.com/random/400x300?sig=${i+10}`} className="w-full h-48 object-cover ring-1 ring-black/5" style={{ borderRadius: settings.borderRadius || '0.75rem' }} alt="" />
               </div>
-              <div className="md:w-3/4">
-                 <span className="text-sm text-indigo-600 font-semibold">{item.date || '01.01.2024'}</span>
-                 <h3 className="text-xl font-bold text-gray-900 mt-2">{item.title || 'Заголовок новости'}</h3>
-                 <p className="mt-3 text-gray-500">{item.excerpt || 'Краткое описание новости. Здесь можно рассказать о последних событиях вашей компании или индустрии.'}</p>
-                 <a href="#" className="mt-4 inline-block text-indigo-600 hover:text-indigo-500">Читать далее &rarr;</a>
+              <div className="md:w-2/3">
+                 <span className="text-sm font-semibold" style={{ color: settings.primaryColor }}>{item.date || '01.01.2024'}</span>
+                 <h3 className="text-xl font-extrabold text-gray-900 mt-2 tracking-tight">{item.title || 'Заголовок новости'}</h3>
+                 <p className="mt-3 text-gray-600">{item.excerpt || 'Краткое описание новости. Здесь можно рассказать о последних событиях вашей компании или индустрии.'}</p>
+                 <a href="#" className="mt-4 inline-flex items-center font-semibold" style={{ color: settings.primaryColor }}>Читать далее →</a>
               </div>
-           </div>
+           </DraggableElement>
          ))}
        </div>
      </div>
   </SectionWrapper>
 );
 
-const NewsCards = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-gray-50">
+const NewsCards = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-gradient-to-b from-gray-50 to-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {section.showTitle !== false && (
-        <h2 className="text-3xl font-extrabold text-gray-900 mb-12 text-center">{section.title || 'Блог'}</h2>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+          <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl mb-12 text-center" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+            {section.title || 'Блог'}
+          </h2>
+        </DraggableElement>
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {(section.items || [1, 2, 3]).map((item, i) => (
-          <div key={i} className="bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
+          <DraggableElement
+            key={item?.id || i}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || i}`}
+            onUpdateSection={onUpdateSection}
+            className="bg-white/80 backdrop-blur border border-gray-200/70 overflow-hidden shadow-sm hover:shadow-md transition-all"
+            style={{ borderRadius: settings.borderRadius || '1rem' }}
+          >
              <img src={item.image || `https://source.unsplash.com/random/400x250?sig=${i+20}`} className="w-full h-48 object-cover" alt="" />
              <div className="p-6">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{item.category || 'Новости'}</span>
-                <h3 className="text-lg font-bold text-gray-900 mt-2">{item.title || 'Интересная статья'}</h3>
-                <p className="mt-3 text-gray-500 text-sm line-clamp-3">{item.excerpt || 'Краткое содержание статьи. Полезная информация для ваших клиентов и партнеров.'}</p>
+                <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: settings.primaryColor }}>{item.category || 'Новости'}</span>
+                <h3 className="text-lg font-extrabold text-gray-900 mt-2 tracking-tight">{item.title || 'Интересная статья'}</h3>
+                <p className="mt-3 text-gray-600 text-sm line-clamp-3">{item.excerpt || 'Краткое содержание статьи. Полезная информация для ваших клиентов и партнеров.'}</p>
              </div>
-          </div>
+          </DraggableElement>
         ))}
       </div>
     </div>
@@ -810,29 +1256,39 @@ const NewsCards = ({ section, settings }: SectionProps) => (
 
 // --- About Sections ---
 
-const AboutSimple = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-16 bg-white">
+const AboutSimple = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
        <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
           <div>
              {section.showTitle !== false && (
-               <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">{section.title || 'О нашей компании'}</h2>
+               <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+                 <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                   {section.title || 'О нашей компании'}
+                 </h2>
+               </DraggableElement>
              )}
              {section.showContent !== false && (
-               <p className="mt-4 text-lg text-gray-500">{section.content || 'Мы занимаемся созданием лучших решений для вашего бизнеса уже более 10 лет. Наша миссия - помогать клиентам достигать успеха.'}</p>
+               <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+                 <p className="mt-5 text-lg text-gray-600 leading-relaxed">{section.content || 'Мы занимаемся созданием лучших решений для вашего бизнеса уже более 10 лет. Наша миссия - помогать клиентам достигать успеха.'}</p>
+               </DraggableElement>
              )}
              <div className="mt-8">
-               <RenderButtons buttons={section.buttons} settings={settings} />
+               <DraggableElement section={section} isSelected={isSelected} elementKey="buttons" onUpdateSection={onUpdateSection}>
+                 <RenderButtons buttons={section.buttons} settings={settings} section={section} />
+               </DraggableElement>
              </div>
           </div>
           {section.showImage !== false && (
             <div className="mt-10 lg:mt-0">
-               <img 
-                 src={section.image || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80"} 
-                 className="shadow-lg object-cover" 
-                 style={{ borderRadius: settings.borderRadius || '0.5rem' }}
-                 alt="" 
-               />
+               <DraggableElement section={section} isSelected={isSelected} elementKey="image" onUpdateSection={onUpdateSection}>
+                 <img 
+                   src={section.image || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80"} 
+                   className="shadow-2xl ring-1 ring-black/10 object-cover" 
+                   style={{ borderRadius: settings.borderRadius || '1.25rem' }}
+                   alt="" 
+                 />
+               </DraggableElement>
             </div>
           )}
        </div>
@@ -840,56 +1296,89 @@ const AboutSimple = ({ section, settings }: SectionProps) => (
   </SectionWrapper>
 );
 
-const AboutStats = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-indigo-700" >
+const AboutStats = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20" >
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-       {section.showTitle !== false && (
-         <div className="text-center mb-10">
-            <h2 className="text-3xl font-extrabold text-white">{section.title || 'Мы в цифрах'}</h2>
-         </div>
-       )}
-       <dl className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+      <div
+        className="rounded-3xl px-8 py-14 md:px-12 overflow-hidden"
+        style={{
+          borderRadius: settings.borderRadius || '1.5rem',
+          background: `linear-gradient(135deg, ${settings.primaryColor} 0%, #111827 100%)`
+        }}
+      >
+        {section.showTitle !== false && (
+          <div className="text-center mb-10">
+            <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                {section.title || 'Мы в цифрах'}
+              </h2>
+            </DraggableElement>
+          </div>
+        )}
+        <dl className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {(section.items || [
             { label: 'Клиентов', value: '1000+' },
             { label: 'Проектов', value: '500+' },
             { label: 'Лет опыта', value: '10+' }
           ]).map((item, i) => (
-             <div key={i} className="flex flex-col bg-white/10 p-8 text-center backdrop-blur-sm" style={{ borderRadius: settings.borderRadius || '0.5rem' }}>
-                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-indigo-100">{item.label}</dt>
-                <dd className="order-1 text-5xl font-extrabold text-white">{item.value}</dd>
-             </div>
+            <DraggableElement
+              key={item?.id || i}
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item:${item?.id || i}`}
+              onUpdateSection={onUpdateSection}
+              className="flex flex-col bg-white/10 p-8 text-center backdrop-blur-sm border border-white/10 shadow-sm"
+              style={{ borderRadius: settings.borderRadius || '1rem' }}
+            >
+              <dt className="order-2 mt-3 text-sm font-semibold tracking-wide text-white/70 uppercase">{item.label}</dt>
+              <dd className="order-1 text-5xl font-extrabold text-white">{item.value}</dd>
+            </DraggableElement>
           ))}
-       </dl>
+        </dl>
+      </div>
     </div>
   </SectionWrapper>
 );
 
-const AboutTeam = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-12 bg-white">
+const AboutTeam = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
       <div className="space-y-12">
         {section.showTitle !== false && (
           <div className="space-y-5 sm:mx-auto sm:max-w-xl sm:space-y-4 lg:max-w-5xl">
-            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{section.title || 'Наша команда'}</h2>
+            <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+              <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+                {section.title || 'Наша команда'}
+              </h2>
+            </DraggableElement>
             {section.showContent !== false && (
-              <p className="text-xl text-gray-500">
-                {section.content || 'Познакомьтесь с талантливыми людьми, которые работают над вашим проектом.'}
-              </p>
+              <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+                <p className="text-xl text-gray-600">
+                  {section.content || 'Познакомьтесь с талантливыми людьми, которые работают над вашим проектом.'}
+                </p>
+              </DraggableElement>
             )}
           </div>
         )}
-        <ul className="mx-auto space-y-16 sm:grid sm:grid-cols-2 sm:gap-16 sm:space-y-0 lg:grid-cols-3 lg:max-w-5xl">
+        <ul className="mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:max-w-5xl">
           {(section.items || [1, 2, 3]).map((person, i) => (
-            <li key={i}>
-              <div className="space-y-6">
-                <img className="mx-auto h-40 w-40 rounded-full xl:w-56 xl:h-56 object-cover" src={person.image || `https://source.unsplash.com/random/200x200?sig=${i+50}`} alt="" />
-                <div className="space-y-2">
-                  <div className="text-lg leading-6 font-medium space-y-1">
-                    <h3>{person.name || 'Имя Фамилия'}</h3>
-                    <p className="text-indigo-600">{person.role || 'Должность'}</p>
+            <li key={person?.id || i}>
+              <DraggableElement
+                section={section}
+                isSelected={isSelected}
+                elementKey={`item:${person?.id || i}`}
+                onUpdateSection={onUpdateSection}
+                className="bg-white/80 backdrop-blur border border-gray-200/70 shadow-sm p-7"
+                style={{ borderRadius: settings.borderRadius || '1rem' }}
+              >
+                <div className="space-y-5">
+                  <img className="mx-auto h-40 w-40 object-cover ring-1 ring-black/10" style={{ borderRadius: settings.borderRadius || '9999px' }} src={person.image || `https://source.unsplash.com/random/200x200?sig=${i+50}`} alt="" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-extrabold text-gray-900">{person.name || 'Имя Фамилия'}</h3>
+                    <p className="font-semibold" style={{ color: settings.primaryColor }}>{person.role || 'Должность'}</p>
                   </div>
                 </div>
-              </div>
+              </DraggableElement>
             </li>
           ))}
         </ul>
@@ -900,49 +1389,71 @@ const AboutTeam = ({ section, settings }: SectionProps) => (
 
 // --- Pricing Sections ---
 
-const PricingThreeCol = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-16 bg-gray-50">
+const PricingThreeCol = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20 bg-gradient-to-b from-gray-50 to-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:flex-col sm:align-center">
         {section.showTitle !== false && (
-          <h1 className="text-5xl font-extrabold text-gray-900 sm:text-center">{section.title || 'Наши тарифы'}</h1>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h1 className="text-5xl font-extrabold tracking-tight text-gray-900 sm:text-center" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Наши тарифы'}
+            </h1>
+          </DraggableElement>
         )}
         {section.showContent !== false && (
-          <p className="mt-5 text-xl text-gray-500 sm:text-center">
-            {section.content || 'Выберите план, который подходит именно вам.'}
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+            <p className="mt-5 text-xl text-gray-600 sm:text-center">
+              {section.content || 'Выберите план, который подходит именно вам.'}
+            </p>
+          </DraggableElement>
         )}
       </div>
       <div className="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-3">
         {(section.items || [1, 2, 3]).map((item, i) => (
-          <div key={i} className={`border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200 bg-white ${item.isPopular ? 'ring-2 ring-indigo-500 relative' : ''}`}>
+          <DraggableElement
+            key={item?.id || i}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || i}`}
+            onUpdateSection={onUpdateSection}
+            className={`border border-gray-200/70 rounded-2xl shadow-sm bg-white/80 backdrop-blur ${item.isPopular ? 'ring-2 relative' : ''}`}
+            style={item.isPopular ? { borderRadius: settings.borderRadius || '1rem', borderColor: `${settings.primaryColor}55`, boxShadow: '0 12px 30px rgba(0,0,0,0.08)', outline: 'none', } : { borderRadius: settings.borderRadius || '1rem' }}
+          >
             {item.isPopular && (
-              <span className="absolute top-0 right-0 -mt-3 mr-3 px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-full shadow-sm">
+              <span className="absolute top-0 right-0 -mt-3 mr-3 px-3 py-1 text-xs font-bold text-white rounded-full shadow-sm" style={{ backgroundColor: settings.primaryColor }}>
                 Популярный
               </span>
             )}
             <div className="p-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">{item.title || 'Тариф'}</h2>
+              <h2 className="text-lg leading-6 font-extrabold text-gray-900">{item.title || 'Тариф'}</h2>
               <p className="mt-4">
                 <span className="text-4xl font-extrabold text-gray-900">{item.price || '0 ₽'}</span>
                 <span className="text-base font-medium text-gray-500">/мес</span>
               </p>
-              <a href="#" className={`mt-8 block w-full py-3 px-6 border border-transparent rounded-md text-center font-medium ${item.isPopular ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>
+              <a
+                href="#"
+                className="mt-8 block w-full py-3 px-6 border border-transparent rounded-xl text-center font-semibold transition-all shadow-sm hover:shadow-md"
+                style={{
+                  borderRadius: settings.borderRadius || '0.75rem',
+                  backgroundColor: item.isPopular ? settings.primaryColor : `${settings.primaryColor}14`,
+                  color: item.isPopular ? '#fff' : settings.primaryColor
+                }}
+              >
                 {item.buttonText || 'Выбрать'}
               </a>
             </div>
-            <div className="pt-6 pb-8 px-6">
-              <h3 className="text-xs font-medium text-gray-900 tracking-wide uppercase">Что включено</h3>
+            <div className="pt-6 pb-8 px-6 border-t border-gray-200/70">
+              <h3 className="text-xs font-extrabold text-gray-900 tracking-wide uppercase">Что включено</h3>
               <ul className="mt-6 space-y-4">
                 {(item.features ? item.features.split(',') : ['Опция 1', 'Опция 2', 'Опция 3']).map((feature: string, idx: number) => (
                   <li key={idx} className="flex space-x-3">
-                    <CheckCircle className="flex-shrink-0 h-5 w-5 text-green-500" aria-hidden="true" />
-                    <span className="text-sm text-gray-500">{feature.trim()}</span>
+                    <CheckCircle className="flex-shrink-0 h-5 w-5" aria-hidden="true" style={{ color: settings.primaryColor }} />
+                    <span className="text-sm text-gray-600">{feature.trim()}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
+          </DraggableElement>
         ))}
       </div>
     </div>
@@ -951,20 +1462,30 @@ const PricingThreeCol = ({ section, settings }: SectionProps) => (
 
 // --- FAQ Sections ---
 
-const FAQAccordion = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-white py-16">
+const FAQAccordion = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto divide-y-2 divide-gray-200">
+      <div className="max-w-3xl mx-auto">
         {section.showTitle !== false && (
-          <h2 className="text-center text-3xl font-extrabold text-gray-900 sm:text-4xl mb-8">
-            {section.title || 'Частые вопросы'}
-          </h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-center text-3xl font-extrabold text-gray-900 sm:text-4xl mb-8" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Частые вопросы'}
+            </h2>
+          </DraggableElement>
         )}
-        <dl className="mt-6 space-y-6 divide-y divide-gray-200">
+        <dl className="mt-6 space-y-4">
           {(section.items || [1, 2, 3]).map((item, i) => (
-            <div key={i} className="pt-6">
+            <DraggableElement
+              key={item?.id || i}
+              section={section}
+              isSelected={isSelected}
+              elementKey={`item:${item?.id || i}`}
+              onUpdateSection={onUpdateSection}
+              className="border border-gray-200/70 bg-white/80 backdrop-blur shadow-sm px-5 py-4"
+              style={{ borderRadius: settings.borderRadius || '1rem' }}
+            >
               <details className="group">
-                <summary className="text-lg font-medium text-gray-900 cursor-pointer list-none flex justify-between items-center">
+                <summary className="text-lg font-extrabold text-gray-900 cursor-pointer list-none flex justify-between items-center">
                   {item.question || 'Какой-то вопрос?'}
                   <span className="ml-6 flex-shrink-0 transition-transform group-open:-rotate-180">
                     <svg className="h-6 w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -972,11 +1493,11 @@ const FAQAccordion = ({ section, settings }: SectionProps) => (
                     </svg>
                   </span>
                 </summary>
-                <p className="mt-2 text-base text-gray-500 pr-12">
+                <p className="mt-3 text-base text-gray-600 pr-12 leading-relaxed">
                   {item.answer || 'Ответ на этот вопрос. Здесь может быть подробное объяснение.'}
                 </p>
               </details>
-            </div>
+            </DraggableElement>
           ))}
         </dl>
       </div>
@@ -986,9 +1507,17 @@ const FAQAccordion = ({ section, settings }: SectionProps) => (
 
 // --- New Sections (Map, Video, Partners) ---
 
-const MapEmbed = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-white">
-    <div className="w-full h-96 bg-gray-200 relative">
+const MapEmbed = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white py-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <DraggableElement
+      section={section}
+      isSelected={isSelected}
+      elementKey="map"
+      onUpdateSection={onUpdateSection}
+      className="w-full h-96 bg-gray-200 relative overflow-hidden ring-1 ring-black/10"
+      style={{ borderRadius: settings.borderRadius || '1rem' }}
+    >
       <iframe 
         width="100%" 
         height="100%" 
@@ -1000,27 +1529,50 @@ const MapEmbed = ({ section, settings }: SectionProps) => (
         tabIndex={0}
       ></iframe>
       {section.showTitle !== false && (
-        <div className="absolute top-4 left-4 bg-white p-4 rounded shadow-md max-w-xs">
-          <h3 className="text-lg font-bold text-gray-900">{section.title || 'Наш офис'}</h3>
-          {section.subtitle && <p className="text-sm text-gray-500 mt-1">{section.subtitle}</p>}
-        </div>
+        <DraggableElement
+          section={section}
+          isSelected={isSelected}
+          elementKey="title"
+          onUpdateSection={onUpdateSection}
+          className="absolute top-4 left-4 bg-white/90 backdrop-blur p-5 shadow-sm border border-gray-200/70 max-w-xs"
+          style={{ borderRadius: settings.borderRadius || '1rem' }}
+        >
+          <div>
+            <h3 className="text-lg font-extrabold text-gray-900 tracking-tight" style={{ fontFamily: getTitleFontFamily(section, settings) }}>{section.title || 'Наш офис'}</h3>
+            {section.subtitle && <p className="text-sm text-gray-600 mt-1">{section.subtitle}</p>}
+          </div>
+        </DraggableElement>
       )}
+    </DraggableElement>
     </div>
   </SectionWrapper>
 );
 
-const VideoSection = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="py-16 bg-gray-900">
+const VideoSection = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
       {section.showTitle !== false && (
         <div className="mb-12">
-          <h2 className="text-3xl font-extrabold text-white">{section.title || 'Видео презентация'}</h2>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+              {section.title || 'Видео презентация'}
+            </h2>
+          </DraggableElement>
           {section.showContent !== false && (
-            <p className="mt-4 text-xl text-gray-300">{section.content || 'Посмотрите короткое видео о наших возможностях.'}</p>
+            <DraggableElement section={section} isSelected={isSelected} elementKey="content" onUpdateSection={onUpdateSection}>
+              <p className="mt-4 text-xl text-gray-600">{section.content || 'Посмотрите короткое видео о наших возможностях.'}</p>
+            </DraggableElement>
           )}
         </div>
       )}
-      <div className="relative aspect-w-16 aspect-h-9 overflow-hidden rounded-xl shadow-2xl bg-black">
+      <DraggableElement
+        section={section}
+        isSelected={isSelected}
+        elementKey="video"
+        onUpdateSection={onUpdateSection}
+        className="relative aspect-w-16 aspect-h-9 overflow-hidden rounded-3xl shadow-2xl bg-black ring-1 ring-black/10"
+        style={{ borderRadius: settings.borderRadius || '1.5rem' }}
+      >
         {section.image ? (
            // If it's a YouTube/Vimeo embed URL
            <iframe 
@@ -1036,28 +1588,37 @@ const VideoSection = ({ section, settings }: SectionProps) => (
              <p>Вставьте ссылку на видео (Embed URL)</p>
            </div>
         )}
-      </div>
+      </DraggableElement>
     </div>
   </SectionWrapper>
 );
 
-const PartnersLogoCloud = ({ section, settings }: SectionProps) => (
-  <SectionWrapper section={section} settings={settings} className="bg-white py-12">
+const PartnersLogoCloud = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <SectionWrapper section={section} settings={settings} className="bg-white py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {section.showTitle !== false && (
-        <p className="text-center text-base font-semibold uppercase text-gray-600 tracking-wider mb-8">
-          {section.title || 'Нам доверяют'}
-        </p>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
+          <p className="text-center text-base font-extrabold uppercase text-gray-600 tracking-wider mb-10" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
+            {section.title || 'Нам доверяют'}
+          </p>
+        </DraggableElement>
       )}
       <div className="grid grid-cols-2 gap-8 md:grid-cols-6 lg:grid-cols-5">
         {(section.items && section.items.length > 0 ? section.items : Array(5).fill({})).map((item, i) => (
-          <div key={i} className="col-span-1 flex justify-center md:col-span-2 lg:col-span-1 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+          <DraggableElement
+            key={item?.id || i}
+            section={section}
+            isSelected={isSelected}
+            elementKey={`item:${item?.id || i}`}
+            onUpdateSection={onUpdateSection}
+            className="col-span-1 flex justify-center md:col-span-2 lg:col-span-1 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
+          >
             {item.image ? (
               <img className="h-12 object-contain" src={item.image} alt={item.title || "Partner"} />
             ) : (
-              <div className="h-12 w-32 bg-gray-200 rounded flex items-center justify-center text-gray-400 font-bold">LOGO</div>
+              <div className="h-12 w-32 bg-gray-100 border border-gray-200/70 rounded-xl flex items-center justify-center text-gray-400 font-extrabold">LOGO</div>
             )}
-          </div>
+          </DraggableElement>
         ))}
       </div>
     </div>
@@ -1066,11 +1627,11 @@ const PartnersLogoCloud = ({ section, settings }: SectionProps) => (
 
 // --- Footer Sections ---
 
-const FooterSimple = ({ section, settings }: SectionProps) => (
-  <footer className="bg-gray-800 text-white py-12" style={{ fontFamily: settings.fontFamily }}>
+const FooterSimple = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <footer className="bg-gray-950 text-white py-14" style={{ fontFamily: settings.fontFamily }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="md:flex md:items-center md:justify-between">
-        <div className="flex justify-center space-x-6 md:order-2">
+        <DraggableElement section={section} isSelected={isSelected} elementKey="social" onUpdateSection={onUpdateSection} className="flex justify-center space-x-6 md:order-2">
           <a href="#" className="text-gray-400 hover:text-gray-300">
             <span className="sr-only">Facebook</span>
             <Facebook className="h-6 w-6" />
@@ -1083,55 +1644,67 @@ const FooterSimple = ({ section, settings }: SectionProps) => (
             <span className="sr-only">Twitter</span>
             <Twitter className="h-6 w-6" />
           </a>
-        </div>
+        </DraggableElement>
         <div className="mt-8 md:mt-0 md:order-1">
-          <p className="text-center text-base text-gray-400">
-            &copy; {new Date().getFullYear()} {section.showTitle !== false && (section.title || settings.title)}. Все права защищены.
-          </p>
+          <DraggableElement section={section} isSelected={isSelected} elementKey="copyright" onUpdateSection={onUpdateSection}>
+            <p className="text-center text-base text-gray-400">
+              &copy; {new Date().getFullYear()} {section.showTitle !== false && (section.title || settings.title)}. Все права защищены.
+            </p>
+          </DraggableElement>
         </div>
       </div>
     </div>
   </footer>
 );
 
-const FooterColumns = ({ section, settings }: SectionProps) => (
-  <footer className="bg-gray-900 text-white py-16" style={{ fontFamily: settings.fontFamily }}>
+const FooterColumns = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
+  <footer className="bg-gray-950 text-white py-20" style={{ fontFamily: settings.fontFamily }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-        <div>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="col:company" onUpdateSection={onUpdateSection}>
+          <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Компания</h3>
            <ul className="space-y-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">О нас</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Блог</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Карьера</a></li>
            </ul>
-        </div>
-        <div>
+          </div>
+        </DraggableElement>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="col:support" onUpdateSection={onUpdateSection}>
+          <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Поддержка</h3>
            <ul className="space-y-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Помощь</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Контакты</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">FAQ</a></li>
            </ul>
-        </div>
-        <div>
+          </div>
+        </DraggableElement>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="col:legal" onUpdateSection={onUpdateSection}>
+          <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Юридическая инфо</h3>
            <ul className="space-y-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Конфиденциальность</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Условия</a></li>
            </ul>
-        </div>
-        <div>
+          </div>
+        </DraggableElement>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="col:subscribe" onUpdateSection={onUpdateSection}>
+          <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Подписка</h3>
            <p className="text-base text-gray-300 mb-4">Подпишитесь на наши новости.</p>
            <div className="flex">
              <input type="email" placeholder="Email" className="bg-gray-800 text-white px-4 py-2 rounded-l-md focus:outline-none w-full" />
              <button className="bg-indigo-600 px-4 py-2 rounded-r-md hover:bg-indigo-700">OK</button>
            </div>
-        </div>
+          </div>
+        </DraggableElement>
       </div>
       <div className="mt-12 border-t border-gray-700 pt-8">
-        <p className="text-base text-gray-400 text-center">&copy; {new Date().getFullYear()} {section.showTitle !== false && (section.title || settings.title)}. Все права защищены.</p>
+        <DraggableElement section={section} isSelected={isSelected} elementKey="copyright" onUpdateSection={onUpdateSection}>
+          <p className="text-base text-gray-400 text-center">&copy; {new Date().getFullYear()} {section.showTitle !== false && (section.title || settings.title)}. Все права защищены.</p>
+        </DraggableElement>
       </div>
     </div>
   </footer>
@@ -1143,9 +1716,11 @@ interface SiteRendererProps {
   settings: SiteSettings;
   selectedSectionId?: string | null;
   onSelectSection?: (id: string) => void;
+  onUpdateSection?: (id: string, updates: Partial<Section>) => void;
+  device?: 'desktop' | 'mobile';
 }
 
-export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: SiteRendererProps) => {
+export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection, onUpdateSection, device = 'desktop' }: SiteRendererProps) => {
   if (!settings || !settings.sections) {
     return <div className="p-10 text-center text-gray-500">Нет контента для отображения</div>;
   }
@@ -1157,7 +1732,8 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
       section,
       settings,
       isSelected,
-      onClick: () => onSelectSection && onSelectSection(section.id)
+      onClick: () => onSelectSection && onSelectSection(section.id),
+      onUpdateSection
     };
 
     let Component: any = null;
@@ -1179,6 +1755,12 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
         break;
       case 'text':
         Component = section.variant === 'cta' ? TextCTA : TextSimple;
+        break;
+      case 'banner':
+        Component = BannerAnnouncement;
+        break;
+      case 'steps':
+        Component = StepsCards;
         break;
       case 'contact':
         Component = ContactSplit;
@@ -1225,6 +1807,8 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
       hero: 'Главный экран',
       features: 'Преимущества',
       text: 'Текст',
+      banner: 'Баннер',
+      steps: 'Шаги',
       contact: 'Контакты',
       gallery: 'Галерея',
       footer: 'Подвал',
@@ -1243,7 +1827,7 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
         key={section.id}
         id={section.id}
         onClick={() => onSelectSection && onSelectSection(section.id)}
-        className={`relative transition-all duration-200 border-2 ${isSelected ? 'border-indigo-600 shadow-lg z-10' : 'border-transparent hover:border-indigo-300 hover:border-dashed'}`}
+        className={`relative transition-all duration-200 border-2 ${isSelected ? 'border-indigo-600 shadow-lg z-10' : 'border-transparent hover:border-indigo-300 hover:border-dashed'} ${getSectionEffectsClassName(section)}`}
       >
         <Component {...commonProps} />
         {onSelectSection && isSelected && (
@@ -1256,9 +1840,11 @@ export const SiteRenderer = ({ settings, selectedSectionId, onSelectSection }: S
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {settings.sections.map((section) => renderSection(section))}
-    </div>
+    <DragDeviceContext.Provider value={device}>
+      <div className="min-h-screen bg-white">
+        {settings.sections.map((section) => renderSection(section))}
+      </div>
+    </DragDeviceContext.Provider>
   );
 };
 

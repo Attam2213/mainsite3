@@ -10,8 +10,6 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ClientDashboard from './pages/client/ClientDashboard';
-import CMSEditor from './pages/client/CMSEditor';
-import SitePreview from './pages/client/SitePreview';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
@@ -65,22 +63,6 @@ const App = () => {
             element={
               <ProtectedRoute allowedRoles={['client', 'admin']}>
                 <ClientDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cms/:siteId"
-            element={
-              <ProtectedRoute allowedRoles={['client', 'admin']}>
-                <CMSEditor />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/preview/:siteId"
-            element={
-              <ProtectedRoute allowedRoles={['client', 'admin']}>
-                <SitePreview />
               </ProtectedRoute>
             }
           />

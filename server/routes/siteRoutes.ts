@@ -159,11 +159,25 @@ router.post('/', authenticateToken, async (req: any, res: any) => {
     await server.increment('currentLoad');
 
     // Reload site with server details to return full info
-    const siteWithServer = await Site.findByPk(site.id, {
-      include: [{ model: Server, as: 'server', attributes: ['name', 'ipAddress'] }]
-    });
+    try {
+      const siteWithServer = await Site.findByPk(site.id, {
+        include: [{ model: Server, as: 'server', attributes: ['name', 'ipAddress'] }]
+      });
+      if (siteWithServer) {
+        res.status(201).json(siteWithServer);
+        return;
+      }
+    } catch (e) {
+      console.error('Error loading created site with server:', e);
+    }
 
-    res.status(201).json(siteWithServer);
+    res.status(201).json({
+      id: site.id,
+      domain: site.domain,
+      status: site.status,
+      cmsVersion: site.cmsVersion,
+      serverId: site.serverId
+    });
   } catch (error) {
     console.error('Error creating site:', error);
     res.status(500).json({ message: 'Error creating site' });

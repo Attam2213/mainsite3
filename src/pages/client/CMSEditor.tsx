@@ -5,6 +5,7 @@ import {
   Save, 
   ArrowLeft, 
   Monitor, 
+  Smartphone,
   Layout, 
   Type, 
   Image as ImageIcon,
@@ -34,12 +35,156 @@ const SectionPreview = ({ type, variant, label }: { type: any, variant: string, 
     content: 'Это пример того, как будет выглядеть данная секция на вашем сайте.',
     image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1000&q=80',
     buttons: [{ id: 'btn-prev', text: 'Действие', url: '#', style: 'primary' }],
-    items: [
-       { title: 'Элемент 1', description: 'Описание элемента', author: 'Имя', text: 'Текст отзыва', rating: 5, image: 'https://images.unsplash.com/photo-1554151228-14d9def656ec?auto=format&fit=crop&w=100&q=80', date: '01.01.2024', label: 'Инфо', value: '100' },
-       { title: 'Элемент 2', description: 'Описание элемента', author: 'Имя', text: 'Текст отзыва', rating: 5, image: 'https://images.unsplash.com/photo-1554151228-14d9def656ec?auto=format&fit=crop&w=100&q=80', date: '01.01.2024', label: 'Инфо', value: '100' },
-       { title: 'Элемент 3', description: 'Описание элемента', author: 'Имя', text: 'Текст отзыва', rating: 5, image: 'https://images.unsplash.com/photo-1554151228-14d9def656ec?auto=format&fit=crop&w=100&q=80', date: '01.01.2024', label: 'Инфо', value: '100' }
-    ]
+    items: [],
+    settings: { effects: { enabled: true, animation: 'fade-up', hoverLift: true } }
   };
+
+  if (type === 'header') {
+    dummySection.title = 'Компания';
+    dummySection.items = [
+      { text: 'Главная', url: '#home' },
+      { text: 'О нас', url: '#about' },
+      { text: 'Контакты', url: '#contact' }
+    ];
+    dummySection.subtitle = undefined;
+    dummySection.content = undefined;
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'features') {
+    dummySection.title = 'Преимущества';
+    dummySection.subtitle = 'Почему выбирают нас';
+    dummySection.items = [
+      { title: 'Скорость', description: 'Быстро загружается и отлично выглядит.' },
+      { title: 'Дизайн', description: 'Современный стиль и аккуратные детали.' },
+      { title: 'Гибкость', description: 'Настраивайте секции под себя.' },
+      { title: 'Поддержка', description: 'Можно расширять функционал дальше.' }
+    ];
+  }
+
+  if (type === 'reviews') {
+    dummySection.title = 'Отзывы';
+    dummySection.items = [
+      { author: 'Иван', text: 'Сайт получился очень крутым!', rating: 5 },
+      { author: 'Мария', text: 'Удобный редактор и красивый результат.', rating: 5 },
+      { author: 'Дмитрий', text: 'Сделали быстро, всё работает.', rating: 4 }
+    ];
+    dummySection.subtitle = undefined;
+    dummySection.image = undefined;
+  }
+
+  if (type === 'gallery') {
+    dummySection.title = 'Галерея';
+    dummySection.items = Array.from({ length: 6 }).map((_, i) => ({
+      image: `https://source.unsplash.com/random/800x800?sig=${i + 1}`
+    }));
+    dummySection.subtitle = 'Лучшие работы';
+    dummySection.content = undefined;
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'news') {
+    dummySection.title = 'Блог';
+    dummySection.subtitle = 'Свежие обновления';
+    dummySection.items = [
+      { title: 'Запуск нового продукта', excerpt: 'Короткое описание новости...', date: '01.01.2026', category: 'Новости', image: 'https://source.unsplash.com/random/800x600?sig=11' },
+      { title: 'Обновление сервиса', excerpt: 'Что изменилось и почему...', date: '12.01.2026', category: 'Обновления', image: 'https://source.unsplash.com/random/800x600?sig=12' },
+      { title: 'Кейсы клиентов', excerpt: 'Истории успеха и цифры...', date: '20.01.2026', category: 'Кейсы', image: 'https://source.unsplash.com/random/800x600?sig=13' }
+    ];
+    dummySection.content = undefined;
+  }
+
+  if (type === 'about') {
+    dummySection.title = 'О компании';
+    dummySection.content = 'Пара строк о вашей команде, ценностях и подходе к работе.';
+    dummySection.subtitle = variant === 'stats' ? undefined : 'Кто мы и чем занимаемся';
+    if (variant === 'stats') {
+      dummySection.items = [
+        { label: 'Проектов', value: '120+' },
+        { label: 'Клиентов', value: '60+' },
+        { label: 'Лет опыта', value: '8' }
+      ];
+    }
+    if (variant === 'team') {
+      dummySection.items = [
+        { name: 'Алексей', role: 'CEO', image: 'https://source.unsplash.com/random/200x200?sig=21' },
+        { name: 'Мария', role: 'Дизайнер', image: 'https://source.unsplash.com/random/200x200?sig=22' },
+        { name: 'Дмитрий', role: 'Разработчик', image: 'https://source.unsplash.com/random/200x200?sig=23' }
+      ];
+      dummySection.subtitle = 'Люди, которые делают продукт';
+    }
+  }
+
+  if (type === 'pricing') {
+    dummySection.title = 'Тарифы';
+    dummySection.subtitle = undefined;
+    dummySection.content = 'Прозрачные цены без скрытых платежей.';
+    dummySection.items = [
+      { title: 'Базовый', price: '1000 ₽', features: 'Опция 1, Опция 2, Опция 3', buttonText: 'Выбрать' },
+      { title: 'Стандарт', price: '2500 ₽', features: 'Все из Базового, Опция 4, Опция 5', buttonText: 'Выбрать', isPopular: true },
+      { title: 'Премиум', price: '5000 ₽', features: 'Все включено, Поддержка 24/7', buttonText: 'Выбрать' }
+    ];
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'faq') {
+    dummySection.title = 'FAQ';
+    dummySection.subtitle = undefined;
+    dummySection.content = undefined;
+    dummySection.items = [
+      { question: 'Как это работает?', answer: 'Вы добавляете секции и настраиваете контент.' },
+      { question: 'Можно ли отключить эффекты?', answer: 'Да, в настройках секции есть переключатели.' },
+      { question: 'Можно ли менять дизайн?', answer: 'Да, цвета, шрифты и блоки настраиваются.' }
+    ];
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'map') {
+    dummySection.title = 'Мы на карте';
+    dummySection.subtitle = 'Адрес и маршрут';
+    dummySection.content = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2245.584360343727!2d37.61763261604557!3d55.75578638055416!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x46b54a50b315e573%3A0xa886bf5a3d9b2e68!2sThe%20Kremlin!5e0!3m2!1sen!2sru!4v1620000000000!5m2!1sen!2sru';
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'video') {
+    dummySection.title = 'Видео';
+    dummySection.subtitle = undefined;
+    dummySection.content = 'Короткая презентация продукта.';
+    dummySection.image = 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'partners') {
+    dummySection.title = 'Нам доверяют';
+    dummySection.subtitle = undefined;
+    dummySection.content = undefined;
+    dummySection.items = Array.from({ length: 5 }).map((_, i) => ({
+      image: `https://source.unsplash.com/random/200x120?sig=${40 + i}`,
+      title: `Partner ${i + 1}`
+    }));
+    dummySection.buttons = undefined;
+  }
+
+  if (type === 'banner') {
+    dummySection.title = 'Акция недели';
+    dummySection.subtitle = undefined;
+    dummySection.content = 'Скидка 20% на запуск сайта. Успейте забронировать.';
+    dummySection.buttons = [{ id: 'btn-prev', text: 'Получить скидку', url: '#', style: 'secondary' }];
+    dummySection.items = undefined;
+    dummySection.image = undefined;
+  }
+
+  if (type === 'steps') {
+    dummySection.title = 'Как это работает';
+    dummySection.subtitle = '3 шага до результата';
+    dummySection.content = undefined;
+    dummySection.items = [
+      { title: 'Шаг 1', description: 'Выберите услугу и подготовьте информацию.' },
+      { title: 'Шаг 2', description: 'Настройте дизайн и блоки в редакторе.' },
+      { title: 'Шаг 3', description: 'Опубликуйте сайт и поделитесь ссылкой.' }
+    ];
+    dummySection.image = undefined;
+  }
 
   const dummySettings: SiteSettings = {
     title: 'Preview',
@@ -79,6 +224,13 @@ const SECTION_TEMPLATES = [
     items: [
       { type: 'hero', variant: 'split', label: 'С изображением сбоку', icon: ImageIcon },
       { type: 'hero', variant: 'center', label: 'По центру', icon: ImageIcon },
+    ]
+  },
+  {
+    category: 'Современные',
+    items: [
+      { type: 'banner', variant: 'announcement', label: 'Баннер', icon: MessageSquare },
+      { type: 'steps', variant: 'cards', label: 'Шаги', icon: Layers },
     ]
   },
   {
@@ -172,6 +324,20 @@ const CMSEditor = () => {
     fontFamily: 'sans-serif',
     sections: []
   });
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+
+  const fontOptions = [
+    { value: "sans-serif", label: "Sans Serif" },
+    { value: "serif", label: "Serif" },
+    { value: "monospace", label: "Monospace" },
+    { value: "'Inter', sans-serif", label: "Inter" },
+    { value: "'Manrope', sans-serif", label: "Manrope" },
+    { value: "'Poppins', sans-serif", label: "Poppins" },
+    { value: "'Roboto', sans-serif", label: "Roboto" },
+    { value: "'Open Sans', sans-serif", label: "Open Sans" },
+    { value: "'Montserrat', sans-serif", label: "Montserrat" },
+    { value: "'Playfair Display', serif", label: "Playfair Display" }
+  ];
 
   useEffect(() => {
     fetchSite();
@@ -375,6 +541,23 @@ const CMSEditor = () => {
       newSection.buttons = [{ id: 'cta-btn', text: 'Связаться', url: '#', style: 'primary' }];
     }
 
+    if (type === 'banner') {
+      newSection.title = 'Акция недели';
+      newSection.content = 'Скидка 20% на запуск сайта. Успейте забронировать предложение!';
+      newSection.buttons = [{ id: 'banner-btn', text: 'Получить скидку', url: '#', style: 'secondary' }];
+    }
+
+    if (type === 'steps') {
+      newSection.title = 'Как это работает';
+      newSection.subtitle = '3 простых шага до результата';
+      newSection.items = [
+        { title: 'Выберите услугу', description: 'Определитесь, что нужно сделать.' },
+        { title: 'Оставьте заявку', description: 'Мы свяжемся и уточним детали.' },
+        { title: 'Получите результат', description: 'Запустим и передадим готовое решение.' }
+      ];
+      newSection.buttons = [{ id: 'steps-btn', text: 'Начать', url: '#', style: 'primary' }];
+    }
+
     if (type === 'video') {
       newSection.title = 'Видео презентация';
       newSection.content = 'Посмотрите короткое видео о наших возможностях.';
@@ -414,10 +597,10 @@ const CMSEditor = () => {
   };
 
   const updateSection = (id: string, updates: Partial<Section>) => {
-    setSettings({
-      ...settings,
-      sections: settings.sections.map(s => s.id === id ? { ...s, ...updates } : s)
-    });
+    setSettings((prev) => ({
+      ...prev,
+      sections: prev.sections.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    }));
   };
 
   const removeSection = (id: string) => {
@@ -519,6 +702,7 @@ const CMSEditor = () => {
     
     if (section.type === 'header') newItem = { ...newItem, text: 'Новая ссылка', url: '#' };
     if (section.type === 'features') newItem = { ...newItem, title: 'Преимущество', description: 'Описание' };
+    if (section.type === 'steps') newItem = { ...newItem, title: 'Шаг', description: 'Описание' };
     if (section.type === 'contact') newItem = { ...newItem, text: '+7 (999) 000-00-00', type: 'phone' };
     if (section.type === 'reviews') newItem = { ...newItem, author: 'Имя Клиента', text: 'Отзыв...', rating: 5 };
     if (section.type === 'gallery') newItem = { ...newItem, image: 'https://source.unsplash.com/random/800x600?sig=' + Date.now() };
@@ -665,7 +849,7 @@ const CMSEditor = () => {
                     />
                   </div>
                   
-                  {['hero', 'header', 'gallery', 'features', 'reviews', 'news'].includes(selectedSection.type) && (
+                  {['hero', 'header', 'gallery', 'features', 'steps', 'reviews', 'news'].includes(selectedSection.type) && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
                         <label className="block text-sm font-medium text-gray-700">Подзаголовок</label>
@@ -703,6 +887,63 @@ const CMSEditor = () => {
                       onChange={(e) => updateSection(selectedSection.id, { content: e.target.value })}
                       className={`mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border ${selectedSection.showContent === false ? 'opacity-50 bg-gray-50' : ''}`}
                     />
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Шрифты секции</label>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Заголовки</label>
+                        <select
+                          value={selectedSection.settings?.typography?.titleFont || ''}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.typography || {};
+                            const next = e.target.value;
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), typography: { ...prev, titleFont: next } } });
+                          }}
+                          className="block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2 border"
+                        >
+                          <option value="">Как у сайта</option>
+                          {fontOptions.map((f) => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Текст</label>
+                        <select
+                          value={selectedSection.settings?.typography?.textFont || ''}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.typography || {};
+                            const next = e.target.value;
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), typography: { ...prev, textFont: next } } });
+                          }}
+                          className="block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2 border"
+                        >
+                          <option value="">Как у сайта</option>
+                          {fontOptions.map((f) => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Кнопки</label>
+                        <select
+                          value={selectedSection.settings?.typography?.buttonFont || ''}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.typography || {};
+                            const next = e.target.value;
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), typography: { ...prev, buttonFont: next } } });
+                          }}
+                          className="block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2 border"
+                        >
+                          <option value="">Как у сайта</option>
+                          {fontOptions.map((f) => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Main Image */}
@@ -767,8 +1008,81 @@ const CMSEditor = () => {
                     />
                   </div>
 
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Эффекты</label>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prevLayout = selectedSection.settings?.layout || {};
+                          const prevPositionsByDevice = (prevLayout as any).positionsByDevice || {};
+                          updateSection(selectedSection.id, {
+                            settings: {
+                              ...(selectedSection.settings || {}),
+                              layout: {
+                                ...prevLayout,
+                                positionsByDevice: { ...prevPositionsByDevice, [previewDevice]: {} },
+                                positions: previewDevice === 'desktop' ? {} : (prevLayout as any).positions
+                              }
+                            }
+                          });
+                        }}
+                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50"
+                        disabled={(() => {
+                          const layout = (selectedSection.settings as any)?.layout || {};
+                          const byDevice = layout.positionsByDevice || {};
+                          const devicePos = byDevice[previewDevice] || (previewDevice === 'desktop' ? layout.positions : null);
+                          return !devicePos || Object.keys(devicePos || {}).length === 0;
+                        })()}
+                      >
+                        Сбросить позиции
+                      </button>
+                      <label className="flex items-center justify-between text-sm text-gray-700">
+                        <span>Включить эффекты</span>
+                        <input
+                          type="checkbox"
+                          checked={(selectedSection.settings?.effects?.enabled ?? true) !== false}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.effects || {};
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), effects: { ...prev, enabled: e.target.checked } } });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </label>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Анимация</label>
+                        <select
+                          value={selectedSection.settings?.effects?.animation || 'none'}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.effects || {};
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), effects: { ...prev, animation: e.target.value } } });
+                          }}
+                          className="block w-full border-gray-300 rounded-md shadow-sm sm:text-sm p-2 border"
+                          disabled={(selectedSection.settings?.effects?.enabled ?? true) === false}
+                        >
+                          <option value="none">Нет</option>
+                          <option value="fade">Появление</option>
+                          <option value="fade-up">Появление снизу</option>
+                        </select>
+                      </div>
+                      <label className={`flex items-center justify-between text-sm ${(selectedSection.settings?.effects?.enabled ?? true) === false ? 'text-gray-400' : 'text-gray-700'}`}>
+                        <span>Подъём при наведении</span>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedSection.settings?.effects?.hoverLift}
+                          onChange={(e) => {
+                            const prev = selectedSection.settings?.effects || {};
+                            updateSection(selectedSection.id, { settings: { ...(selectedSection.settings || {}), effects: { ...prev, hoverLift: e.target.checked } } });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          disabled={(selectedSection.settings?.effects?.enabled ?? true) === false}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
                   {/* Buttons Editor */}
-                  {['hero', 'text', 'about'].includes(selectedSection.type) && (
+                  {['hero', 'text', 'about', 'banner', 'steps'].includes(selectedSection.type) && (
                     <div className="pt-4 border-t border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">Кнопки</label>
@@ -879,7 +1193,7 @@ const CMSEditor = () => {
                   )}
 
                   {/* Items Editor */}
-                  {['header', 'features', 'contact', 'reviews', 'gallery', 'news', 'about', 'pricing', 'faq'].includes(selectedSection.type) && (
+                  {['header', 'features', 'steps', 'contact', 'reviews', 'gallery', 'news', 'about', 'pricing', 'faq'].includes(selectedSection.type) && (
                     <div className="pt-4 border-t border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">
@@ -942,7 +1256,7 @@ const CMSEditor = () => {
                                 </>
                               )}
 
-                              {selectedSection.type === 'features' && (
+                              {(selectedSection.type === 'features' || selectedSection.type === 'steps') && (
                                 <>
                                   <input
                                     type="text"
@@ -1266,12 +1580,9 @@ const CMSEditor = () => {
                   onChange={(e) => setSettings({ ...settings, fontFamily: e.target.value })}
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
                 >
-                  <option value="sans-serif">Sans Serif</option>
-                  <option value="serif">Serif</option>
-                  <option value="monospace">Monospace</option>
-                  <option value="'Inter', sans-serif">Inter</option>
-                  <option value="'Roboto', sans-serif">Roboto</option>
-                  <option value="'Open Sans', sans-serif">Open Sans</option>
+                  {fontOptions.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1387,21 +1698,45 @@ const CMSEditor = () => {
       {/* Main Preview Area */}
       <div className="flex-1 overflow-auto bg-gray-200 flex flex-col">
         <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm z-10">
-          <div className="flex items-center text-sm text-gray-500">
-            <Monitor className="h-4 w-4 mr-2" />
-            <span>Предпросмотр (ПК)</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center text-sm text-gray-500">
+              {previewDevice === 'desktop' ? <Monitor className="h-4 w-4 mr-2" /> : <Smartphone className="h-4 w-4 mr-2" />}
+              <span>{previewDevice === 'desktop' ? 'Предпросмотр (ПК)' : 'Предпросмотр (Телефон)'}</span>
+            </div>
+            <div className="flex items-center rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setPreviewDevice('desktop')}
+                className={`px-3 py-1.5 text-sm flex items-center gap-2 ${previewDevice === 'desktop' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <Monitor className="h-4 w-4" />
+                ПК
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewDevice('mobile')}
+                className={`px-3 py-1.5 text-sm flex items-center gap-2 border-l border-gray-200 ${previewDevice === 'mobile' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <Smartphone className="h-4 w-4" />
+                Телефон
+              </button>
+            </div>
           </div>
           <a href={`/preview/${siteId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
             Открыть в новой вкладке
           </a>
         </div>
         
-        <div className="flex-1 p-8 flex justify-center">
-          <div className="w-full max-w-[1200px] bg-white shadow-2xl overflow-hidden rounded-lg min-h-[calc(100vh-100px)]">
+        <div className={`flex-1 flex justify-center ${previewDevice === 'desktop' ? 'p-8' : 'p-4'}`}>
+          <div
+            className={`${previewDevice === 'desktop' ? 'w-full max-w-[1200px] min-h-[calc(100vh-100px)] overflow-hidden' : 'w-[390px] max-w-[90vw] h-[844px] overflow-auto'} bg-white shadow-2xl rounded-lg`}
+          >
              <SiteRenderer 
                settings={settings} 
                selectedSectionId={selectedSectionId}
                onSelectSection={setSelectedSectionId}
+               onUpdateSection={updateSection}
+               device={previewDevice}
              />
           </div>
         </div>

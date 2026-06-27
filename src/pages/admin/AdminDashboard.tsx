@@ -17,7 +17,6 @@ import {
   Loader,
   Server,
   Terminal,
-  Globe,
   RefreshCw,
   MessageCircle,
   Settings
@@ -34,14 +33,6 @@ interface ServerNode {
   createdAt: string;
 }
 
-interface Site {
-  id: string;
-  domain: string;
-  status: string;
-  cmsVersion: string;
-  createdAt: string;
-}
-
 interface Service {
   id: string;
   title: string;
@@ -52,6 +43,8 @@ interface Service {
   color: string;
   hidden?: boolean;
 }
+
+const isCmsService = (service: Service) => service.title.includes('CMS');
 
 interface PortfolioItem {
   id: string;
@@ -172,7 +165,7 @@ const formatDate = (date: string | Date) => {
 };
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'websites' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -231,70 +224,6 @@ const AdminDashboard = () => {
   const [newServer, setNewServer] = useState({ name: '', ipAddress: '', capacity: 10 });
   const [showToken, setShowToken] = useState<string | null>(null);
   
-  // Server Sites Modal
-  const [viewServerSites, setViewServerSites] = useState<string | null>(null);
-  const [serverSites, setServerSites] = useState<Site[]>([]);
-  const [loadingServerSites, setLoadingServerSites] = useState(false);
-
-  const fetchServerSites = async (serverId: string) => {
-    try {
-      setLoadingServerSites(true);
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/servers/${serverId}/sites`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setServerSites(data);
-        setViewServerSites(serverId);
-      }
-    } catch (error) {
-      console.error('Error fetching server sites:', error);
-    } finally {
-      setLoadingServerSites(false);
-    }
-  };
-
-  const handleDeleteSite = async (siteId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот сайт? Это действие нельзя отменить.')) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/sites/${siteId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        setServerSites(serverSites.filter(s => s.id !== siteId));
-        // Update server load locally
-        if (viewServerSites) {
-            setServers(prev => prev.map(s => 
-                s.id === viewServerSites 
-                ? { ...s, currentLoad: Math.max(0, s.currentLoad - 1) } 
-                : s
-            ));
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting site:', error);
-    }
-  };
-
-  const [websiteFilters, setWebsiteFilters] = useState({
-    status: 'all', // all, up, down
-    payment: 'all' // all, paid, unpaid
-  });
-
-  const isUserPaid = (userId: string) => {
-    return invoices.some(inv => 
-      inv.userId === userId && 
-      inv.type === 'monthly' && 
-      inv.status === 'paid' && 
-      new Date(inv.dueDate) > new Date()
-    );
-  };
-
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // Refresh every 30s
@@ -345,7 +274,7 @@ const AdminDashboard = () => {
       const servicesData = servicesRes.ok ? await servicesRes.json() : [];
       const portfolioData = portfolioRes.ok ? await portfolioRes.json() : [];
       
-      if (Array.isArray(servicesData)) setServices(servicesData);
+      if (Array.isArray(servicesData)) setServices(servicesData.filter((service) => !isCmsService(service)));
       if (Array.isArray(portfolioData)) setPortfolioItems(portfolioData);
 
       if (usersRes.ok) {
@@ -841,10 +770,8 @@ const AdminDashboard = () => {
                 { id: 'orders', label: 'Заказы' },
                 { id: 'discussions', label: 'Обсуждения' },
                 { id: 'users', label: 'Пользователи' },
-                { id: 'websites', label: 'Сайты' },
                 { id: 'invoices', label: 'Счета' },
                 { id: 'projects', label: 'Проекты' },
-                { id: 'servers', label: 'Серверы' },
                 { id: 'feedback', label: 'Обратная связь' },
                 { id: 'hosting_nodes', label: 'Локации (VDS)' },
                 { id: 'game_servers', label: 'Игровые серверы' }
@@ -856,8 +783,6 @@ const AdminDashboard = () => {
                   badgeCount = orders.filter(o => o.service && o.status === 'pending').length;
                 } else if (tab.id === 'discussions') {
                   badgeCount = orders.filter(o => !o.service).reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
-                } else if (tab.id === 'websites') {
-                  badgeCount = projects.filter(p => p.siteStatus === 'down').length;
                 } else if (tab.id === 'feedback') {
                   badgeCount = feedbacks.filter(f => f.status === 'new').length;
                 }
@@ -1249,13 +1174,6 @@ const AdminDashboard = () => {
                           Токен настройки
                         </button>
                         <button
-                          onClick={() => fetchServerSites(server.id)}
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium flex items-center"
-                        >
-                          <Globe className="w-4 h-4 mr-1" />
-                          Сайты
-                        </button>
-                        <button
                           onClick={() => handleDeleteServer(server.id)}
                           className="text-red-600 hover:text-red-900"
                         >
@@ -1351,55 +1269,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Server Sites Modal */}
-          {viewServerSites && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-              <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl max-h-[80vh] flex flex-col">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">Сайты на сервере</h2>
-                  <button onClick={() => setViewServerSites(null)} className="text-gray-400 hover:text-gray-500">
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto">
-                  {loadingServerSites ? (
-                    <div className="flex justify-center py-10">
-                      <Loader className="animate-spin text-indigo-600 h-8 w-8" />
-                    </div>
-                  ) : serverSites.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500">
-                      На этом сервере нет сайтов.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {serverSites.map(site => (
-                        <div key={site.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{site.domain}</h3>
-                            <p className="text-xs text-gray-500">Создан: {formatDate(site.createdAt)}</p>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              site.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {site.status === 'active' ? 'Активен' : 'Настройка'}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleDeleteSite(site.id)}
-                            className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-full transition-colors"
-                            title="Удалить сайт"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'users' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
@@ -1460,100 +1329,6 @@ const AdminDashboard = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'websites' && (
-            <div className="space-y-6">
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Статус сайта</label>
-                  <select
-                    value={websiteFilters.status}
-                    onChange={(e) => setWebsiteFilters({...websiteFilters, status: e.target.value})}
-                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                  >
-                    <option value="all">Все</option>
-                    <option value="up">Работает</option>
-                    <option value="down">Не работает</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Оплата</label>
-                  <select
-                    value={websiteFilters.payment}
-                    onChange={(e) => setWebsiteFilters({...websiteFilters, payment: e.target.value})}
-                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                  >
-                    <option value="all">Все</option>
-                    <option value="paid">Оплачено</option>
-                    <option value="unpaid">Не оплачено</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сайт</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус сайта</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Оплата</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {projects
-                        .filter(p => p.websiteUrl)
-                        .filter(p => {
-                          if (websiteFilters.status === 'up' && p.siteStatus !== 'up') return false;
-                          if (websiteFilters.status === 'down' && p.siteStatus !== 'down') return false;
-                          
-                          const paid = isUserPaid(p.clientId);
-                          if (websiteFilters.payment === 'paid' && !paid) return false;
-                          if (websiteFilters.payment === 'unpaid' && paid) return false;
-                          
-                          return true;
-                        })
-                        .map(project => {
-                          const client = users.find(u => u.id === project.clientId);
-                          const paid = isUserPaid(project.clientId);
-                          return (
-                            <tr key={project.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{client?.name || 'Unknown'}</div>
-                                <div className="text-xs text-gray-500">{client?.email}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900">
-                                  {project.websiteUrl}
-                                </a>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  project.siteStatus === 'up' ? 'bg-green-100 text-green-800' : 
-                                  project.siteStatus === 'down' ? 'bg-red-100 text-red-800' : 
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {project.siteStatus === 'up' ? 'Работает' : 
-                                   project.siteStatus === 'down' ? 'Не работает' : 'Неизвестно'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {paid ? 'Оплачено' : 'Не оплачено'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             </div>
           )}

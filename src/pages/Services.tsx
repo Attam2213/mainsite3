@@ -28,6 +28,8 @@ interface Service {
   color: string;
 }
 
+const isCmsService = (service: Service) => service.title.includes('CMS');
+
 const Services = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -75,7 +77,7 @@ const Services = () => {
           throw new Error('Failed to fetch services');
         }
         const data = await response.json();
-        setServices(data);
+        setServices(Array.isArray(data) ? data.filter((service) => !isCmsService(service)) : []);
       } catch (err) {
         console.error('Error fetching services:', err);
         setError('Не удалось загрузить услуги');

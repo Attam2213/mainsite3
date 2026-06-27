@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=Open+Sans:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,5 +7,45 @@
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer utilities {
+  @keyframes cmsFadeUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 12px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes cmsFade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .cms-anim-fade-up {
+    animation: cmsFadeUp 0.6s ease-out both;
+  }
+
+  .cms-anim-fade {
+    animation: cmsFade 0.45s ease-out both;
+  }
+
+  .cms-hover-lift {
+    transition: transform 220ms ease, box-shadow 220ms ease;
+    will-change: transform;
+  }
+
+  .cms-hover-lift:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
   }
 }
