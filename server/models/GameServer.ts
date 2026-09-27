@@ -15,6 +15,7 @@ class GameServer extends Model {
   declare mcVersion?: string;
   declare mcCustomJarUrl?: string;
   declare mcCustomJarName?: string;
+  declare cs16Build?: string;
   declare monthlyPrice: number;
   declare paidUntil: Date | null;
   declare containerId?: string;
@@ -41,6 +42,7 @@ GameServer.init(
     mcVersion: { type: DataTypes.STRING, defaultValue: 'LATEST' },
     mcCustomJarUrl: { type: DataTypes.TEXT, allowNull: true },
     mcCustomJarName: { type: DataTypes.STRING, allowNull: true },
+    cs16Build: { type: DataTypes.STRING, defaultValue: 'jives_cstrike_latest' },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
     monthlyPrice: { type: DataTypes.INTEGER, defaultValue: 0 },
     paidUntil: { type: DataTypes.DATE, allowNull: true },

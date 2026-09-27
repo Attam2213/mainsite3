@@ -6,6 +6,7 @@ import GameServerConfigurator, {
   type PublicNode,
   MINECRAFT_CORE_OPTIONS,
   POPULAR_MINECRAFT_VERSIONS,
+  CS16_BUILD_OPTIONS,
 } from '../../components/GameServerConfigurator';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -149,6 +150,7 @@ interface GameServer {
   mcVersion?: string;
   mcCustomJarUrl?: string;
   mcCustomJarName?: string;
+  cs16Build?: string;
 }
 
 const formatDate = (date: string | Date) => {
@@ -2906,6 +2908,47 @@ const ClientDashboard = () => {
                                     </label>
                                 </div>
                             </>
+                        )}
+
+                        {/* CS 1.6 Build Selector */}
+                        {currentSettingsServer.game === 'cs16' && (
+                            <div className="p-4 bg-amber-50/60 border border-amber-100 rounded-lg space-y-3.5">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-700">Сборка CS 1.6</h4>
+                                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                                        Переустановка с сохранением карт/плагинов
+                                    </span>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Версия HLDS / ReHLDS</label>
+                                    <select
+                                        className="w-full p-2 border rounded text-sm"
+                                        value={serverSettings.cs16Build || 'archont94_stable_2021'}
+                                        onChange={e => setServerSettings({...serverSettings, cs16Build: e.target.value})}
+                                    >
+                                        {CS16_BUILD_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                    {(() => {
+                                        const cur = serverSettings.cs16Build || 'archont94_stable_2021';
+                                        const b = CS16_BUILD_OPTIONS.find(o => o.value === cur);
+                                        return b?.desc ? (
+                                            <p className="mt-1.5 text-[11px] text-gray-600 leading-snug bg-amber-50/50 border border-amber-100 rounded px-2.5 py-1.5">
+                                                {b.desc}
+                                            </p>
+                                        ) : null;
+                                    })()}
+                                    {(serverSettings.cs16Build || 'archont94_stable_2021') === 'steamcmd_latest' && (
+                                        <div className="mt-2 flex items-start gap-2 p-2.5 bg-yellow-50 border border-yellow-200 rounded">
+                                            <span className="mt-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-yellow-500 text-white text-[9px] font-black flex-shrink-0">!</span>
+                                            <p className="text-[11px] font-semibold text-yellow-900 leading-snug">
+                                                Первая установка займёт 2–10 минут (скачивание HLDS через SteamCMD).
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
 
                         {/* CS Settings (CS2 & CS 1.6) */}

@@ -98,6 +98,14 @@ export const MINECRAFT_CORE_OPTIONS: Array<{ value: string; label: string; hint:
   { value: 'custom', label: 'Своё ядро (.jar)', hint: 'Укажите ссылку на .jar или загрузите свой файл через SFTP в /data.' },
 ];
 
+export const CS16_BUILD_OPTIONS: Array<{ value: string; label: string; desc: string }> = [
+  { value: 'jives_cstrike_latest', label: 'Steam Latest (build 9xxx, 25th Anniv.)', desc: 'jives/hlds:cstrike — актуальная post-25th Anniversary сборка 9xxx, протокол 48, современный ReHLDS/ReGameDLL.' },
+  { value: 'jives_cstrike_legacy', label: 'Steam Legacy (build ~8684)', desc: 'jives/hlds:cstrike-legacy — старая сборка ~8684 ReHLDS/ReGameDLL, совместимость со старыми плагинами AMX.' },
+  { value: 'steamcmd_latest', label: 'SteamCMD авто-обновления (чистая)', desc: 'ghcr.io/ich777/steamcmd:cstrike1.6 — чистая сборка из Steam 90, автообновления при старте. ⚠️ Первая установка 2-10 минут.' },
+  { value: 'archont94_stable_2021', label: 'Stable 2021 (AMXModX + FastDL)', desc: 'archont94/counter-strike1.6 — стабильная сборка 2021, предустановлены Metamod + AMX Mod X, FastDL 80/tcp внутри образа.' },
+  { value: 'hlds_official', label: 'Classic HLDS Official', desc: 'hlds/server:latest — базовый официальный HLDS, без предустановленных плагинов. Для опытных админов.' },
+];
+
 
 export interface PublicNode {
   id: string;
@@ -149,6 +157,7 @@ export interface GameServerOrderPayload {
   mcCore?: string;
   mcCustomJarUrl?: string;
   mcCustomJarName?: string;
+  cs16Build?: string;
 }
 
 interface GameServerConfiguratorProps {
@@ -181,6 +190,7 @@ const GameServerConfigurator = ({
   const [mcCore, setMcCore] = useState('paper');
   const [mcCustomJarUrl, setMcCustomJarUrl] = useState('');
   const [mcCustomJarName, setMcCustomJarName] = useState('');
+  const [cs16Build, setCs16Build] = useState('jives_cstrike_latest');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
 
@@ -228,11 +238,21 @@ const GameServerConfigurator = ({
       if (!MINECRAFT_CORE_OPTIONS.some(o => o.value === mcCore)) {
         setMcCore('paper');
       }
+      setCs16Build('jives_cstrike_latest');
+    } else if (selectedGame === 'cs16') {
+      if (!CS16_BUILD_OPTIONS.some(o => o.value === cs16Build)) {
+        setCs16Build('jives_cstrike_latest');
+      }
+      setMcVersion('LATEST');
+      setMcCore('paper');
+      setMcCustomJarUrl('');
+      setMcCustomJarName('');
     } else {
       setMcVersion('LATEST');
       setMcCore('paper');
       setMcCustomJarUrl('');
       setMcCustomJarName('');
+      setCs16Build('jives_cstrike_latest');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGame]);
@@ -269,6 +289,7 @@ const GameServerConfigurator = ({
         mcCore: selectedGame === 'minecraft' ? mcCore : undefined,
         mcCustomJarUrl: selectedGame === 'minecraft' ? mcCustomJarUrl.trim() || undefined : undefined,
         mcCustomJarName: selectedGame === 'minecraft' ? mcCustomJarName.trim() || undefined : undefined,
+        cs16Build: selectedGame === 'cs16' ? cs16Build : undefined,
       });
     } finally {
       setInternalLoading(false);
@@ -502,6 +523,47 @@ const GameServerConfigurator = ({
     );
   };
 
+  const Cs16BuildSelector = () => {
+    if (selectedGame !== 'cs16') return null;
+    const opt = CS16_BUILD_OPTIONS.find(o => o.value === cs16Build);
+    return (
+      <div className="space-y-5 bg-white/70 border border-amber-100 rounded-2xl p-5 mt-2">
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="text-sm font-extrabold text-gray-800 tracking-wide">Сборка CS 1.6</h4>
+          <span className="text-[10px] uppercase tracking-wider text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-full">
+            билд сервера
+          </span>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Версия HLDS / ReHLDS</label>
+          <select
+            value={cs16Build}
+            onChange={e => setCs16Build(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+          >
+            {CS16_BUILD_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {opt && (
+            <p className="mt-2 text-[11px] text-gray-600 leading-relaxed bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2">
+              {opt.desc}
+            </p>
+          )}
+          {cs16Build === 'steamcmd_latest' && (
+            <div className="mt-2 flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-500 text-white text-[10px] font-black flex-shrink-0 mt-0.5">!</span>
+              <p className="text-xs font-semibold text-yellow-900 leading-snug">
+                Первая установка займёт 2–10 минут (скачивание ~1.5 ГБ HLDS через SteamCMD).
+                Последующие запуски — мгновенные, обновления проверяются автоматически.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
 
   const PricePanel = () => {
     const IconGame = game.icon;
@@ -543,6 +605,9 @@ const GameServerConfigurator = ({
               ...(selectedGame === 'minecraft' ? [
                 { k: 'Версия', v: mcVersion || 'LATEST', I: Sparkles },
                 { k: 'Ядро', v: (MINECRAFT_CORE_OPTIONS.find(o => o.value === mcCore)?.label || mcCore || 'Paper'), I: Cpu },
+              ] : []),
+              ...(selectedGame === 'cs16' ? [
+                { k: 'Сборка', v: (CS16_BUILD_OPTIONS.find(o => o.value === cs16Build)?.label || cs16Build || 'Steam Latest'), I: Sparkles },
               ] : []),
             ].map((row, i) => {
               const Ic = row.I as any;
@@ -688,6 +753,7 @@ const GameServerConfigurator = ({
               <div className="space-y-6 pt-2">
                 <Sliders />
                 <McVersionSelector />
+                <Cs16BuildSelector />
               </div>
             </div>
             <div className="lg:col-span-2">

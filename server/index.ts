@@ -157,17 +157,20 @@ const startServer = async () => {
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcVersion VARCHAR(64) NOT NULL DEFAULT 'LATEST';");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcCustomJarUrl TEXT;");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcCustomJarName VARCHAR(255);");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS cs16Build VARCHAR(64) NOT NULL DEFAULT 'jives_cstrike_latest';");
       } else if (dialect === 'sqlite') {
         await ensureSqliteColumn('game_servers', 'mcVersion', 'VARCHAR(64) DEFAULT \'LATEST\'');
         await ensureSqliteColumn('game_servers', 'mcCustomJarUrl', 'TEXT');
         await ensureSqliteColumn('game_servers', 'mcCustomJarName', 'VARCHAR(255)');
+        await ensureSqliteColumn('game_servers', 'cs16Build', 'VARCHAR(64) DEFAULT \'jives_cstrike_latest\'');
       } else {
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcVersion VARCHAR(64) DEFAULT 'LATEST';");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcCustomJarUrl TEXT;");
         await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcCustomJarName VARCHAR(255);");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN cs16Build VARCHAR(64) DEFAULT 'jives_cstrike_latest';");
       }
     } catch (e) {
-      console.error('[DB] ensure game_servers mcVersion/mcCustom* columns failed:', e);
+      console.error('[DB] ensure game_servers mcVersion/mcCustom*/cs16Build columns failed:', e);
     }
 
     try {

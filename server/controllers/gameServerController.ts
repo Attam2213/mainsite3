@@ -32,6 +32,117 @@ const POPULAR_MINECRAFT_VERSIONS = new Set([
     '1.19.4', '1.18.2', '1.17.1', '1.16.5'
 ]);
 
+const CS16_BUILDS: Record<string, {
+    image: string;
+    label: string;
+    mountPath: string;
+    steamMountPath?: string;
+    env?: Record<string, string | number>;
+    extraPorts?: string[];
+    startup: (args: { slots: number; map: string; rcon: string; port: number }) => string;
+}> = {
+    jives_cstrike_latest: {
+        image: 'jives/hlds:cstrike',
+        label: 'Steam Latest (Post-25th Anniversary, build 9xxx, protocol 48)',
+        mountPath: '/hlds',
+        startup: ({ slots, map, rcon, port }) =>
+            `+ip 0.0.0.0 +port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0 +log on`
+    },
+    jives_cstrike_legacy: {
+        image: 'jives/hlds:cstrike-legacy',
+        label: 'Steam Legacy (Pre-25th Anniversary, build ~8684, ReHLDS/ReGameDLL/old AMX plugins)',
+        mountPath: '/hlds',
+        startup: ({ slots, map, rcon, port }) =>
+            `+ip 0.0.0.0 +port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0 +log on`
+    },
+    steamcmd_latest: {
+        image: 'ghcr.io/ich777/steamcmd:cstrike1.6',
+        label: 'SteamCMD Fresh (Always latest official Valve build, auto-updates; долгая первая установка 2–10 мин)',
+        mountPath: '/hlds',
+        steamMountPath: '/serverdata/serverfiles',
+        env: { GAME_ID: 90, GAME_NAME: 'cstrike', VALIDATE: 'true', UID: 1000, GID: 1000 },
+        startup: () => '',
+    },
+    archont94_stable_2021: {
+        image: 'archont94/counter-strike1.6:latest',
+        label: 'Stable 2021 AMXModX (встроены Metamod + AMX Mod X + Fast DL 80/tcp, проверенный временем)',
+        mountPath: '/hlds',
+        env: { SV_LAN: 0 },
+        extraPorts: ['80'],
+        startup: () => ''
+    },
+    hlds_official: {
+        image: 'hlds/server:latest',
+        label: 'Classic HLDS Official (базовый build, без предустановленных плагинов)',
+        mountPath: '/hlds',
+        startup: ({ slots, map, rcon, port }) =>
+            `-game cstrike -ip 0.0.0.0 -port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0`
+    }
+};
+
+const DEFAULT_CS16_BUILD_KEY = 'jives_cstrike_latest';
+const LEGACY_CS16_BUILD_KEY = 'archont94_stable_2021';
+
+const validateCs16Build = (key?: string): string => {
+    if (!key) return LEGACY_CS16_BUILD_KEY;
+    const k = String(key).trim().toLowerCase();
+    if (!k) return LEGACY_CS16_BUILD_KEY;
+    if (Object.prototype.hasOwnProperty.call(CS16_BUILDS, k)) return k;
+    return LEGACY_CS16_BUILD_KEY;
+};
+
+const buildCs16DockerArgs = (server: any, port: number, containerName: string): { runFlags: string; image: string; cmd: string; hostVolumeArg: string } => {
+    const slots = Number(server?.slots) || 32;
+    const map = 'de_dust2';
+    const rcon = String(server?.rconPassword || '').trim() || ('rcon_' + crypto.randomBytes(6).toString('hex'));
+    const buildKey = validateCs16Build(server?.cs16Build);
+    const meta = CS16_BUILDS[buildKey];
+
+    const uidPart = (String(server.userId || '')).split('-')[0] || 'u';
+    const hostDir = `/var/lib/wexa/game-servers/${String(server.id)}`;
+
+    const flags: string[] = [];
+    flags.push('-d');
+    flags.push('--restart unless-stopped');
+    flags.push(`--name ${containerName}`);
+    flags.push(`-p ${port}:27015/udp`);
+    flags.push(`-p ${port}:27015/tcp`);
+
+    if (meta?.extraPorts?.length) {
+        for (const ep of meta.extraPorts) {
+            flags.push(`-p 9${port.toString().slice(-4)}:${ep}/tcp`);
+        }
+    }
+
+    if (meta?.env && Object.keys(meta.env).length) {
+        if (buildKey === 'archont94_stable_2021') {
+            flags.push(`-e PORT=${port}`);
+            flags.push(`-e MAP=${map}`);
+            flags.push(`-e MAXPLAYERS=${slots}`);
+        }
+        for (const [k, v] of Object.entries(meta.env)) {
+            flags.push(`-e ${k}=${shellQuote(String(v))}`);
+        }
+    }
+
+    if (server?.ram && Number(server.ram) > 64) {
+        flags.push(`-m ${Number(server.ram)}m`);
+    }
+
+    const volMounts: string[] = [];
+    volMounts.push(`-v ${hostDir}:${meta.mountPath}`);
+    if (meta.steamMountPath && meta.steamMountPath !== meta.mountPath) {
+        volMounts.push(`-v ${hostDir}:${meta.steamMountPath}`);
+    }
+
+    return {
+        runFlags: flags.join(' '),
+        image: meta.image,
+        cmd: meta.startup({ slots, map, rcon, port }),
+        hostVolumeArg: volMounts.join(' ')
+    };
+};
+
 const validateMcVersion = (v?: string): string => {
     if (!v) return 'LATEST';
     const clean = String(v).trim();
@@ -150,6 +261,69 @@ const reprovisionMinecraftContainer = async (server: any, node: any, config: any
     const containerId = (output || '').trim().substring(0, 12);
     if (!containerId) {
         throw new Error('Пустой ответ при запуске нового контейнера Minecraft');
+    }
+    return containerId;
+};
+
+const reprovisionCs16Container = async (server: any, node: any, config: any): Promise<string> => {
+    const basePort = Number(GAME_PORTS[server.game as string]) || 27015;
+    const port = Number(server.port) || basePort;
+    const uidPart = (String(server.userId || '')).split('-')[0] || 'u';
+    const containerName = `gs_${uidPart}_${port}`;
+    const hostDir = `/var/lib/wexa/game-servers/${String(server.id)}`;
+
+    const buildKey = validateCs16Build(server?.cs16Build);
+    const meta = CS16_BUILDS[buildKey];
+    const mountPath = meta.mountPath || '/hlds';
+
+    const oldIdent = String(server.containerId || '').trim();
+
+    try {
+        await execCommand(config, `sh -lc "docker stop ${containerName} >/dev/null 2>&1 || true"`);
+    } catch {}
+    if (oldIdent && !oldIdent.startsWith('mock_')) {
+        try {
+            await execCommand(config, `sh -lc "docker stop ${oldIdent} >/dev/null 2>&1 || true"`);
+        } catch {}
+    }
+
+    try {
+        const lsHostRaw = await execCommand(config, `sh -lc "ls -A ${hostDir} 2>/dev/null || true"`);
+        const hostHasFiles = Boolean((lsHostRaw || '').trim());
+
+        if (!hostHasFiles && oldIdent && !oldIdent.startsWith('mock_')) {
+            const owner = await getPathOwner(config, oldIdent, mountPath).catch(() => null)
+                ?? { uid: 0, gid: 0 };
+            const uid = owner?.uid ?? 1000;
+            const gid = owner?.gid ?? 1000;
+            await execCommand(config, `sh -lc "mkdir -p ${hostDir} >/dev/null 2>&1 || true"`);
+            try {
+                await execCommand(config, `sh -lc "docker cp ${oldIdent}:${mountPath}/. ${hostDir}/ >/dev/null 2>&1 || true"`);
+            } catch {}
+            try {
+                await execCommand(config, `sh -lc "chown -R ${uid}:${gid} ${hostDir} >/dev/null 2>&1 || true"`);
+            } catch {}
+        }
+    } catch (e: any) {
+        console.warn('[reprovisionCs16] bind/data-copy step warning:', e?.message || e);
+    }
+
+    try { await execCommand(config, `sh -lc "docker rm -f ${containerName} >/dev/null 2>&1 || true"`); } catch {}
+    if (oldIdent && !oldIdent.startsWith('mock_')) {
+        try { await execCommand(config, `sh -lc "docker rm -f ${oldIdent} >/dev/null 2>&1 || true"`); } catch {}
+    }
+
+    const built = buildCs16DockerArgs(server, port, containerName);
+    const runParts: string[] = ['docker run'];
+    if (built.hostVolumeArg) runParts.push(built.hostVolumeArg);
+    if (built.runFlags) runParts.push(built.runFlags);
+    runParts.push(built.image);
+    if (built.cmd) runParts.push(built.cmd);
+    const runCmd = runParts.join(' ');
+    const output = await execCommand(config, runCmd);
+    const containerId = (output || '').trim().substring(0, 12);
+    if (!containerId) {
+        throw new Error('Пустой ответ при запуске нового контейнера CS 1.6');
     }
     return containerId;
 };
@@ -542,14 +716,23 @@ export const createGameServer = async (req: Request, res: Response) => {
         const rawMcCore = (req.body as any).mcCore ?? (req.body as any).core;
         const rawMcCustomJarUrl = (req.body as any).mcCustomJarUrl;
         const rawMcCustomJarName = (req.body as any).mcCustomJarName;
+        const rawCs16Build = (req.body as any).cs16Build;
 
         const safeMcVersion = validateMcVersion(rawMcVersion);
         const safeMcCore = validateMcCore(rawMcCore);
         const safeMcCustomJarUrl = validateUrlSafe(rawMcCustomJarUrl);
         const safeMcCustomJarName = validateJarName(rawMcCustomJarName);
+        const safeCs16Build = validateCs16Build(rawCs16Build);
         
         if (game === 'minecraft' && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
             res.status(400).json({ message: 'Для CUSTOM-ядра Minecraft укажите mcCustomJarUrl (ссылка на .jar) или mcCustomJarName (имя файла, залили через SFTP в /data).' });
+            return;
+        }
+
+        if (game === 'cs16' && rawCs16Build && Object.prototype.hasOwnProperty.call(CS16_BUILDS, String(rawCs16Build).trim().toLowerCase()) === false) {
+            res.status(400).json({
+                message: `Неизвестная сборка CS16: '${rawCs16Build}'. Доступные: ${Object.keys(CS16_BUILDS).join(', ')}.`
+            });
             return;
         }
         
@@ -578,7 +761,19 @@ export const createGameServer = async (req: Request, res: Response) => {
         } else if (game === 'cs2') {
             dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${slots || 32}`;
         } else if (game === 'cs16') {
-            dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} ${GAME_IMAGES['cs16']} +map de_dust2 +maxplayers ${slots || 32}`;
+            const built = buildCs16DockerArgs({
+                ram: ram || 1024,
+                slots: slots || 32,
+                userId,
+                id: 'tmp_' + userId,
+                cs16Build: safeCs16Build,
+            }, port, containerName);
+            const parts: string[] = ['docker run'];
+            if (built.hostVolumeArg) parts.push(built.hostVolumeArg);
+            if (built.runFlags) parts.push(built.runFlags);
+            parts.push(built.image);
+            if (built.cmd) parts.push(built.cmd);
+            dockerCmd = parts.join(' ');
         }
 
         const config = {
@@ -614,6 +809,7 @@ export const createGameServer = async (req: Request, res: Response) => {
             mcVersion: game === 'minecraft' ? safeMcVersion : undefined,
             mcCustomJarUrl: game === 'minecraft' ? safeMcCustomJarUrl : undefined,
             mcCustomJarName: game === 'minecraft' ? safeMcCustomJarName : undefined,
+            cs16Build: game === 'cs16' ? safeCs16Build : undefined,
             status: 'running',
             containerId,
             monthlyPrice,
@@ -720,14 +916,23 @@ export const orderGameServer = async (req: Request, res: Response) => {
         const rawMcCore = (req.body as any).mcCore ?? (req.body as any).core;
         const rawMcCustomJarUrl = (req.body as any).mcCustomJarUrl;
         const rawMcCustomJarName = (req.body as any).mcCustomJarName;
+        const rawCs16Build = (req.body as any).cs16Build;
 
         const safeMcVersion = validateMcVersion(rawMcVersion);
         const safeMcCore = validateMcCore(rawMcCore);
         const safeMcCustomJarUrl = validateUrlSafe(rawMcCustomJarUrl);
         const safeMcCustomJarName = validateJarName(rawMcCustomJarName);
+        const safeCs16Build = validateCs16Build(rawCs16Build);
 
         if (game === 'minecraft' && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
             res.status(400).json({ message: 'Для CUSTOM-ядра Minecraft укажите ссылку на .jar (mcCustomJarUrl) или имя файла, который вы зальёте через SFTP (mcCustomJarName).' });
+            return;
+        }
+
+        if (game === 'cs16' && rawCs16Build && Object.prototype.hasOwnProperty.call(CS16_BUILDS, String(rawCs16Build).trim().toLowerCase()) === false) {
+            res.status(400).json({
+                message: `Неизвестная сборка CS16: '${rawCs16Build}'. Доступные: ${Object.keys(CS16_BUILDS).join(', ')}.`
+            });
             return;
         }
 
@@ -788,6 +993,7 @@ export const orderGameServer = async (req: Request, res: Response) => {
             mcVersion: game === 'minecraft' ? safeMcVersion : undefined,
             mcCustomJarUrl: game === 'minecraft' ? safeMcCustomJarUrl : undefined,
             mcCustomJarName: game === 'minecraft' ? safeMcCustomJarName : undefined,
+            cs16Build: game === 'cs16' ? safeCs16Build : undefined,
             status: isAdmin ? 'running' : 'pending_payment',
             monthlyPrice,
             paidUntil: now
@@ -1041,17 +1247,20 @@ export const updateServerSettings = async (req: Request, res: Response) => {
         // @ts-ignore
         const node = server.node;
         const isMinecraft = server.game === 'minecraft';
+        const isCs16 = server.game === 'cs16';
         const isMockNode = node.ip === '127.0.0.1' || node.ip === '1.1.1.1';
 
         const rawMcVersion = isMinecraft ? (newSettings.mcVersion ?? (server as any).mcVersion) : undefined;
         const rawMcCore = isMinecraft ? (newSettings.mcCore ?? newSettings.core ?? server.core) : undefined;
         const rawMcCustomJarUrl = isMinecraft ? (newSettings.mcCustomJarUrl ?? (server as any).mcCustomJarUrl) : undefined;
         const rawMcCustomJarName = isMinecraft ? (newSettings.mcCustomJarName ?? (server as any).mcCustomJarName) : undefined;
+        const rawCs16Build = isCs16 ? (newSettings.cs16Build ?? (server as any).cs16Build) : undefined;
 
         const safeMcVersion = isMinecraft ? validateMcVersion(rawMcVersion) : undefined;
         const safeMcCore = isMinecraft ? validateMcCore(rawMcCore) : undefined;
         const safeMcCustomJarUrl = isMinecraft ? validateUrlSafe(rawMcCustomJarUrl) : undefined;
         const safeMcCustomJarName = isMinecraft ? validateJarName(rawMcCustomJarName) : undefined;
+        const safeCs16Build = isCs16 ? validateCs16Build(rawCs16Build) : undefined;
 
         if (isMinecraft && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
             res.status(400).json({
@@ -1060,10 +1269,18 @@ export const updateServerSettings = async (req: Request, res: Response) => {
             return;
         }
 
+        if (isCs16 && rawCs16Build && Object.prototype.hasOwnProperty.call(CS16_BUILDS, String(rawCs16Build).trim().toLowerCase()) === false) {
+            res.status(400).json({
+                message: `Неизвестная сборка CS16: '${rawCs16Build}'. Доступные: ${Object.keys(CS16_BUILDS).join(', ')}.`
+            });
+            return;
+        }
+
         const beforeCore = String(server.core || '').toLowerCase();
         const beforeVersion = String((server as any).mcVersion || 'LATEST').trim();
         const beforeCustomUrl = String((server as any).mcCustomJarUrl || '').trim();
         const beforeCustomName = String((server as any).mcCustomJarName || '').trim();
+        const beforeCs16Build = validateCs16Build((server as any).cs16Build);
 
         const mcChanged = isMinecraft && (
             String(safeMcCore || '').toLowerCase() !== beforeCore ||
@@ -1072,13 +1289,16 @@ export const updateServerSettings = async (req: Request, res: Response) => {
             String(safeMcCustomJarName || '').trim() !== beforeCustomName
         );
 
+        const cs16Changed = isCs16 && String(safeCs16Build || '') !== beforeCs16Build;
+
         if (isMockNode) {
-            console.log(`[Mock] Updating settings for ${server.containerId}:`, newSettings, { mcChanged });
+            console.log(`[Mock] Updating settings for ${server.containerId}:`, { mcChanged, cs16Changed });
             const patch: any = {};
             if (isMinecraft && safeMcCore !== undefined) patch.core = safeMcCore;
             if (isMinecraft && safeMcVersion !== undefined) patch.mcVersion = safeMcVersion;
             if (isMinecraft) patch.mcCustomJarUrl = safeMcCustomJarUrl ?? null;
             if (isMinecraft) patch.mcCustomJarName = safeMcCustomJarName ?? null;
+            if (isCs16 && safeCs16Build) patch.cs16Build = safeCs16Build;
             if (Object.keys(patch).length > 0) {
                 await server.update(patch);
             }
@@ -1120,59 +1340,97 @@ export const updateServerSettings = async (req: Request, res: Response) => {
             }
         }
 
-        // 1. Get current properties (from NEW container if reprovisioned, else OLD)
-        const propsIdent = newContainerId || server.containerId;
-        let props: any = {};
-        try {
-            const content = await execCommand(config, `docker exec -i ${propsIdent} cat /data/server.properties`);
-            props = parseProperties(content);
-        } catch (e) {
-            console.warn('[updateServerSettings] could not read server.properties, will write new ones:', e);
+        if (isCs16 && cs16Changed && !isMockNode) {
+            try {
+                console.log(`[updateServerSettings] cs16 build changed, reprovisioning server ${server.id}...`);
+                const serverSnapshot: any = server.toJSON
+                    ? server.toJSON()
+                    : { ...(server as any) };
+                serverSnapshot.cs16Build = safeCs16Build;
+
+                newContainerId = await reprovisionCs16Container(serverSnapshot, node, config);
+                reprovisioned = true;
+                console.log(`[updateServerSettings] cs16 reprovision OK, new containerId=${newContainerId}`);
+            } catch (repErr: any) {
+                console.error('[updateServerSettings] cs16 reprovision failed:', repErr?.message || repErr);
+                res.status(500).json({
+                    message: `Ошибка переустановки контейнера CS 1.6: ${repErr?.message || 'unknown'}`,
+                    reprovisioned: false,
+                });
+                return;
+            }
         }
 
-        // 2. Merge new settings, remove mc*/core from properties file
-        const {
-            core: _core,
-            mcCore: _mcCore,
-            mcVersion: _mcVersion,
-            mcCustomJarUrl: _mcCustomJarUrl,
-            mcCustomJarName: _mcCustomJarName,
-            ...fileSettings
-        } = newSettings;
+        const propsIdent = newContainerId || server.containerId;
 
+        // 1. Read current properties (path depends on game)
+        const propsFile =
+            isMinecraft ? '/data/server.properties'
+            : isCs16 ? '/hlds/cstrike/server.cfg'
+            : null;
+
+        let props: any = {};
+        if (propsFile) {
+            try {
+                const content = await execCommand(config, `docker exec -i ${propsIdent} cat "${propsFile}"`);
+                props = parseProperties(content);
+            } catch (e) {
+                console.warn(`[updateServerSettings] could not read ${propsFile}, will write new file:`, e);
+            }
+        }
+
+        // 2. Merge new settings, strip game-specific keys
+        const stripKeys: string[] = [
+            'core', 'mcCore', 'mcVersion', 'mcCustomJarUrl', 'mcCustomJarName',
+            'cs16Build'
+        ];
+        const fileSettings: any = {};
+        for (const [k, v] of Object.entries(newSettings)) {
+            if (stripKeys.includes(k)) continue;
+            (fileSettings as any)[k] = v;
+        }
         const updatedProps = { ...props, ...fileSettings };
         const newContent = stringifyProperties(updatedProps);
 
-        // 3. Write properties to NEW or OLD container
-        try {
-            const tmpFile = `/tmp/wexa_server_${id}.properties`;
-            const escapedContent = newContent
-                .replace(/\\/g, '\\\\')
-                .replace(/'/g, "'\\''");
-            await execCommand(config, `sh -lc "printf '%s' '${escapedContent}' > ${tmpFile}"`);
-            await execCommand(config, `sh -lc "docker cp ${tmpFile} ${propsIdent}:/data/server.properties >/dev/null 2>&1 || true"`);
-            await execCommand(config, `sh -lc "rm -f ${tmpFile} >/dev/null 2>&1 || true"`);
-        } catch (writeErr: any) {
-            console.error('[updateServerSettings] write server.properties failed:', writeErr?.message || writeErr);
-            res.status(500).json({ message: 'Ошибка сохранения server.properties' });
-            return;
+        // 3. Write to container via tmpFile + docker cp
+        if (propsFile) {
+            try {
+                const tmpExt = isMinecraft ? 'properties' : 'cfg';
+                const tmpFile = `/tmp/wexa_server_${id}.${tmpExt}`;
+                const escapedContent = newContent
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "'\\''");
+                await execCommand(config, `sh -lc "printf '%s' '${escapedContent}' > ${tmpFile}"`);
+                await execCommand(config, `sh -lc "docker cp ${tmpFile} ${propsIdent}:${propsFile} >/dev/null 2>&1 || true"`);
+                await execCommand(config, `sh -lc "rm -f ${tmpFile} >/dev/null 2>&1 || true"`);
+            } catch (writeErr: any) {
+                console.error(`[updateServerSettings] write ${propsFile} failed:`, writeErr?.message || writeErr);
+                const humanName = isMinecraft ? 'server.properties' : 'server.cfg';
+                res.status(500).json({ message: `Ошибка сохранения ${humanName}` });
+                return;
+            }
         }
 
-        // 4. Save mc* fields to DB + containerId if reprovisioned
+        // 4. DB patch
         const dbPatch: any = {};
         if (isMinecraft && safeMcCore !== undefined) dbPatch.core = safeMcCore;
         if (isMinecraft && safeMcVersion !== undefined) dbPatch.mcVersion = safeMcVersion;
         if (isMinecraft) dbPatch.mcCustomJarUrl = safeMcCustomJarUrl ?? null;
         if (isMinecraft) dbPatch.mcCustomJarName = safeMcCustomJarName ?? null;
+        if (isCs16 && safeCs16Build) dbPatch.cs16Build = safeCs16Build;
         if (reprovisioned && newContainerId) dbPatch.containerId = newContainerId;
         if (Object.keys(dbPatch).length > 0) {
             await server.update(dbPatch);
         }
 
+        const actionText = reprovisioned
+            ? 'Настройки сохранены. Сервер переустановлен с сохранением данных/миров/админ-листов и запущен.'
+            : isCs16
+                ? 'Настройки сохранены. Перезапустите сервер CS 1.6 для применения server.cfg (параметры запуска map/slots применены).'
+                : 'Настройки сохранены. Перезапустите сервер для применения server.properties.';
+
         res.json({
-            message: reprovisioned
-                ? 'Настройки сохранены. Сервер переустановлен с сохранением мира и данных.'
-                : 'Настройки сохранены. Перезапустите сервер для применения server.properties.',
+            message: actionText,
             reprovisioned,
             newContainerId,
         });
@@ -1763,12 +2021,22 @@ export const applyGameServerPaidInvoice = async (invoice: any): Promise<void> =>
             const port = !last || !last.port || last.port < basePort ? basePort : last.port + 1;
             const containerName = `gs_${server.userId.split('-')[0]}_${port}`;
 
-            const dockerCmd =
-                server.game === 'minecraft'
-                    ? `docker run ${buildMinecraftDockerArgs(server, port, containerName)}`
-                    : server.game === 'cs2'
-                      ? `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN joedwards32/cs2 +maxplayers ${server.slots || 32}`
-                      : `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} archont94/counter-strike1.6:latest +map de_dust2 +maxplayers ${server.slots || 32}`;
+            let dockerCmd = '';
+            if (server.game === 'minecraft') {
+                dockerCmd = `docker run ${buildMinecraftDockerArgs(server, port, containerName)}`;
+            } else if (server.game === 'cs2') {
+                dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN joedwards32/cs2 +maxplayers ${server.slots || 32}`;
+            } else if (server.game === 'cs16') {
+                const built = buildCs16DockerArgs(server, port, containerName);
+                const parts: string[] = ['docker run'];
+                if (built.hostVolumeArg) parts.push(built.hostVolumeArg);
+                if (built.runFlags) parts.push(built.runFlags);
+                parts.push(built.image);
+                if (built.cmd) parts.push(built.cmd);
+                dockerCmd = parts.join(' ');
+            } else {
+                dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} archont94/counter-strike1.6:latest +map de_dust2 +maxplayers ${server.slots || 32}`;
+            }
 
             const config = {
                 host: node.ip,
