@@ -6,6 +6,9 @@ const run = async () => {
     
     const queries = [
         "ALTER TABLE users ADD COLUMN balance DECIMAL(12,2) DEFAULT 0.0;",
+        "ALTER TABLE game_servers ADD COLUMN mcVersion VARCHAR(64) DEFAULT 'LATEST';",
+        "ALTER TABLE game_servers ADD COLUMN mcCustomJarUrl TEXT;",
+        "ALTER TABLE game_servers ADD COLUMN mcCustomJarName VARCHAR(255);",
         "ALTER TABLE projects ADD COLUMN paidUntil DATE;",
         "ALTER TABLE projects ADD COLUMN siteStatus TEXT DEFAULT 'unknown';",
         "ALTER TABLE invoices ADD COLUMN periodMonths INTEGER DEFAULT 1;",

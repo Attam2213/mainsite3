@@ -154,6 +154,24 @@ const startServer = async () => {
 
     try {
       if (dialect === 'postgres') {
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcVersion VARCHAR(64) NOT NULL DEFAULT 'LATEST';");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcCustomJarUrl TEXT;");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS mcCustomJarName VARCHAR(255);");
+      } else if (dialect === 'sqlite') {
+        await ensureSqliteColumn('game_servers', 'mcVersion', 'VARCHAR(64) DEFAULT \'LATEST\'');
+        await ensureSqliteColumn('game_servers', 'mcCustomJarUrl', 'TEXT');
+        await ensureSqliteColumn('game_servers', 'mcCustomJarName', 'VARCHAR(255)');
+      } else {
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcVersion VARCHAR(64) DEFAULT 'LATEST';");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcCustomJarUrl TEXT;");
+        await sequelize.query("ALTER TABLE game_servers ADD COLUMN mcCustomJarName VARCHAR(255);");
+      }
+    } catch (e) {
+      console.error('[DB] ensure game_servers mcVersion/mcCustom* columns failed:', e);
+    }
+
+    try {
+      if (dialect === 'postgres') {
         await sequelize.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS balance DECIMAL(12,2) NOT NULL DEFAULT 0.0;");
       } else if (dialect === 'sqlite') {
         await ensureSqliteColumn('users', 'balance', 'DECIMAL(12,2) DEFAULT 0.0');

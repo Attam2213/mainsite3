@@ -21,6 +21,140 @@ const GAME_IMAGES: Record<string, string> = {
     'cs16': 'archont94/counter-strike1.6:latest'
 };
 
+const MINECRAFT_CORES = new Set([
+    'paper', 'purpur', 'folia', 'spigot', 'bukkit', 'pufferfish',
+    'fabric', 'forge', 'neoforge', 'mohist', 'vanilla', 'custom'
+]);
+
+const POPULAR_MINECRAFT_VERSIONS = new Set([
+    'LATEST', 'SNAPSHOT', '1.21.4', '1.21.3', '1.21.1', '1.21',
+    '1.20.6', '1.20.4', '1.20.2', '1.20.1',
+    '1.19.4', '1.18.2', '1.17.1', '1.16.5'
+]);
+
+const validateMcVersion = (v?: string): string => {
+    if (!v) return 'LATEST';
+    const clean = String(v).trim();
+    if (!clean) return 'LATEST';
+    if (!/^[a-zA-Z0-9_.\-]+$/.test(clean)) return 'LATEST';
+    return clean;
+};
+
+const validateMcCore = (core?: string): string => {
+    if (!core) return 'paper';
+    const c = String(core).trim().toLowerCase();
+    if (!MINECRAFT_CORES.has(c)) return 'paper';
+    return c;
+};
+
+const validateUrlSafe = (u?: string): string | null => {
+    if (!u) return null;
+    const s = String(u).trim();
+    if (!s) return null;
+    if (!/^https?:\/\/[^\s"'`]+$/i.test(s)) return null;
+    return s;
+};
+
+const validateJarName = (n?: string): string | null => {
+    if (!n) return null;
+    const s = String(n).trim();
+    if (!s) return null;
+    if (!/^[a-zA-Z0-9._\-]+\.jar$/i.test(s)) return null;
+    return s;
+};
+
+const shellQuote = (s: string | number): string => {
+    const str = String(s);
+    if (/^[a-zA-Z0-9_./:?=&%@+\-]+$/.test(str)) return str;
+    return "'" + str.replace(/'/g, "'\\''") + "'";
+};
+
+const buildMinecraftDockerArgs = (server: any, port: number, containerName: string): string => {
+    const ram = Number(server?.ram) || 1024;
+    const slots = Number(server?.slots) || 20;
+    const version = validateMcVersion(server?.mcVersion);
+    const core = validateMcCore(server?.core);
+    const customUrl = validateUrlSafe(server?.mcCustomJarUrl);
+    const customJarName = validateJarName(server?.mcCustomJarName);
+
+    const isCustom = core === 'custom';
+
+    const parts: string[] = [];
+    parts.push(`-d`);
+    parts.push(`--restart unless-stopped`);
+    parts.push(`--name ${containerName}`);
+    parts.push(`-p ${port}:25565/tcp`);
+    parts.push(`-m ${ram}m`);
+    parts.push(`-e EULA=TRUE`);
+    parts.push(`-e MAX_PLAYERS=${slots}`);
+    parts.push(`-e VERSION=${shellQuote(version)}`);
+    parts.push(`-e TYPE=${shellQuote(isCustom ? 'CUSTOM' : core.toUpperCase())}`);
+    if (isCustom && customUrl) {
+        parts.push(`-e DOWNLOAD_URL=${shellQuote(customUrl)}`);
+    }
+    if (isCustom && customJarName && !customUrl) {
+        parts.push(`-e CUSTOM_SERVER=/data/${shellQuote(customJarName)}`);
+    }
+
+    return `${parts.join(' ')} ${GAME_IMAGES['minecraft']}`;
+};
+
+
+const reprovisionMinecraftContainer = async (server: any, node: any, config: any): Promise<string> => {
+    const basePort = Number(GAME_PORTS[server.game as string]) || 25565;
+    const port = Number(server.port) || basePort;
+    const uidPart = (String(server.userId || '')).split('-')[0] || 'u';
+    const containerName = `gs_${uidPart}_${port}`;
+    const hostDir = `/var/lib/wexa/game-servers/${String(server.id)}`;
+    const mountPath = '/data';
+
+    const oldIdent = String(server.containerId || '').trim();
+
+    try {
+        await execCommand(config, `sh -lc "docker stop ${containerName} >/dev/null 2>&1 || true"`);
+    } catch {}
+    if (oldIdent && !oldIdent.startsWith('mock_')) {
+        try {
+            await execCommand(config, `sh -lc "docker stop ${oldIdent} >/dev/null 2>&1 || true"`);
+        } catch {}
+    }
+
+    try {
+        const lsHostRaw = await execCommand(config, `sh -lc "ls -A ${hostDir} 2>/dev/null || true"`);
+        const hostHasFiles = Boolean((lsHostRaw || '').trim());
+
+        if (!hostHasFiles && oldIdent && !oldIdent.startsWith('mock_')) {
+            const owner = await getPathOwner(config, oldIdent, mountPath);
+            const uid = owner?.uid ?? 1000;
+            const gid = owner?.gid ?? 1000;
+            await execCommand(config, `sh -lc "mkdir -p ${hostDir} >/dev/null 2>&1 || true"`);
+            try {
+                await execCommand(config, `sh -lc "docker cp ${oldIdent}:${mountPath}/. ${hostDir}/ >/dev/null 2>&1 || true"`);
+            } catch {}
+            try {
+                await execCommand(config, `sh -lc "chown -R ${uid}:${gid} ${hostDir} >/dev/null 2>&1 || true"`);
+            } catch {}
+        }
+    } catch (e: any) {
+        console.warn('[reprovisionMinecraft] bind/data-copy step warning:', e?.message || e);
+    }
+
+    try { await execCommand(config, `sh -lc "docker rm -f ${containerName} >/dev/null 2>&1 || true"`); } catch {}
+    if (oldIdent && !oldIdent.startsWith('mock_')) {
+        try { await execCommand(config, `sh -lc "docker rm -f ${oldIdent} >/dev/null 2>&1 || true"`); } catch {}
+    }
+
+    const baseArgs = buildMinecraftDockerArgs(server, port, containerName);
+    const runCmd = `docker run -v ${hostDir}:${mountPath} ${baseArgs}`;
+    const output = await execCommand(config, runCmd);
+    const containerId = (output || '').trim().substring(0, 12);
+    if (!containerId) {
+        throw new Error('Пустой ответ при запуске нового контейнера Minecraft');
+    }
+    return containerId;
+};
+
+
 const calculateMonthlyPrice = (_ramMb: number, slots: number, slotPrice: number) => {
     return Math.ceil(slots * slotPrice);
 };
@@ -404,6 +538,20 @@ export const createGameServer = async (req: Request, res: Response) => {
     // Admin only or via payment
     try {
         const { userId, nodeId, game, name, ram, slots } = req.body;
+        const rawMcVersion = (req.body as any).mcVersion;
+        const rawMcCore = (req.body as any).mcCore ?? (req.body as any).core;
+        const rawMcCustomJarUrl = (req.body as any).mcCustomJarUrl;
+        const rawMcCustomJarName = (req.body as any).mcCustomJarName;
+
+        const safeMcVersion = validateMcVersion(rawMcVersion);
+        const safeMcCore = validateMcCore(rawMcCore);
+        const safeMcCustomJarUrl = validateUrlSafe(rawMcCustomJarUrl);
+        const safeMcCustomJarName = validateJarName(rawMcCustomJarName);
+        
+        if (game === 'minecraft' && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
+            res.status(400).json({ message: 'Для CUSTOM-ядра Minecraft укажите mcCustomJarUrl (ссылка на .jar) или mcCustomJarName (имя файла, залили через SFTP в /data).' });
+            return;
+        }
         
         const node = await ServerNode.findByPk(nodeId);
         if (!node) {
@@ -422,7 +570,11 @@ export const createGameServer = async (req: Request, res: Response) => {
         
         let dockerCmd = '';
         if (game === 'minecraft') {
-            dockerCmd = `docker run -d -p ${port}:25565 -e EULA=TRUE -e MAX_PLAYERS=${slots || 20} --name ${containerName} -m ${ram || 1024}m ${GAME_IMAGES['minecraft']}`;
+            dockerCmd = `docker run ${buildMinecraftDockerArgs({
+                ram: ram || 1024, slots: slots || 20,
+                mcVersion: safeMcVersion, core: safeMcCore,
+                mcCustomJarUrl: safeMcCustomJarUrl, mcCustomJarName: safeMcCustomJarName,
+            }, port, containerName)}`;
         } else if (game === 'cs2') {
             dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${slots || 32}`;
         } else if (game === 'cs16') {
@@ -458,6 +610,10 @@ export const createGameServer = async (req: Request, res: Response) => {
             port,
             ram: ram || 1024,
             slots: slots || 10,
+            core: game === 'minecraft' ? safeMcCore : undefined,
+            mcVersion: game === 'minecraft' ? safeMcVersion : undefined,
+            mcCustomJarUrl: game === 'minecraft' ? safeMcCustomJarUrl : undefined,
+            mcCustomJarName: game === 'minecraft' ? safeMcCustomJarName : undefined,
             status: 'running',
             containerId,
             monthlyPrice,
@@ -559,6 +715,22 @@ export const orderGameServer = async (req: Request, res: Response) => {
         const periodRaw = Number(req.body.periodMonths) || 1;
         const periodMonths = VALID_PERIODS.includes(periodRaw) ? periodRaw : 1;
         const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
+
+        const rawMcVersion = (req.body as any).mcVersion;
+        const rawMcCore = (req.body as any).mcCore ?? (req.body as any).core;
+        const rawMcCustomJarUrl = (req.body as any).mcCustomJarUrl;
+        const rawMcCustomJarName = (req.body as any).mcCustomJarName;
+
+        const safeMcVersion = validateMcVersion(rawMcVersion);
+        const safeMcCore = validateMcCore(rawMcCore);
+        const safeMcCustomJarUrl = validateUrlSafe(rawMcCustomJarUrl);
+        const safeMcCustomJarName = validateJarName(rawMcCustomJarName);
+
+        if (game === 'minecraft' && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
+            res.status(400).json({ message: 'Для CUSTOM-ядра Minecraft укажите ссылку на .jar (mcCustomJarUrl) или имя файла, который вы зальёте через SFTP (mcCustomJarName).' });
+            return;
+        }
+
         // @ts-ignore
         const userId = req.user.id;
 
@@ -612,6 +784,10 @@ export const orderGameServer = async (req: Request, res: Response) => {
             name: name || `${game} server`,
             ram: safeRam,
             slots: safeSlots,
+            core: game === 'minecraft' ? safeMcCore : undefined,
+            mcVersion: game === 'minecraft' ? safeMcVersion : undefined,
+            mcCustomJarUrl: game === 'minecraft' ? safeMcCustomJarUrl : undefined,
+            mcCustomJarName: game === 'minecraft' ? safeMcCustomJarName : undefined,
             status: isAdmin ? 'running' : 'pending_payment',
             monthlyPrice,
             paidUntil: now
@@ -824,7 +1000,10 @@ export const getServerSettings = async (req: Request, res: Response) => {
                 'online-mode': 'false',
                 'max-players': '20',
                 'white-list': 'false',
-                'core': server.core || 'vanilla'
+                'core': server.core || 'paper',
+                'mcVersion': (server as any).mcVersion || 'LATEST',
+                'mcCustomJarUrl': (server as any).mcCustomJarUrl || '',
+                'mcCustomJarName': (server as any).mcCustomJarName || '',
             });
             return;
         }
@@ -838,7 +1017,10 @@ export const getServerSettings = async (req: Request, res: Response) => {
 
         const content = await execCommand(config, `docker exec -i ${server.containerId} cat /data/server.properties`);
         const props = parseProperties(content);
-        props.core = server.core || 'vanilla';
+        props.core = server.core || 'paper';
+        props.mcVersion = (server as any).mcVersion || 'LATEST';
+        props.mcCustomJarUrl = (server as any).mcCustomJarUrl || '';
+        props.mcCustomJarName = (server as any).mcCustomJarName || '';
         res.json(props);
     } catch (error) {
         console.error('Get settings error:', error);
@@ -855,16 +1037,52 @@ export const updateServerSettings = async (req: Request, res: Response) => {
             res.status(404).json({ message: 'Server not found' });
             return;
         }
-        
+
         // @ts-ignore
         const node = server.node;
+        const isMinecraft = server.game === 'minecraft';
+        const isMockNode = node.ip === '127.0.0.1' || node.ip === '1.1.1.1';
 
-        if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
-            console.log(`[Mock] Updating settings for ${server.containerId}:`, newSettings);
-            if (newSettings.core && newSettings.core !== server.core) {
-                await server.update({ core: newSettings.core });
+        const rawMcVersion = isMinecraft ? (newSettings.mcVersion ?? (server as any).mcVersion) : undefined;
+        const rawMcCore = isMinecraft ? (newSettings.mcCore ?? newSettings.core ?? server.core) : undefined;
+        const rawMcCustomJarUrl = isMinecraft ? (newSettings.mcCustomJarUrl ?? (server as any).mcCustomJarUrl) : undefined;
+        const rawMcCustomJarName = isMinecraft ? (newSettings.mcCustomJarName ?? (server as any).mcCustomJarName) : undefined;
+
+        const safeMcVersion = isMinecraft ? validateMcVersion(rawMcVersion) : undefined;
+        const safeMcCore = isMinecraft ? validateMcCore(rawMcCore) : undefined;
+        const safeMcCustomJarUrl = isMinecraft ? validateUrlSafe(rawMcCustomJarUrl) : undefined;
+        const safeMcCustomJarName = isMinecraft ? validateJarName(rawMcCustomJarName) : undefined;
+
+        if (isMinecraft && safeMcCore === 'custom' && !safeMcCustomJarUrl && !safeMcCustomJarName) {
+            res.status(400).json({
+                message: 'Для CUSTOM-ядра Minecraft укажите ссылку на .jar (mcCustomJarUrl) или имя файла .jar, залитого через SFTP в /data (mcCustomJarName).'
+            });
+            return;
+        }
+
+        const beforeCore = String(server.core || '').toLowerCase();
+        const beforeVersion = String((server as any).mcVersion || 'LATEST').trim();
+        const beforeCustomUrl = String((server as any).mcCustomJarUrl || '').trim();
+        const beforeCustomName = String((server as any).mcCustomJarName || '').trim();
+
+        const mcChanged = isMinecraft && (
+            String(safeMcCore || '').toLowerCase() !== beforeCore ||
+            String(safeMcVersion || '').trim() !== beforeVersion ||
+            String(safeMcCustomJarUrl || '').trim() !== beforeCustomUrl ||
+            String(safeMcCustomJarName || '').trim() !== beforeCustomName
+        );
+
+        if (isMockNode) {
+            console.log(`[Mock] Updating settings for ${server.containerId}:`, newSettings, { mcChanged });
+            const patch: any = {};
+            if (isMinecraft && safeMcCore !== undefined) patch.core = safeMcCore;
+            if (isMinecraft && safeMcVersion !== undefined) patch.mcVersion = safeMcVersion;
+            if (isMinecraft) patch.mcCustomJarUrl = safeMcCustomJarUrl ?? null;
+            if (isMinecraft) patch.mcCustomJarName = safeMcCustomJarName ?? null;
+            if (Object.keys(patch).length > 0) {
+                await server.update(patch);
             }
-            res.json({ message: 'Settings updated' });
+            res.json({ message: 'Settings updated', reprovisioned: false, mock: true });
             return;
         }
 
@@ -875,34 +1093,89 @@ export const updateServerSettings = async (req: Request, res: Response) => {
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
 
-        // 1. Get current properties
-        const content = await execCommand(config, `docker exec -i ${server.containerId} cat /data/server.properties`);
-        const props = parseProperties(content);
-        
-        // 2. Merge new settings
-        // Remove 'core' from props to save, as it's not in server.properties
-        const { core, ...fileSettings } = newSettings;
-        const updatedProps = { ...props, ...fileSettings };
-        
-        // 3. Write back
-        const newContent = stringifyProperties(updatedProps);
-        // We need to escape special characters for bash echo/cat
-        // Using a temporary file approach or proper escaping would be safer
-        // For now, let's try a simple cat with heredoc or similar if possible, 
-        // but ssh exec is tricky. Let's use the stream upload we already have or simple echo.
-        
-        // Simple echo might fail with multiline. 
-        // Let's use a one-liner to write file
-        const cmd = `echo "${newContent.replace(/"/g, '\\"')}" > /data/server.properties`;
-        await execCommand(config, `docker exec -i ${server.containerId} sh -c '${cmd}'`);
-        
-        // 4. Update Core in DB if changed
-        if (core && core !== server.core) {
-            await server.update({ core });
-            // TODO: Trigger reinstall/update logic if core changed
+        let reprovisioned = false;
+        let newContainerId: string | undefined;
+
+        if (isMinecraft && mcChanged && !isMockNode) {
+            try {
+                console.log(`[updateServerSettings] mc* changed, reprovisioning server ${server.id}...`);
+                const serverSnapshot: any = server.toJSON
+                    ? server.toJSON()
+                    : { ...(server as any) };
+                serverSnapshot.core = safeMcCore;
+                serverSnapshot.mcVersion = safeMcVersion;
+                serverSnapshot.mcCustomJarUrl = safeMcCustomJarUrl;
+                serverSnapshot.mcCustomJarName = safeMcCustomJarName;
+
+                newContainerId = await reprovisionMinecraftContainer(serverSnapshot, node, config);
+                reprovisioned = true;
+                console.log(`[updateServerSettings] reprovision OK, new containerId=${newContainerId}`);
+            } catch (repErr: any) {
+                console.error('[updateServerSettings] reprovision failed:', repErr?.message || repErr);
+                res.status(500).json({
+                    message: `Ошибка переустановки контейнера: ${repErr?.message || 'unknown'}`,
+                    reprovisioned: false,
+                });
+                return;
+            }
         }
 
-        res.json({ message: 'Settings updated' });
+        // 1. Get current properties (from NEW container if reprovisioned, else OLD)
+        const propsIdent = newContainerId || server.containerId;
+        let props: any = {};
+        try {
+            const content = await execCommand(config, `docker exec -i ${propsIdent} cat /data/server.properties`);
+            props = parseProperties(content);
+        } catch (e) {
+            console.warn('[updateServerSettings] could not read server.properties, will write new ones:', e);
+        }
+
+        // 2. Merge new settings, remove mc*/core from properties file
+        const {
+            core: _core,
+            mcCore: _mcCore,
+            mcVersion: _mcVersion,
+            mcCustomJarUrl: _mcCustomJarUrl,
+            mcCustomJarName: _mcCustomJarName,
+            ...fileSettings
+        } = newSettings;
+
+        const updatedProps = { ...props, ...fileSettings };
+        const newContent = stringifyProperties(updatedProps);
+
+        // 3. Write properties to NEW or OLD container
+        try {
+            const tmpFile = `/tmp/wexa_server_${id}.properties`;
+            const escapedContent = newContent
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "'\\''");
+            await execCommand(config, `sh -lc "printf '%s' '${escapedContent}' > ${tmpFile}"`);
+            await execCommand(config, `sh -lc "docker cp ${tmpFile} ${propsIdent}:/data/server.properties >/dev/null 2>&1 || true"`);
+            await execCommand(config, `sh -lc "rm -f ${tmpFile} >/dev/null 2>&1 || true"`);
+        } catch (writeErr: any) {
+            console.error('[updateServerSettings] write server.properties failed:', writeErr?.message || writeErr);
+            res.status(500).json({ message: 'Ошибка сохранения server.properties' });
+            return;
+        }
+
+        // 4. Save mc* fields to DB + containerId if reprovisioned
+        const dbPatch: any = {};
+        if (isMinecraft && safeMcCore !== undefined) dbPatch.core = safeMcCore;
+        if (isMinecraft && safeMcVersion !== undefined) dbPatch.mcVersion = safeMcVersion;
+        if (isMinecraft) dbPatch.mcCustomJarUrl = safeMcCustomJarUrl ?? null;
+        if (isMinecraft) dbPatch.mcCustomJarName = safeMcCustomJarName ?? null;
+        if (reprovisioned && newContainerId) dbPatch.containerId = newContainerId;
+        if (Object.keys(dbPatch).length > 0) {
+            await server.update(dbPatch);
+        }
+
+        res.json({
+            message: reprovisioned
+                ? 'Настройки сохранены. Сервер переустановлен с сохранением мира и данных.'
+                : 'Настройки сохранены. Перезапустите сервер для применения server.properties.',
+            reprovisioned,
+            newContainerId,
+        });
 
     } catch (error) {
         console.error('Update settings error:', error);
@@ -1492,7 +1765,7 @@ export const applyGameServerPaidInvoice = async (invoice: any): Promise<void> =>
 
             const dockerCmd =
                 server.game === 'minecraft'
-                    ? `docker run -d -p ${port}:25565 -e EULA=TRUE -e MAX_PLAYERS=${server.slots || 20} --name ${containerName} -m ${server.ram || 1024}m itzg/minecraft-server`
+                    ? `docker run ${buildMinecraftDockerArgs(server, port, containerName)}`
                     : server.game === 'cs2'
                       ? `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN joedwards32/cs2 +maxplayers ${server.slots || 32}`
                       : `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} archont94/counter-strike1.6:latest +map de_dust2 +maxplayers ${server.slots || 32}`;

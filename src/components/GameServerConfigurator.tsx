@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
-  Terminal, Upload, Crown, Sparkles, CreditCard
+  Terminal, Upload, Crown, Sparkles, CreditCard, Cpu
 } from 'lucide-react';
 
 export const SUPPORTED_GAMES = [
@@ -78,6 +78,27 @@ export const STEPS = [
 export const PERIOD_DISCOUNTS: Record<number, number> = { 1: 0, 3: 0.05, 6: 0.10, 12: 0.15 };
 export const VALID_PERIODS = [1, 3, 6, 12];
 
+export const POPULAR_MINECRAFT_VERSIONS: string[] = [
+  'LATEST', 'SNAPSHOT',
+  '1.21.4', '1.21.3', '1.21.1', '1.21',
+  '1.20.6', '1.20.4', '1.20.1',
+  '1.19.4', '1.18.2', '1.17.1', '1.16.5',
+];
+
+export const MINECRAFT_CORE_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
+  { value: 'paper', label: 'Paper (рекомендуемый)', hint: 'Плагины Paper / Spigot. Лучшая производительность + стабильность.' },
+  { value: 'purpur', label: 'Purpur', hint: 'Форк Paper. Дополнительные твики, лучше TPS, 1.21 оптимизации.' },
+  { value: 'folia', label: 'Folia', hint: 'Многопоточный Paper. Для больших серверов 50+ игроков (автор PaperMC).' },
+  { value: 'spigot', label: 'Spigot', hint: 'Классический Spigot. Поддержка плагинов Spigot API.' },
+  { value: 'fabric', label: 'Fabric', hint: 'Моды Fabric. Лёгкий loader, современные моды 1.17+.' },
+  { value: 'forge', label: 'Forge', hint: 'Моды Minecraft Forge. Классические модпаки.' },
+  { value: 'neoforge', label: 'NeoForge', hint: 'Современный форк Forge 1.20.1+. Новые моды 1.21.' },
+  { value: 'mohist', label: 'Mohist', hint: 'Плагины Paper/Bukkit + моды Forge одновременно. Forge + Plugins!' },
+  { value: 'vanilla', label: 'Vanilla (чистый)', hint: 'Оригинальный сервер Mojang без плагинов и модов.' },
+  { value: 'custom', label: 'Своё ядро (.jar)', hint: 'Укажите ссылку на .jar или загрузите свой файл через SFTP в /data.' },
+];
+
+
 export interface PublicNode {
   id: string;
   name: string;
@@ -121,10 +142,13 @@ export interface GameServerOrderPayload {
   location: string;
   slots: number;
   ram?: number;
-  core?: number;
   periodMonths: number;
   name?: string;
   nodeId?: string;
+  mcVersion?: string;
+  mcCore?: string;
+  mcCustomJarUrl?: string;
+  mcCustomJarName?: string;
 }
 
 interface GameServerConfiguratorProps {
@@ -153,6 +177,10 @@ const GameServerConfigurator = ({
   const [slots, setSlots] = useState(SUPPORTED_GAMES.find(g => g.id === (initialGame ?? SUPPORTED_GAMES[0].id))!.defaultSlots);
   const [periodMonths, setPeriodMonths] = useState(1);
   const [name, setName] = useState('');
+  const [mcVersion, setMcVersion] = useState('LATEST');
+  const [mcCore, setMcCore] = useState('paper');
+  const [mcCustomJarUrl, setMcCustomJarUrl] = useState('');
+  const [mcCustomJarName, setMcCustomJarName] = useState('');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
 
@@ -193,6 +221,20 @@ const GameServerConfigurator = ({
     if (game) {
       setSlots(game.defaultSlots);
     }
+    if (selectedGame === 'minecraft') {
+      if (!mcVersion || !['LATEST', 'SNAPSHOT'].includes(mcVersion) && !/^\d+\.\d+/.test(mcVersion)) {
+        setMcVersion('LATEST');
+      }
+      if (!MINECRAFT_CORE_OPTIONS.some(o => o.value === mcCore)) {
+        setMcCore('paper');
+      }
+    } else {
+      setMcVersion('LATEST');
+      setMcCore('paper');
+      setMcCustomJarUrl('');
+      setMcCustomJarName('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGame]);
 
   const game = SUPPORTED_GAMES.find(g => g.id === selectedGame)!;
@@ -220,10 +262,13 @@ const GameServerConfigurator = ({
         location: selectedLocation,
         slots,
         ram: 1024,
-        core: 1,
         periodMonths,
         name: name.trim() || undefined,
         nodeId: selectedNode?.id,
+        mcVersion: selectedGame === 'minecraft' ? mcVersion : undefined,
+        mcCore: selectedGame === 'minecraft' ? mcCore : undefined,
+        mcCustomJarUrl: selectedGame === 'minecraft' ? mcCustomJarUrl.trim() || undefined : undefined,
+        mcCustomJarName: selectedGame === 'minecraft' ? mcCustomJarName.trim() || undefined : undefined,
       });
     } finally {
       setInternalLoading(false);
@@ -359,6 +404,105 @@ const GameServerConfigurator = ({
     </div>
   );
 
+  const McVersionSelector = () => {
+    if (selectedGame !== 'minecraft') return null;
+    const coreHint = MINECRAFT_CORE_OPTIONS.find(o => o.value === mcCore)?.hint ?? '';
+    return (
+      <div className="space-y-5 bg-white/70 border border-indigo-100 rounded-2xl p-5 mt-2">
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="text-sm font-extrabold text-gray-800 tracking-wide">Версия Minecraft и ядро</h4>
+          <span className="text-[10px] uppercase tracking-wider text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full">
+            настройки сервера
+          </span>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Версия</label>
+          <div className="flex gap-2">
+            <select
+              value={POPULAR_MINECRAFT_VERSIONS.includes(mcVersion) ? mcVersion : '__custom__'}
+              onChange={e => {
+                const v = e.target.value;
+                if (v === '__custom__') return;
+                setMcVersion(v);
+              }}
+              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+            >
+              {POPULAR_MINECRAFT_VERSIONS.map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+              <option value="__custom__">✎ Ввести вручную…</option>
+            </select>
+            <input
+              type="text"
+              value={mcVersion}
+              onChange={e => setMcVersion(e.target.value)}
+              placeholder="например 1.20.1"
+              className="w-40 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium font-mono text-indigo-900"
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+            <span className="font-semibold">LATEST</span> — автоматически последняя стабильная Mojang •&nbsp;
+            <span className="font-semibold">SNAPSHOT</span> — снапшоты разработки •&nbsp;
+            <span className="font-semibold">1.20.1 / 1.20.4</span> — популярные сборки модов.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Тип ядра</label>
+          <select
+            value={mcCore}
+            onChange={e => setMcCore(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+          >
+            {MINECRAFT_CORE_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          {coreHint && (
+            <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">{coreHint}</p>
+          )}
+        </div>
+
+        {mcCore === 'custom' && (
+          <div className="space-y-3 p-4 bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-200 rounded-xl">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black">!</span>
+              <p className="text-xs font-bold text-indigo-800 leading-snug">
+                Для СВОЕГО ядра укажите <span className="underline underline-offset-1">либо</span> прямую ссылку HTTPS на .jar,
+                <span className="underline underline-offset-1"> либо</span> имя файла .jar, который вы зальёте через SFTP в корень /data.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-indigo-800 mb-1.5">Ссылка на .jar (https://…/server.jar)</label>
+              <input
+                type="url"
+                value={mcCustomJarUrl}
+                onChange={e => setMcCustomJarUrl(e.target.value)}
+                placeholder="https://example.com/modpacks/mycore-1.20.4.jar"
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-indigo-200 focus:border-indigo-500 focus:ring-0 outline-none text-xs font-mono bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-indigo-800 mb-1.5">или имя файла в /data (SFTP)</label>
+              <input
+                type="text"
+                value={mcCustomJarName}
+                onChange={e => setMcCustomJarName(e.target.value)}
+                placeholder="my-awesome-server.jar"
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-indigo-200 focus:border-indigo-500 focus:ring-0 outline-none text-xs font-mono bg-white"
+              />
+              <p className="mt-1 text-[10px] text-indigo-600/80 leading-relaxed">
+                Загрузите свой .jar по SFTP в папку сервера (/data), укажите точное имя файла, сервер запустит его.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+
   const PricePanel = () => {
     const IconGame = game.icon;
     return (
@@ -396,6 +540,10 @@ const GameServerConfigurator = ({
               { k: 'Локация', v: LOCATIONS.find(l => l.id === selectedLocation)?.name ?? '', I: MapPin },
               { k: 'Слоты', v: `${slots} шт.`, I: Users },
               { k: 'Период', v: periodLabel(periodMonths), I: Clock },
+              ...(selectedGame === 'minecraft' ? [
+                { k: 'Версия', v: mcVersion || 'LATEST', I: Sparkles },
+                { k: 'Ядро', v: (MINECRAFT_CORE_OPTIONS.find(o => o.value === mcCore)?.label || mcCore || 'Paper'), I: Cpu },
+              ] : []),
             ].map((row, i) => {
               const Ic = row.I as any;
               return (
@@ -539,6 +687,7 @@ const GameServerConfigurator = ({
               {showNameField && <NameField />}
               <div className="space-y-6 pt-2">
                 <Sliders />
+                <McVersionSelector />
               </div>
             </div>
             <div className="lg:col-span-2">
@@ -549,27 +698,6 @@ const GameServerConfigurator = ({
       </div>
     </section>
   );
-
-  if (compact) {
-    return (
-      <div className="space-y-5">
-        <PeriodSelector />
-        {showNameField && <NameField />}
-        <div className="grid lg:grid-cols-5 rounded-3xl overflow-hidden bg-white shadow-lg border border-gray-100">
-          <div className="lg:col-span-3 p-6 space-y-5">
-            <CompactGameSelector />
-            <CompactLocationSelector />
-            <div className="space-y-5 pt-2">
-              <Sliders />
-            </div>
-          </div>
-          <div className="lg:col-span-2">
-            <PricePanel />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

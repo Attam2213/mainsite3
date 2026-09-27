@@ -12,6 +12,9 @@ class GameServer extends Model {
   declare slots: number;
   declare core: string;
   declare status: string;
+  declare mcVersion?: string;
+  declare mcCustomJarUrl?: string;
+  declare mcCustomJarName?: string;
   declare monthlyPrice: number;
   declare paidUntil: Date | null;
   declare containerId?: string;
@@ -34,7 +37,10 @@ GameServer.init(
     port: { type: DataTypes.INTEGER, allowNull: true },
     ram: { type: DataTypes.INTEGER, defaultValue: 1024 },
     slots: { type: DataTypes.INTEGER, defaultValue: 10 },
-    core: { type: DataTypes.STRING, defaultValue: 'vanilla' },
+    core: { type: DataTypes.STRING, defaultValue: 'paper' },
+    mcVersion: { type: DataTypes.STRING, defaultValue: 'LATEST' },
+    mcCustomJarUrl: { type: DataTypes.TEXT, allowNull: true },
+    mcCustomJarName: { type: DataTypes.STRING, allowNull: true },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
     monthlyPrice: { type: DataTypes.INTEGER, defaultValue: 0 },
     paidUntil: { type: DataTypes.DATE, allowNull: true },

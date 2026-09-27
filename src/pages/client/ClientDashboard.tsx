@@ -4,6 +4,8 @@ import Layout from '../../components/Layout';
 import GameServerConfigurator, {
   type GameServerOrderPayload,
   type PublicNode,
+  MINECRAFT_CORE_OPTIONS,
+  POPULAR_MINECRAFT_VERSIONS,
 } from '../../components/GameServerConfigurator';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -143,6 +145,10 @@ interface GameServer {
   node?: HostingNode;
   containerId?: string;
   rconPassword?: string;
+  core?: string;
+  mcVersion?: string;
+  mcCustomJarUrl?: string;
+  mcCustomJarName?: string;
 }
 
 const formatDate = (date: string | Date) => {
@@ -1234,13 +1240,26 @@ const ClientDashboard = () => {
       if (!currentSettingsServer) return;
       try {
           const token = localStorage.getItem('token');
-          await fetch(`/api/game-servers/${currentSettingsServer.id}/settings`, {
+          const res = await fetch(`/api/game-servers/${currentSettingsServer.id}/settings`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify(serverSettings)
           });
-          alert('Настройки сохранены. Перезагрузите сервер для применения изменений.');
+
+          if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              alert(`Ошибка: ${err?.message || `HTTP ${res.status}`}`);
+              return;
+          }
+
+          const data = await res.json().catch(() => ({}));
+          if (data?.reprovisioned) {
+              alert('✅ Настройки сохранены. Сервер переустановлен с сохранением мира/данных и запущен.');
+          } else {
+              alert('✅ Настройки сохранены. Перезапустите сервер (если меняли server.properties) для применения.');
+          }
           setIsSettingsModalOpen(false);
+          await fetchData();
       } catch (e) {
           console.error(e);
           alert('Ошибка сохранения настроек');
@@ -2760,6 +2779,100 @@ const ClientDashboard = () => {
                         {/* Minecraft Settings */}
                         {currentSettingsServer.game === 'minecraft' && (
                             <>
+                                <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-lg space-y-3.5">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-indigo-700">Версия и ядро</h4>
+                                        <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                                            Переустановка с сохранением мира
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Версия Minecraft</label>
+                                        <div className="flex gap-2">
+                                            <select
+                                                className="flex-1 p-2 border rounded text-sm"
+                                                value={POPULAR_MINECRAFT_VERSIONS.includes(String(serverSettings.mcVersion || 'LATEST'))
+                                                    ? String(serverSettings.mcVersion || 'LATEST')
+                                                    : '__custom__'}
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    if (v === '__custom__') return;
+                                                    setServerSettings({...serverSettings, mcVersion: v});
+                                                }}
+                                            >
+                                                {POPULAR_MINECRAFT_VERSIONS.map(v => (
+                                                    <option key={v} value={v}>{v}</option>
+                                                ))}
+                                                <option value="__custom__">✎ Ввести вручную…</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                className="w-32 p-2 border rounded text-sm font-mono"
+                                                value={serverSettings.mcVersion || 'LATEST'}
+                                                onChange={e => setServerSettings({...serverSettings, mcVersion: e.target.value})}
+                                                placeholder="1.20.1"
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-gray-500 leading-snug">
+                                            LATEST — последняя стабильная • SNAPSHOT — снапшоты • точная версия — сборка модов.
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Тип ядра</label>
+                                        <select
+                                            className="w-full p-2 border rounded text-sm"
+                                            value={serverSettings.mcCore || serverSettings.core || 'paper'}
+                                            onChange={e => setServerSettings({...serverSettings, mcCore: e.target.value, core: e.target.value})}
+                                        >
+                                            {MINECRAFT_CORE_OPTIONS.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                        {(() => {
+                                            const c = MINECRAFT_CORE_OPTIONS.find(o => o.value === (serverSettings.mcCore || serverSettings.core || 'paper'));
+                                            return c?.hint ? (
+                                                <p className="mt-1 text-[10px] text-gray-500 leading-snug">{c.hint}</p>
+                                            ) : null;
+                                        })()}
+                                    </div>
+
+                                    {((serverSettings.mcCore || serverSettings.core || 'paper') === 'custom') && (
+                                        <div className="space-y-2 p-3 bg-white border border-indigo-200 rounded">
+                                            <div className="flex items-start gap-1.5">
+                                                <span className="mt-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black">!</span>
+                                                <p className="text-[11px] text-indigo-800 leading-snug font-semibold">
+                                                    Укажите <u>либо</u> прямую HTTPS-ссылку на .jar, <u>либо</u> имя файла .jar, который вы загрузите по SFTP в корень /data.
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-indigo-900 mb-0.5">Ссылка на .jar (https://…/server.jar)</label>
+                                                <input
+                                                    type="url"
+                                                    className="w-full p-2 border rounded text-xs font-mono"
+                                                    value={serverSettings.mcCustomJarUrl || ''}
+                                                    onChange={e => setServerSettings({...serverSettings, mcCustomJarUrl: e.target.value})}
+                                                    placeholder="https://example.com/mods/mycore-1.20.1.jar"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-indigo-900 mb-0.5">или имя файла в /data (SFTP)</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full p-2 border rounded text-xs font-mono"
+                                                    value={serverSettings.mcCustomJarName || ''}
+                                                    onChange={e => setServerSettings({...serverSettings, mcCustomJarName: e.target.value})}
+                                                    placeholder="my-server-1.20.jar"
+                                                />
+                                                <p className="mt-0.5 text-[9px] text-indigo-600/80 leading-snug">
+                                                    Загрузите .jar в папку /data по SFTP и укажите точное имя.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Режим игры</label>
                                     <select className="w-full p-2 border rounded" value={serverSettings.gamemode || 'survival'} onChange={e => setServerSettings({...serverSettings, gamemode: e.target.value})}>
@@ -2777,25 +2890,6 @@ const ClientDashboard = () => {
                                         <option value="normal">Нормальная</option>
                                         <option value="hard">Сложная</option>
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Ядро (Требуется переустановка)</label>
-                                    <input 
-                                        list="core-options" 
-                                        className="w-full p-2 border rounded" 
-                                        value={serverSettings.core || 'vanilla'} 
-                                        onChange={e => setServerSettings({...serverSettings, core: e.target.value})} 
-                                        placeholder="Выберите или введите название ядра"
-                                    />
-                                    <datalist id="core-options">
-                                        <option value="vanilla">Vanilla (Стандартное)</option>
-                                        <option value="paper">Paper (Оптимизированное)</option>
-                                        <option value="spigot">Spigot</option>
-                                        <option value="forge">Forge (Моды)</option>
-                                        <option value="fabric">Fabric (Моды)</option>
-                                        <option value="velocity">Velocity</option>
-                                        <option value="purpur">Purpur</option>
-                                    </datalist>
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
