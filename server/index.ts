@@ -151,6 +151,19 @@ const startServer = async () => {
     } catch (e) {
       console.error('[DB] ensure game_servers/invoices columns failed:', e);
     }
+
+    try {
+      if (dialect === 'postgres') {
+        await sequelize.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS balance DECIMAL(12,2) NOT NULL DEFAULT 0.0;");
+      } else if (dialect === 'sqlite') {
+        await ensureSqliteColumn('users', 'balance', 'DECIMAL(12,2) DEFAULT 0.0');
+      } else {
+        await sequelize.query("ALTER TABLE users ADD COLUMN balance DECIMAL(12,2) DEFAULT 0.0;");
+      }
+    } catch (e) {
+      console.error('[DB] ensure users.balance column failed:', e);
+    }
+
     await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });
     
     console.log('Database synced.');

@@ -5,6 +5,7 @@ const run = async () => {
     console.log('Fixing DB schema...');
     
     const queries = [
+        "ALTER TABLE users ADD COLUMN balance DECIMAL(12,2) DEFAULT 0.0;",
         "ALTER TABLE projects ADD COLUMN paidUntil DATE;",
         "ALTER TABLE projects ADD COLUMN siteStatus TEXT DEFAULT 'unknown';",
         "ALTER TABLE invoices ADD COLUMN periodMonths INTEGER DEFAULT 1;",
