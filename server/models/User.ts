@@ -10,6 +10,7 @@ class User extends Model {
   declare company: string;
   declare telegram_id: string;
   declare avatar: string;
+  declare balance: number;
 }
 
 User.init(
@@ -48,6 +49,11 @@ User.init(
     avatar: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    balance: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0.0,
     },
   },
   {

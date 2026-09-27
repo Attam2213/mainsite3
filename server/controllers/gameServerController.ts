@@ -1,12 +1,13 @@
 
 import { Request, Response } from 'express';
-import { GameServer, ServerNode, Invoice } from '../models';
+import { GameServer, ServerNode, Invoice, User } from '../models';
 import { decrypt } from '../utils/crypto';
 import { execCommand, uploadStream } from '../services/sshService';
 import Busboy from 'busboy';
 import * as net from 'net';
 import * as dgram from 'dgram';
 import crypto from 'crypto';
+import { adjustBalance, round2 } from '../services/balanceService';
 
 const GAME_PORTS: Record<string, number> = {
     'minecraft': 25565,
@@ -585,6 +586,25 @@ export const orderGameServer = async (req: Request, res: Response) => {
         const monthlyPrice = calculateMonthlyPrice(safeRam, safeSlots, getSlotPriceForNodeGame(node as any, game));
         const totalAmount = Math.ceil(monthlyPrice * periodMonths * (1 - discount));
 
+        // @ts-ignore
+        const isAdmin: boolean = req.user.role === 'admin';
+        const user = await User.findByPk(userId, { attributes: ['id', 'balance'] });
+        if (!user) {
+            res.status(404).json({ message: 'Пользователь не найден' });
+            return;
+        }
+        const userBalance = round2(user.balance ?? 0);
+
+        if (!isAdmin && userBalance < totalAmount - 0.001) {
+            res.status(402).json({
+                message: 'Недостаточно средств на балансе',
+                needed: round2(totalAmount - userBalance),
+                balance: userBalance,
+                totalAmount,
+            });
+            return;
+        }
+
         const server = await GameServer.create({
             userId,
             nodeId,
@@ -592,7 +612,7 @@ export const orderGameServer = async (req: Request, res: Response) => {
             name: name || `${game} server`,
             ram: safeRam,
             slots: safeSlots,
-            status: 'pending_payment',
+            status: isAdmin ? 'running' : 'pending_payment',
             monthlyPrice,
             paidUntil: now
         });
@@ -608,7 +628,40 @@ export const orderGameServer = async (req: Request, res: Response) => {
             periodMonths
         });
 
-        res.status(201).json({ server, invoice, period: periodMonths, discount: Math.round(discount * 100) });
+        if (!isAdmin) {
+            try {
+                await adjustBalance({
+                    userId,
+                    amount: -round2(totalAmount),
+                    type: 'withdraw',
+                    description: invoice.title,
+                    invoiceId: invoice.id,
+                    gameServerId: server.id,
+                });
+            } catch (wb: any) {
+                res.status(402).json({
+                    message: wb.message || 'Недостаточно средств',
+                    balance: userBalance,
+                    totalAmount,
+                    needed: round2(totalAmount - userBalance),
+                });
+                return;
+            }
+            invoice.status = 'paid';
+            await invoice.save();
+            server.status = 'running';
+            server.paidUntil = addMonths(now, periodMonths);
+            await server.save();
+            try {
+                await applyGameServerPaidInvoice(invoice);
+            } catch (provErr: any) {
+                console.error('Provision after order pay failed:', provErr?.message || provErr);
+            }
+            res.status(201).json({ server, invoice, period: periodMonths, discount: Math.round(discount * 100), paidWithBalance: true });
+            return;
+        }
+
+        res.status(201).json({ server, invoice, period: periodMonths, discount: Math.round(discount * 100), paidWithBalance: false });
 
     } catch (error) {
         console.error('Order game server error:', error);
@@ -1343,6 +1396,20 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
         const monthlyPrice = Number(server.monthlyPrice) || fallbackMonthly;
         const amount = Math.max(0, Math.ceil(monthlyPrice * periodMonths * (1 - discount)));
 
+        if (!isAdmin) {
+            const u = await User.findByPk(server.userId, { attributes: ['id', 'balance'] });
+            const userBal = round2(u?.balance ?? 0);
+            if (userBal < amount - 0.001) {
+                res.status(402).json({
+                    message: 'Недостаточно средств на балансе',
+                    needed: round2(amount - userBal),
+                    balance: userBal,
+                    totalAmount: amount,
+                });
+                return;
+            }
+        }
+
         const invoice = await Invoice.create({
             title: `Продление игрового сервера: ${server.name} (${formatPeriodSuffix(periodMonths)}${discount > 0 ? `, -${Math.round(discount*100)}%` : ''})`,
             amount,
@@ -1353,6 +1420,27 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
             gameServerId: server.id,
             periodMonths: periodMonths
         });
+
+        if (!isAdmin) {
+            try {
+                await adjustBalance({
+                    userId: server.userId,
+                    amount: -round2(amount),
+                    type: 'withdraw',
+                    description: invoice.title,
+                    invoiceId: invoice.id,
+                    gameServerId: server.id,
+                });
+            } catch (wb: any) {
+                res.status(402).json({ message: wb.message || 'Недостаточно средств' });
+                return;
+            }
+            invoice.status = 'paid';
+            await invoice.save();
+            try { await applyGameServerPaidInvoice(invoice); } catch (e) { console.error(e); }
+            res.status(201).json({ ...invoice.toJSON(), paidWithBalance: true });
+            return;
+        }
 
         res.status(201).json(invoice);
     } catch (error) {

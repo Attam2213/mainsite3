@@ -11,6 +11,7 @@ import Lead from './Lead';
 import Feedback from './Feedback';
 import ServerNode from './ServerNode';
 import GameServer from './GameServer';
+import WalletTransaction from './WalletTransaction';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -55,6 +56,9 @@ GameServer.belongsTo(ServerNode, { foreignKey: 'nodeId', as: 'node' });
 GameServer.hasMany(Invoice, { foreignKey: 'gameServerId', as: 'invoices' });
 Invoice.belongsTo(GameServer, { foreignKey: 'gameServerId', as: 'gameServer' });
 
+User.hasMany(WalletTransaction, { foreignKey: 'userId', as: 'walletTransactions' });
+WalletTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 export {
   User,
   Service,
@@ -68,5 +72,6 @@ export {
   Lead,
   Feedback,
   ServerNode,
-  GameServer
+  GameServer,
+  WalletTransaction
 };

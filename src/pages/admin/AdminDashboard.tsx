@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Users, 
   FileText,
@@ -23,7 +24,30 @@ import {
   UserCog,
   ChevronDown,
   ShieldAlert,
+  Wallet,
+  ChevronLeft,
+  ChevronRight,
+  Minus,
 } from 'lucide-react';
+
+interface WalletTransactionItem {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'deposit' | 'withdraw' | 'adjust' | 'refund';
+  description: string | null;
+  invoiceId: string | null;
+  gameServerId: string | null;
+  relatedId: string | null;
+  metadata: any | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
 
 interface ServerNode {
   id: string;
@@ -106,6 +130,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  balance: number;
   createdAt?: string;
 }
 
@@ -177,7 +202,8 @@ const formatDate = (date: string | Date) => {
 };
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers'>('dashboard');
+  const { refreshBalance } = useAuth();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers' | 'finances'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -189,6 +215,145 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [servers, setServers] = useState<ServerNode[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ============== WALLET / BALANCE (ADMIN) ==============
+  // Users filter
+  const [userBalanceFilter, setUserBalanceFilter] = useState<'all' | 'positive' | 'zero'>('all');
+  const [userSortByBalance, setUserSortByBalance] = useState<'none' | 'asc' | 'desc'>('desc');
+
+  // Adjust modal (+- balance manually)
+  const [adjustModal, setAdjustModal] = useState<{
+    open: boolean;
+    targetUserId: string;
+    targetUserName: string;
+    sign: '+' | '-';
+    amount: string;
+    description: string;
+    loading: boolean;
+  }>({
+    open: false,
+    targetUserId: '',
+    targetUserName: '',
+    sign: '+',
+    amount: '',
+    description: '',
+    loading: false,
+  });
+
+  // All transactions (Finances Tab)
+  const [allTransactions, setAllTransactions] = useState<WalletTransactionItem[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txOffset, setTxOffset] = useState(0);
+  const [txTotal, setTxTotal] = useState(0);
+  const txLimit = 20;
+  const [txUserFilter, setTxUserFilter] = useState<string>('');
+  const [txTypeFilter, setTxTypeFilter] = useState<'all' | 'deposit' | 'withdraw' | 'adjust' | 'refund'>('all');
+
+  // Helpers
+  const formatTxTypeBadge = (t: WalletTransactionItem) => {
+    const amount = Number(t.amount) || 0;
+    if (t.type === 'deposit') return { label: 'Пополнение', className: 'bg-emerald-100 text-emerald-800', sign: '+' };
+    if (t.type === 'refund') return { label: 'Возврат', className: 'bg-emerald-100 text-emerald-800', sign: '+' };
+    if (t.type === 'adjust') {
+      const positive = amount >= 0;
+      return {
+        label: positive ? 'Ручное начисление' : 'Ручное списание',
+        className: positive ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800',
+        sign: positive ? '+' : '-',
+      };
+    }
+    return { label: 'Списание', className: 'bg-rose-100 text-rose-800', sign: '-' };
+  };
+
+  const formatTxDescription = (t: WalletTransactionItem) => {
+    if (t.description) return t.description;
+    if (t.type === 'deposit') return 'Пополнение баланса';
+    if (t.type === 'withdraw') return 'Оплата услуг';
+    const manualBy = t.metadata?.manualBy ? `(админ: ${String(t.metadata.manualBy).slice(0, 8)})` : '';
+    let s = manualBy || '';
+    if (t.gameServerId) s = `${s ? s + ' · ' : ''}Сервер #${t.gameServerId.slice(0, 8)}`;
+    if (t.invoiceId) s = `${s ? s + ' · ' : ''}Счёт #${t.invoiceId.slice(0, 8)}`;
+    return s || '—';
+  };
+
+  const loadAllTransactions = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      setTxLoading(true);
+      let url = `/api/wallet/transactions?limit=${txLimit}&offset=${txOffset}`;
+      if (txUserFilter) url += `&userId=${encodeURIComponent(txUserFilter)}`;
+      if (txTypeFilter !== 'all') url += `&type=${txTypeFilter}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.rows)) setAllTransactions(data.rows);
+        if (typeof data?.count === 'number') setTxTotal(data.count);
+      }
+    } catch (e) {
+      console.error('loadAllTransactions error:', e);
+    } finally {
+      setTxLoading(false);
+    }
+  };
+
+  const openAdjustModal = (u: User, sign: '+' | '-') => {
+    setAdjustModal({
+      open: true,
+      targetUserId: u.id,
+      targetUserName: u.name || u.email,
+      sign,
+      amount: sign === '+' ? '500' : '100',
+      description: '',
+      loading: false,
+    });
+  };
+
+  const submitAdjustBalance = async () => {
+    const amount = Number(adjustModal.amount);
+    if (!amount || amount <= 0) {
+      alert('Введите положительную сумму');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    if (!token || !adjustModal.targetUserId) return;
+    try {
+      setAdjustModal((s) => ({ ...s, loading: true }));
+      const res = await fetch('/api/wallet/admin/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: adjustModal.targetUserId,
+          amount: adjustModal.sign === '+' ? Math.abs(amount) : -Math.abs(amount),
+          description: adjustModal.description.trim() || (adjustModal.sign === '+' ? 'Ручное пополнение' : 'Ручное списание'),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.message || 'Ошибка изменения баланса');
+        return;
+      }
+      setAdjustModal({ open: false, targetUserId: '', targetUserName: '', sign: '+', amount: '', description: '', loading: false });
+      alert(`Баланс пользователя обновлён. Новый баланс: ${Number(data?.newBalance ?? '').toFixed(2)} ₽`);
+      try { await refreshBalance(); } catch (e) {}
+      fetchData();
+      if (activeTab === 'finances') loadAllTransactions();
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка запроса');
+    } finally {
+      setAdjustModal((s) => ({ ...s, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'finances') {
+      loadAllTransactions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, txOffset, txUserFilter, txTypeFilter]);
 
   // Game Servers: Filters + Mass Selection
   const [selectedGameServerIds, setSelectedGameServerIds] = useState<Set<string>>(new Set());
@@ -996,6 +1161,7 @@ const AdminDashboard = () => {
               {[
                 { id: 'dashboard', label: 'Обзор' },
                 { id: 'users', label: 'Пользователи' },
+                { id: 'finances', label: 'Финансы' },
                 { id: 'invoices', label: 'Счета' },
                 { id: 'hosting_nodes', label: 'Ноды (локации)' },
                 { id: 'game_servers', label: 'Игровые серверы' },
@@ -1653,84 +1819,432 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'users' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Пользователь
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Роль
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Действия
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center cursor-pointer hover:bg-indigo-200" onClick={() => handleOpenUserProfile(user)}>
-                              <span className="text-indigo-600 font-medium text-sm">
-                                {user.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600" onClick={() => handleOpenUserProfile(user)}>
-                                {user.name}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {user.role === 'admin' ? 'Администратор' : 'Клиент'}
+            (() => {
+              // Filter + sort users for display
+              const filteredUsers = users.filter((u) => {
+                const b = Number(u.balance) || 0;
+                if (userBalanceFilter === 'positive') return b > 0;
+                if (userBalanceFilter === 'zero') return b === 0;
+                return true;
+              });
+              const sortedUsers = [...filteredUsers].sort((a, b) => {
+                if (userSortByBalance === 'asc') return (Number(a.balance) || 0) - (Number(b.balance) || 0);
+                if (userSortByBalance === 'desc') return (Number(b.balance) || 0) - (Number(a.balance) || 0);
+                return 0;
+              });
+              return (
+                <div className="space-y-4">
+                  {/* Filters */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <div className="flex flex-wrap items-center gap-4 justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-900">Пользователи</h2>
+                        <p className="mt-0.5 text-xs text-gray-500">Всего: {users.length} · после фильтра: {sortedUsers.length}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-1.5">
+                          {[
+                            { id: 'all', label: 'Все' },
+                            { id: 'positive', label: 'Баланс > 0' },
+                            { id: 'zero', label: 'Баланс = 0' },
+                          ].map((opt) => (
+                            <button
+                              key={opt.id}
+                              onClick={() => setUserBalanceFilter(opt.id as any)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                userBalanceFilter === opt.id
+                                  ? 'bg-white shadow text-indigo-700 ring-1 ring-indigo-200'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setUserSortByBalance((prev) =>
+                              prev === 'desc' ? 'asc' : prev === 'asc' ? 'none' : 'desc'
+                            );
+                          }}
+                          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            userSortByBalance !== 'none'
+                              ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Wallet className="h-4 w-4" />
+                          Сортировка по балансу
+                          <span className="ml-0.5 rounded-full bg-white/80 px-2 py-0.5 text-[10px]">
+                            {userSortByBalance === 'desc' ? '↓ Max' : userSortByBalance === 'asc' ? '↑ Min' : '—'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                          {user.role !== 'admin' ? (
-                            <button
-                              onClick={() => handlePromoteUser(user.id)}
-                              className="text-purple-600 hover:text-purple-900 inline-flex items-center"
-                              title="Назначить администратором"
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Пользователь
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Роль
+                            </th>
+                            <th
+                              scope="col"
+                              onClick={() =>
+                                setUserSortByBalance((p) => (p === 'desc' ? 'asc' : p === 'asc' ? 'none' : 'desc'))
+                              }
+                              className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider cursor-pointer select-none transition hover:text-indigo-600"
                             >
-                              <ShieldAlert className="h-4 w-4 mr-1" />
-                              Админ
-                            </button>
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                Баланс, ₽
+                                <span className="text-[10px] font-bold text-indigo-500">
+                                  {userSortByBalance === 'desc' ? '↓' : userSortByBalance === 'asc' ? '↑' : '↕'}
+                                </span>
+                              </div>
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Действия
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {sortedUsers.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-16 text-center text-gray-500">
+                                <Users className="mx-auto h-10 w-10 text-gray-300" />
+                                <div className="mt-3 text-sm font-medium text-gray-700">Нет пользователей по выбранному фильтру</div>
+                              </td>
+                            </tr>
                           ) : (
-                            <button
-                              onClick={() => handleDemoteUser(user.id)}
-                              className="text-orange-600 hover:text-orange-900 inline-flex items-center"
-                              title="Снять права администратора"
-                            >
-                              <UserCog className="h-4 w-4 mr-1" />
-                              Клиент
-                            </button>
+                            sortedUsers.map((u) => {
+                              const balance = Number(u.balance) || 0;
+                              return (
+                                <tr key={u.id} className="hover:bg-slate-50">
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div
+                                        className="flex-shrink-0 h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center cursor-pointer hover:bg-indigo-200"
+                                        onClick={() => handleOpenUserProfile(u)}
+                                      >
+                                        <span className="text-indigo-600 font-medium text-sm">
+                                          {u.name?.charAt?.(0)?.toUpperCase() || u.email.charAt(0).toUpperCase()}
+                                        </span>
+                                      </div>
+                                      <div className="ml-4">
+                                        <div
+                                          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600"
+                                          onClick={() => handleOpenUserProfile(u)}
+                                        >
+                                          {u.name}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                        u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                                      }`}
+                                    >
+                                      {u.role === 'admin' ? 'Администратор' : 'Клиент'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                                    <div
+                                      className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 ${
+                                        balance > 0
+                                          ? 'bg-emerald-50 text-emerald-800'
+                                          : balance < 0
+                                          ? 'bg-rose-50 text-rose-800'
+                                          : 'bg-gray-50 text-gray-700'
+                                      }`}
+                                    >
+                                      <Wallet className="h-4 w-4 opacity-70" />
+                                      <span className="text-sm font-bold tabular-nums">{balance.toFixed(2)}</span>
+                                      <span className="text-xs font-semibold opacity-80">₽</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => openAdjustModal(u, '+')}
+                                        className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                        title="Пополнить баланс пользователю"
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Пополнить
+                                      </button>
+                                      <button
+                                        onClick={() => openAdjustModal(u, '-')}
+                                        className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                                        title="Списать средства с баланса пользователя"
+                                      >
+                                        <Minus className="h-3.5 w-3.5" />
+                                        Списать
+                                      </button>
+                                      <span className="mx-1 h-4 w-px bg-gray-200" />
+                                      {u.role !== 'admin' ? (
+                                        <button
+                                          onClick={() => handlePromoteUser(u.id)}
+                                          className="text-purple-600 hover:text-purple-900 inline-flex items-center text-xs"
+                                          title="Назначить администратором"
+                                        >
+                                          <ShieldAlert className="h-4 w-4 mr-1" />
+                                          Админ
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleDemoteUser(u.id)}
+                                          className="text-orange-600 hover:text-orange-900 inline-flex items-center text-xs"
+                                          title="Снять права администратора"
+                                        >
+                                          <UserCog className="h-4 w-4 mr-1" />
+                                          Клиент
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => openInvoiceModal(u)}
+                                        className="text-indigo-600 hover:text-indigo-900 inline-flex items-center text-xs"
+                                      >
+                                        <CreditCard className="h-4 w-4 mr-1" />
+                                        Счёт
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
-                          <button
-                            onClick={() => openInvoiceModal(user)}
-                            className="text-indigo-600 hover:text-indigo-900 inline-flex items-center"
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Выставить счет
-                          </button>
-                        </td>
-                      </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+          {activeTab === 'finances' && (
+            <div className="space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Wallet className="h-6 w-6 text-indigo-600" />
+                    Финансы: все транзакции пользователей
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">История начислений и списаний по всем пользователям системы</p>
+                </div>
+              </div>
+
+              {(() => {
+                const totalBalances = users.reduce((s, u) => s + (Number(u.balance) || 0), 0);
+                const sumDeposits = allTransactions.reduce((s, t) => s + (t.type === 'deposit' ? (Number(t.amount) || 0) : 0), 0);
+                const sumWithdraws = allTransactions.reduce((s, t) => s + (t.type === 'withdraw' || (t.type === 'adjust' && (Number(t.amount) || 0) < 0) ? Math.abs(Number(t.amount) || 0) : 0), 0);
+                const stats = [
+                  { label: 'Сумма балансов пользователей', value: totalBalances, icon: Wallet, color: 'from-indigo-500 to-indigo-600', sign: true },
+                  { label: 'Сумма пополнений на странице', value: sumDeposits, icon: Wallet, color: 'from-emerald-500 to-emerald-600', sign: true },
+                  { label: 'Сумма списаний на странице', value: sumWithdraws, icon: Wallet, color: 'from-rose-500 to-rose-600', sign: true },
+                  { label: 'Всего транзакций', value: txTotal, icon: Wallet, color: 'from-amber-500 to-amber-600', sign: false },
+                ];
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {stats.map((s, i) => (
+                      <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{s.label}</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-2">
+                              {s.sign ? `${s.value.toFixed(2)} ₽` : s.value}
+                            </p>
+                          </div>
+                          <div className={`inline-flex items-center justify-center rounded-lg p-2.5 bg-gradient-to-br ${s.color} text-white shadow-md`}>
+                            <s.icon className="h-5 w-5" />
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                );
+              })()}
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                  <div className="md:col-span-5">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Пользователь</label>
+                    <select
+                      value={txUserFilter}
+                      onChange={(e) => { setTxUserFilter(e.target.value); setTxOffset(0); }}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    >
+                      <option value="">Все пользователи</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.email}) — {(Number(u.balance) || 0).toFixed(2)} ₽</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Тип операции</label>
+                    <select
+                      value={txTypeFilter}
+                      onChange={(e) => { setTxTypeFilter(e.target.value as any); setTxOffset(0); }}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    >
+                      <option value="all">Все типы</option>
+                      <option value="deposit">Пополнения</option>
+                      <option value="withdraw">Списания</option>
+                      <option value="adjust">Ручные операции</option>
+                      <option value="refund">Возвраты</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-4 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setTxUserFilter(''); setTxTypeFilter('all'); setTxOffset(0);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                    >
+                      Сбросить
+                    </button>
+                    <button
+                      onClick={() => { setTxOffset(0); loadAllTransactions(); }}
+                      className="flex-1 inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+                    >
+                      Обновить
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Пользователь</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тип</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {txLoading ? (
+                        <tr>
+                          <td colSpan={5} className="px-5 py-12 text-center">
+                            <div className="inline-flex items-center gap-3 text-gray-500">
+                              <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                              Загрузка транзакций...
+                            </div>
+                          </td>
+                        </tr>
+                      ) : allTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-5 py-16 text-center">
+                            <Wallet className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                            <p className="text-sm text-gray-500">Транзакций по заданным фильтрам не найдено</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        allTransactions.map((t) => {
+                          const badge = formatTxTypeBadge(t);
+                          const amt = Number(t.amount) || 0;
+                          const embeddedUser = t.user;
+                          const lookupUser = users.find(u => u.id === t.userId);
+                          const user = embeddedUser || lookupUser;
+                          const userBalance = lookupUser
+                            ? Number(lookupUser.balance) || 0
+                            : (embeddedUser && typeof (embeddedUser as any).balance === 'number'
+                                ? Number((embeddedUser as any).balance)
+                                : 0);
+                          return (
+                            <tr key={t.id} className="hover:bg-gray-50">
+                              <td className="px-5 py-3 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{new Date(t.createdAt).toLocaleDateString('ru-RU')}</div>
+                                <div className="text-xs text-gray-500">{new Date(t.createdAt).toLocaleTimeString('ru-RU')}</div>
+                              </td>
+                              <td className="px-5 py-3 whitespace-nowrap">
+                                {user ? (
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xs font-bold">
+                                      {String(user.name || user.email || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">{user.name || '—'}</div>
+                                      <div className="text-xs text-gray-500">{user.email} · {userBalance.toFixed(2)} ₽</div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400">user #{t.userId?.slice(0, 8)}</div>
+                                )}
+                              </td>
+                              <td className="px-5 py-3 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${badge.className}`}>
+                                  {badge.sign}{badge.label}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3">
+                                <div className="text-sm text-gray-900">{formatTxDescription(t)}</div>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {t.invoiceId && (
+                                    <span className="inline-flex items-center rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                                      счёт #{t.invoiceId.slice(0, 8)}
+                                    </span>
+                                  )}
+                                  {t.gameServerId && (
+                                    <span className="inline-flex items-center rounded bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                                      сервер #{t.gameServerId.slice(0, 8)}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className={`px-5 py-3 whitespace-nowrap text-right text-sm font-bold ${
+                                amt >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                              }`}>
+                                {amt >= 0 ? '+' : ''}{amt.toFixed(2)} ₽
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {txTotal > 0 && (
+                  <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50">
+                    <div className="text-xs text-gray-500">
+                      Транзакции {txOffset + 1}–{Math.min(txOffset + txLimit, txTotal)} из {txTotal}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setTxOffset((o) => Math.max(0, o - txLimit)); }}
+                        disabled={txOffset === 0 || txLoading}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" /> Назад
+                      </button>
+                      <span className="text-xs text-gray-600 font-medium">
+                        стр. {Math.floor(txOffset / txLimit) + 1} / {Math.max(1, Math.ceil(txTotal / txLimit))}
+                      </span>
+                      <button
+                        onClick={() => { setTxOffset((o) => o + txLimit); }}
+                        disabled={txOffset + txLimit >= txTotal || txLoading}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Вперёд <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3220,6 +3734,143 @@ const AdminDashboard = () => {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Adjust Balance Modal */}
+      {adjustModal.open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+          onClick={() => !adjustModal.loading && setAdjustModal((s) => ({ ...s, open: false }))}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+          >
+            <div className={`p-5 bg-gradient-to-br ${
+              adjustModal.sign === '+'
+                ? 'from-emerald-500 to-emerald-600'
+                : 'from-rose-500 to-rose-600'
+            } text-white`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <Wallet className="h-5 w-5" />
+                    {adjustModal.sign === '+' ? 'Пополнить баланс' : 'Списать средства'}
+                  </h3>
+                  <p className="text-sm text-white/90 mt-1">Пользователь: {adjustModal.targetUserName}</p>
+                </div>
+                <button
+                  onClick={() => !adjustModal.loading && setAdjustModal((s) => ({ ...s, open: false }))}
+                  className="text-white/90 hover:text-white"
+                  disabled={adjustModal.loading}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Сумма операции</label>
+                <div className="relative">
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold ${
+                    adjustModal.sign === '+' ? 'text-emerald-600' : 'text-rose-600'
+                  }`}>
+                    {adjustModal.sign}
+                  </span>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={adjustModal.amount}
+                    onChange={(e) => setAdjustModal((s) => ({ ...s, amount: e.target.value }))}
+                    disabled={adjustModal.loading}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2.5 pl-9 text-lg font-semibold disabled:bg-gray-50"
+                    placeholder="100"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₽</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {adjustModal.sign === '+' ? (
+                    [100, 500, 1000, 3000, 10000].map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAdjustModal((s) => ({ ...s, amount: String(a) }))}
+                        disabled={adjustModal.loading}
+                        className="px-3 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        +{a} ₽
+                      </button>
+                    ))
+                  ) : (
+                    [100, 500, 1000, 3000].map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAdjustModal((s) => ({ ...s, amount: String(a) }))}
+                        disabled={adjustModal.loading}
+                        className="px-3 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 disabled:opacity-50"
+                      >
+                        -{a} ₽
+                      </button>
+                    ))
+                  )}
+                </div>
+                {Number(adjustModal.amount) > 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Изменение баланса:{' '}
+                    <span className={`font-bold ${adjustModal.sign === '+' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {adjustModal.sign}{Number(adjustModal.amount).toFixed(2)} ₽
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Комментарий <span className="text-gray-400 font-normal">(причина)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={adjustModal.description}
+                  onChange={(e) => setAdjustModal((s) => ({ ...s, description: e.target.value }))}
+                  disabled={adjustModal.loading}
+                  placeholder={adjustModal.sign === '+' ? 'Бонус, акция, ручное пополнение...' : 'Штраф, отмена услуги...'}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2.5 disabled:bg-gray-50 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-100 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setAdjustModal((s) => ({ ...s, open: false }))}
+                disabled={adjustModal.loading}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={submitAdjustBalance}
+                disabled={adjustModal.loading || !Number(adjustModal.amount) || Number(adjustModal.amount) <= 0}
+                className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  adjustModal.sign === '+'
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700'
+                    : 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700'
+                }`}
+              >
+                {adjustModal.loading && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+                {adjustModal.loading ? 'Выполняем...' : adjustModal.sign === '+' ? 'Пополнить' : 'Списать'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}

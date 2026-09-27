@@ -5,6 +5,7 @@ import { plategaService } from '../services/PlategaService';
 import { execCommand, startPM2Process } from '../services/sshService';
 import { decrypt } from '../utils/crypto';
 import { applyGameServerPaidInvoice } from '../controllers/gameServerController';
+import { adjustBalance } from '../services/balanceService';
 import { Request, Response } from 'express';
 
 const router = express.Router();
@@ -87,6 +88,27 @@ router.post('/webhook', async (req: Request, res: Response) => {
         invoice.status = 'paid';
         await invoice.save();
         console.log(`Invoice ${invoiceId} marked as paid via webhook`);
+
+        // Deposit top-up (wallet)
+        const title = String(invoice.title || '');
+        if (invoice.type === 'one_time' && /пополнени|баланс|deposit|wallet/i.test(title)) {
+          try {
+            const amt = Number(invoice.amount) || 0;
+            if (amt > 0) {
+              const { newBalance } = await adjustBalance({
+                userId: invoice.userId,
+                amount: +Math.round(amt * 100) / 100,
+                type: 'deposit',
+                description: title || 'Пополнение через Platega',
+                invoiceId: invoice.id,
+                metadata: { source: 'platega_webhook' },
+              });
+              console.log(`Wallet deposited +${amt} for user ${invoice.userId} => new balance=${newBalance}`);
+            }
+          } catch (wb: any) {
+            console.error('Webhook wallet deposit error:', wb?.message || wb);
+          }
+        }
 
         // Handle Subscription Logic
         if (invoice.type === 'monthly' && invoice.projectId) {

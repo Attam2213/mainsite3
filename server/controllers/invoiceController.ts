@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Invoice, User, Service, Project, GameServer } from '../models';
 import { applyGameServerPaidInvoice } from './gameServerController';
+import { adjustBalance, round2 } from '../services/balanceService';
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -95,6 +96,22 @@ export const createSubscriptionInvoice = async (req: Request, res: Response): Pr
     // Use monthlyRate if available, otherwise budget (fallback)
     const monthlyPrice = project.monthlyRate > 0 ? project.monthlyRate : project.budget;
     const amount = monthlyPrice * months;
+
+    // @ts-ignore
+    const isAdmin: boolean = req.user.role === 'admin';
+    if (!isAdmin) {
+      const u = await User.findByPk(userId, { attributes: ['id', 'balance'] });
+      const userBal = round2(u?.balance ?? 0);
+      if (userBal < amount - 0.001) {
+        res.status(402).json({
+          message: 'Недостаточно средств на балансе',
+          balance: userBal,
+          totalAmount: amount,
+          needed: round2(amount - userBal),
+        });
+        return;
+      }
+    }
     
     const invoice = await Invoice.create({
         title: `Продление подписки: ${project.title} (${months} мес.)`,
@@ -106,6 +123,33 @@ export const createSubscriptionInvoice = async (req: Request, res: Response): Pr
         projectId: project.id,
         periodMonths: months
     });
+
+    if (!isAdmin) {
+      try {
+        await adjustBalance({
+          userId,
+          amount: -round2(amount),
+          type: 'withdraw',
+          description: invoice.title,
+          invoiceId: invoice.id,
+        });
+      } catch (wb: any) {
+        res.status(402).json({ message: wb.message || 'Недостаточно средств' });
+        return;
+      }
+      invoice.status = 'paid';
+      await invoice.save();
+      // Extend project.paidUntil
+      let startDate = new Date();
+      if (project.paidUntil && new Date(project.paidUntil as any) > startDate) {
+        startDate = new Date(project.paidUntil as any);
+      }
+      startDate.setMonth(startDate.getMonth() + months);
+      (project as any).paidUntil = startDate;
+      await project.save();
+      res.status(201).json({ ...invoice.toJSON(), paidWithBalance: true });
+      return;
+    }
     
     res.status(201).json(invoice);
   } catch (error) {

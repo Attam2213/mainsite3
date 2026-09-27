@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import GameServerConfigurator, {
   type GameServerOrderPayload,
   type PublicNode,
 } from '../../components/GameServerConfigurator';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
   MessageCircle,
@@ -33,7 +34,24 @@ import {
   Ban,
   UserMinus,
   Clock,
+  Wallet,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+
+interface WalletTransactionItem {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'deposit' | 'withdraw' | 'adjust' | 'refund';
+  description: string | null;
+  invoiceId: string | null;
+  gameServerId: string | null;
+  relatedId: string | null;
+  metadata: any | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface Lead {
   id: string;
@@ -193,6 +211,8 @@ const getGameServerStatusMeta = (status: string) => {
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, refreshBalance } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const firstLoadRef = useRef(true);
@@ -205,9 +225,20 @@ const ClientDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers' | 'balance'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
+
+  // Wallet & Balance State
+  const [isTopupModalOpen, setIsTopupModalOpen] = useState(false);
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [transactions, setTransactions] = useState<WalletTransactionItem[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txOffset, setTxOffset] = useState(0);
+  const [txTotal, setTxTotal] = useState(0);
+  const txLimit = 20;
+  const QUICK_TOPUP_AMOUNTS = [100, 300, 500, 1000, 3000];
   
   // Game Hosting State
   const [isCreateServerModalOpen, setIsCreateServerModalOpen] = useState(false);
@@ -360,11 +391,22 @@ const ClientDashboard = () => {
 
       if (res.ok) {
         const data = await res.json();
+        // If payment was deducted from balance immediately — refresh balance & data
+        if (data?.paid || data?.balanceAfter !== undefined) {
+          try { await refreshBalance(); } catch (e) {}
+          await fetchData();
+        }
         if (data.url) {
           window.location.href = data.url;
-        } else {
-          alert('Ошибка получения ссылки на оплату');
+        } else if (!data?.paid) {
+          alert('Оплата выполнена');
         }
+      } else if (res.status === 402) {
+        const err = await res.json().catch(() => ({}));
+        setConfirmPayOpen(false);
+        setInvoiceToPay(null);
+        showInsufficientFundsAlert(err, 'Недостаточно средств для оплаты счета');
+        return;
       } else {
         const error = await res.json().catch(() => ({}));
         alert(error.message || 'Ошибка создания платежа');
@@ -392,9 +434,20 @@ const ClientDashboard = () => {
         
         if (res.ok) {
             const invoice = await res.json();
-            handlePayInvoice(invoice.id);
+            // Renewal via balance paid immediately — refresh
+            if (invoice?.status === 'paid') {
+              try { await refreshBalance(); } catch (e) {}
+              await fetchData();
+              alert('Подписка успешно продлена');
+            } else {
+              handlePayInvoice(invoice.id);
+            }
+        } else if (res.status === 402) {
+            const err = await res.json().catch(() => ({}));
+            showInsufficientFundsAlert(err, 'Недостаточно средств для продления');
         } else {
-            alert('Ошибка создания счета');
+            const err = await res.json().catch(() => ({}));
+            alert(err.message || 'Ошибка создания счета');
         }
     } catch (error) {
         console.error('Extend error:', error);
@@ -415,7 +468,16 @@ const ClientDashboard = () => {
 
       if (res.ok) {
         const invoice = await res.json();
-        handlePayInvoice(invoice.id);
+        if (invoice?.status === 'paid') {
+          try { await refreshBalance(); } catch (e) {}
+          await fetchData();
+          alert('Сервер успешно продлён');
+        } else {
+          handlePayInvoice(invoice.id);
+        }
+      } else if (res.status === 402) {
+        const err = await res.json().catch(() => ({}));
+        showInsufficientFundsAlert(err, 'Недостаточно средств для продления сервера');
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.message || 'Ошибка создания счета');
@@ -442,11 +504,19 @@ const ClientDashboard = () => {
         const data = await res.json().catch(() => ({}));
         setIsCreateServerModalOpen(false);
         await fetchData();
-        if (data?.invoice?.id) {
+        // Balance paid: invoice status=paid OR game server already created
+        if (data?.invoice?.status === 'paid' || data?.gameServer?.id) {
+          try { await refreshBalance(); } catch (e) {}
+          await fetchData();
+        }
+        if (data?.invoice?.id && data?.invoice?.status !== 'paid') {
           handlePayInvoice(data.invoice.id);
-        } else if (!data?.invoice) {
+        } else if (!data?.invoice && !data?.gameServer) {
           alert('Сервер создан, но счет не был сформирован автоматически');
         }
+      } else if (res.status === 402) {
+        const errorData = await res.json().catch(() => ({}));
+        showInsufficientFundsAlert(errorData, 'Недостаточно средств для создания сервера');
       } else {
         const errorData = await res.json().catch(() => ({}));
         console.error('Order error response:', errorData);
@@ -860,6 +930,131 @@ const ClientDashboard = () => {
       setSftpLoading(prev => ({ ...prev, [serverId]: false }));
     }
   };
+
+  // ========== WALLET / BALANCE FUNCTIONS ==========
+  const loadTransactions = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      setTxLoading(true);
+      const res = await fetch(`/api/wallet/transactions?limit=${txLimit}&offset=${txOffset}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.rows)) setTransactions(data.rows);
+        if (typeof data?.count === 'number') setTxTotal(data.count);
+      }
+    } catch (e) {
+      console.error('loadTransactions error:', e);
+    } finally {
+      setTxLoading(false);
+    }
+  };
+
+  const showInsufficientFundsAlert = async (err: any, fallbackTitle = 'Недостаточно средств') => {
+    const needed = Number(err?.needed);
+    const balance = Number(err?.balance);
+    const total = Number(err?.totalAmount);
+    const neededShort = needed && Number.isFinite(needed) ? needed : (total - balance > 0 ? total - balance : null);
+    const msg = neededShort
+      ? `Недостаточно средств на балансе.\nТребуется ещё: ${Math.ceil(neededShort)} ₽\nТекущий баланс: ${Number(balance || 0).toFixed(2)} ₽`
+      : (err?.message || fallbackTitle);
+    const confirmed = window.confirm(`${msg}\n\nХотите пополнить баланс сейчас?`);
+    if (confirmed) {
+      if (neededShort && Number.isFinite(neededShort)) {
+        setCustomAmount(String(Math.max(100, Math.ceil(neededShort))));
+      }
+      setIsTopupModalOpen(true);
+    }
+  };
+
+  const handleCreateTopup = async (amountInput: number | string) => {
+    const amount = Number(amountInput);
+    if (!amount || amount < 100) {
+      alert('Минимальная сумма пополнения: 100 ₽');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      setTopupLoading(true);
+      const res = await fetch('/api/wallet/deposit/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.message || 'Ошибка создания платежа');
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Ссылка на оплату не получена');
+      }
+    } catch (e) {
+      console.error('Topup create error:', e);
+      alert('Ошибка соединения при создании платежа');
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
+  const formatTxTypeBadge = (t: WalletTransactionItem) => {
+    const amount = Number(t.amount) || 0;
+    if (t.type === 'deposit') return { label: 'Пополнение', className: 'bg-emerald-100 text-emerald-800', sign: '+' };
+    if (t.type === 'refund') return { label: 'Возврат', className: 'bg-emerald-100 text-emerald-800', sign: '+' };
+    if (t.type === 'adjust') {
+      const positive = amount >= 0;
+      return {
+        label: positive ? 'Начисление' : 'Списание',
+        className: positive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800',
+        sign: positive ? '+' : '-',
+      };
+    }
+    // withdraw
+    return { label: 'Списание', className: 'bg-rose-100 text-rose-800', sign: '-' };
+  };
+
+  const formatTxDescription = (t: WalletTransactionItem) => {
+    if (t.description) return t.description;
+    if (t.type === 'deposit') return 'Пополнение баланса';
+    if (t.type === 'withdraw') return 'Оплата услуг';
+    if (t.gameServerId) return `Операция по серверу #${t.gameServerId.slice(0, 8)}`;
+    if (t.invoiceId) return `По счету #${t.invoiceId.slice(0, 8)}`;
+    return '—';
+  };
+
+  // Load transactions when balance tab is selected or pagination changed
+  useEffect(() => {
+    if (activeTab === 'balance') {
+      loadTransactions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, txOffset]);
+
+  // Detect return from Platega success page & refresh balance + reload data
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('success') === 'true' || params.get('topup') === 'ok') {
+      (async () => {
+        try {
+          await refreshBalance();
+          await fetchData();
+          loadTransactions();
+        } catch (e) { console.error(e); }
+      })();
+      // clear query params without reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete('success');
+      url.searchParams.delete('topup');
+      url.searchParams.delete('order_id');
+      window.history.replaceState({}, '', url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const fetchMessages = async (orderId: string) => {
     try {
@@ -1355,7 +1550,7 @@ const ClientDashboard = () => {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                           <div className="rounded-2xl bg-slate-50 p-4">
                             <div className="text-xs uppercase tracking-wide text-gray-500">Всего серверов</div>
                             <div className="mt-1 text-2xl font-semibold text-gray-900">{gameServers.length}</div>
@@ -1371,6 +1566,18 @@ const ClientDashboard = () => {
                           <div className="rounded-2xl bg-indigo-50 p-4">
                             <div className="text-xs uppercase tracking-wide text-indigo-700">SFTP доступ</div>
                             <div className="mt-1 text-2xl font-semibold text-indigo-900">{sftpEnabledCount}</div>
+                          </div>
+                          <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 cursor-pointer hover:shadow-md transition" onClick={() => setActiveTab('balance')}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-xs uppercase tracking-wide text-indigo-700">Баланс</div>
+                                <div className="mt-1 text-2xl font-bold text-gray-900">{Number(user?.balance ?? 0).toFixed(2)} <span className="text-sm font-semibold text-indigo-700">₽</span></div>
+                              </div>
+                              <div className="rounded-xl bg-indigo-500 p-2 text-white shadow"><Wallet className="h-5 w-5" /></div>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setIsTopupModalOpen(true); }} className="mt-2 w-full text-xs bg-indigo-600 text-white py-1.5 rounded-lg hover:bg-indigo-700 transition">
+                              Пополнить
+                            </button>
                           </div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -1641,6 +1848,163 @@ const ClientDashboard = () => {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Balance Tab */}
+              {activeTab === 'balance' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <h2 className="text-xl font-bold text-gray-900">Баланс и операции</h2>
+                  </div>
+
+                  {/* Big Balance Widget */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 p-8 text-white shadow-2xl"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-6">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-indigo-200">
+                          Текущий баланс
+                        </div>
+                        <div className="mt-3 text-5xl font-black tracking-tight">
+                          {Number(user?.balance ?? 0).toFixed(2)}
+                          <span className="ml-2 text-2xl font-bold text-indigo-200">₽</span>
+                        </div>
+                        <p className="mt-3 max-w-md text-sm text-indigo-200">
+                          Пополняйте баланс удобной суммой — при заказе или продлении сервера стоимость будет списана автоматически. Если средств не хватит — вы получите уведомление.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3 sm:min-w-[240px]">
+                        <button
+                          onClick={() => { setCustomAmount(''); setIsTopupModalOpen(true); }}
+                          className="rounded-2xl bg-white px-6 py-3 text-sm font-bold text-indigo-700 shadow-xl transition hover:bg-indigo-50 hover:scale-[1.02]"
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Пополнить баланс
+                          </span>
+                        </button>
+                        <button
+                          onClick={async () => { try { await refreshBalance(); loadTransactions(); alert('Баланс обновлён'); } catch(e){} }}
+                          className="rounded-2xl border border-white/20 bg-white/10 px-6 py-3 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                        >
+                          Обновить баланс
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Quick Top-up amounts */}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {QUICK_TOPUP_AMOUNTS.map((amt) => (
+                      <button
+                        key={amt}
+                        onClick={() => handleCreateTopup(amt)}
+                        disabled={topupLoading}
+                        className="group relative rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md disabled:opacity-60"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Быстрое пополнение</div>
+                            <div className="mt-2 text-3xl font-black text-gray-900">{amt} <span className="text-base font-semibold text-indigo-600">₽</span></div>
+                          </div>
+                          <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                            <Plus className="h-5 w-5" />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Transactions History */}
+                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-4 flex-wrap">
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900">История операций</h3>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          Всего записей: <span className="font-semibold text-gray-700">{txTotal}</span> · страница <span className="font-semibold text-gray-700">{Math.floor(txOffset / txLimit) + 1}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setTxOffset((o) => Math.max(0, o - txLimit))}
+                          disabled={txOffset === 0 || txLoading}
+                          className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-4 w-4" /> Назад
+                        </button>
+                        <button
+                          onClick={() => setTxOffset((o) => o + txLimit)}
+                          disabled={txOffset + txLimit >= txTotal || txLoading}
+                          className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Вперёд <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {txLoading && !transactions.length ? (
+                      <div className="p-16 text-center text-gray-500">
+                        <Loader className="mx-auto h-8 w-8 animate-spin text-indigo-500" />
+                        <div className="mt-3 text-sm">Загрузка истории...</div>
+                      </div>
+                    ) : transactions.length === 0 ? (
+                      <div className="p-16 text-center text-gray-500">
+                        <Wallet className="mx-auto h-12 w-12 text-gray-300" />
+                        <h3 className="mt-3 text-sm font-medium text-gray-900">Пока нет операций</h3>
+                        <p className="mt-1 text-xs text-gray-500">Сделайте первое пополнение, и история появится здесь.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-100">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Дата</th>
+                              <th className="px-6 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Тип</th>
+                              <th className="px-6 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Описание</th>
+                              <th className="px-6 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Сумма</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50 bg-white">
+                            {transactions.map((t) => {
+                              const badge = formatTxTypeBadge(t);
+                              const abs = Math.abs(Number(t.amount) || 0);
+                              return (
+                                <tr key={t.id} className="transition hover:bg-slate-50">
+                                  <td className="whitespace-nowrap px-6 py-3.5 text-sm text-gray-700">
+                                    <div className="font-medium">{formatDate(t.createdAt)}</div>
+                                    <div className="text-[11px] text-gray-400">{new Date(t.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-3.5">
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.className}`}>
+                                      {badge.label}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-3.5 text-sm text-gray-700">
+                                    <div className="font-medium">{formatTxDescription(t)}</div>
+                                    {(t.invoiceId || t.gameServerId) && (
+                                      <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-gray-400">
+                                        {t.invoiceId && <span className="rounded-md bg-gray-50 px-2 py-0.5">Счёт #{t.invoiceId.slice(0, 8)}</span>}
+                                        {t.gameServerId && <span className="rounded-md bg-gray-50 px-2 py-0.5">Сервер #{t.gameServerId.slice(0, 8)}</span>}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-3.5 text-right">
+                                    <span className={`text-sm font-bold ${(Number(t.amount) || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                      {(Number(t.amount) || 0) >= 0 ? badge.sign : badge.sign} {abs.toFixed(2)} ₽
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2187,6 +2551,17 @@ const ClientDashboard = () => {
                   >
                     <CreditCard className="mr-3 h-5 w-5" />
                     Финансы
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('balance')}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'balance' 
+                        ? 'bg-indigo-50 text-indigo-700' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Wallet className="mr-3 h-5 w-5" />
+                    Баланс
                   </button>
                   <button
                     onClick={() => setActiveTab('requests')}
@@ -3873,6 +4248,133 @@ const ClientDashboard = () => {
                       </form>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top-up Balance Modal */}
+        {isTopupModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity"
+                aria-hidden="true"
+                onClick={() => !topupLoading && setIsTopupModalOpen(false)}
+              >
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+              <div className="inline-block transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div className="bg-white px-6 pt-6 pb-5 sm:p-7">
+                  <div className="mb-6 flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-bold leading-6 text-gray-900">Пополнить баланс</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Текущий баланс: <span className="font-semibold text-gray-900">{Number(user?.balance ?? 0).toFixed(2)} ₽</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => !topupLoading && setIsTopupModalOpen(false)}
+                      disabled={topupLoading}
+                      className="rounded-xl bg-gray-100 p-2 text-gray-500 transition hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Quick Amount Buttons */}
+                  <div className="mb-6">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Быстрая сумма
+                    </label>
+                    <div className="grid gap-2 sm:grid-cols-5">
+                      {QUICK_TOPUP_AMOUNTS.map((amt) => (
+                        <button
+                          key={amt}
+                          onClick={() => setCustomAmount(String(amt))}
+                          disabled={topupLoading}
+                          className={`rounded-xl border-2 px-2 py-3 text-sm font-bold transition disabled:opacity-60 ${
+                            customAmount === String(amt)
+                              ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-200 hover:bg-indigo-50/60'
+                          }`}
+                        >
+                          {amt} ₽
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Amount */}
+                  <div className="mb-6">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Или введите свою сумму <span className="text-rose-500">(минимум 100 ₽)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={100}
+                        step={1}
+                        disabled={topupLoading}
+                        value={customAmount}
+                        onChange={(e) => setCustomAmount(e.target.value)}
+                        className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 pr-14 text-lg font-bold text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 disabled:opacity-70"
+                        placeholder="500"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-lg font-bold text-indigo-600">
+                        ₽
+                      </div>
+                    </div>
+                    {customAmount && Number(customAmount) < 100 && (
+                      <p className="mt-2 text-xs font-medium text-rose-600">
+                        ⚠️ Минимальная сумма пополнения — 100 ₽
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+                    <div className="flex gap-3">
+                      <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600">
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div className="text-left text-xs text-indigo-900/80">
+                        <div className="mb-0.5 font-semibold text-indigo-900">Оплата через Platega</div>
+                        <div>После оплаты средства поступят на ваш баланс в течение нескольких секунд. Вы будете перенаправлены на защищённую страницу банка/платёжной системы.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 bg-gray-50 px-6 py-4 sm:px-7">
+                  <button
+                    type="button"
+                    onClick={() => !topupLoading && setIsTopupModalOpen(false)}
+                    disabled={topupLoading}
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateTopup(customAmount || 0)}
+                    disabled={topupLoading || !customAmount || Number(customAmount) < 100}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {topupLoading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        Создаём платёж...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4" />
+                        Пополнить на {Number(customAmount || 0).toFixed(0)} ₽
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

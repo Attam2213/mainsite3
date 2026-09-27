@@ -5,6 +5,7 @@ interface User {
   name: string;
   email: string;
   role: 'admin' | 'client';
+  balance: number;
 }
 
 interface AuthResponse {
@@ -19,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<User>;
   register: (name: string, email: string, password: string) => Promise<User>;
   logout: () => void;
+  refreshBalance: () => Promise<number>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,8 +109,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const refreshBalance = async (): Promise<number> => {
+    const token = localStorage.getItem('token');
+    if (!token || !user) {
+      throw new Error('Not authenticated');
+    }
+    try {
+      const res = await fetch('/api/wallet/balance', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Balance fetch failed');
+      const data = await res.json();
+      const b = Number(data.balance) || 0;
+      setUser({ ...user, balance: b });
+      return b;
+    } catch (e) {
+      throw e;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout, refreshBalance }}>
       {children}
     </AuthContext.Provider>
   );

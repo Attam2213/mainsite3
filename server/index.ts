@@ -31,6 +31,7 @@ import { startMonitoring } from './services/monitorService';
 import { startSubscriptionService } from './services/subscriptionService';
 import nodeRoutes from './routes/nodeRoutes';
 import gameServerRoutes from './routes/gameServerRoutes';
+import walletRoutes from './routes/walletRoutes';
 
 // Prevent unused variable errors for now (will use them in routes later)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -74,6 +75,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/game-servers', gameServerRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Basic health check
 app.get('/api/health', (req, res) => {
