@@ -89,6 +89,33 @@ export interface PublicNode {
   maxSlots: number;
 }
 
+const isRoutablePublicIp = (ip: string): boolean => {
+  if (!ip) return false;
+  const s = ip.trim().toLowerCase();
+  if (['127.0.0.1', '0.0.0.0', '::1', '1.1.1.1', '255.255.255.255', 'localhost'].includes(s)) return false;
+  if (s.startsWith('127.') || s.startsWith('192.168.') || s.startsWith('10.')) return false;
+  if (s.startsWith('172.')) {
+    const parts = s.split('.');
+    if (parts.length >= 2) {
+      const n = Number(parts[1]);
+      if (!Number.isNaN(n) && n >= 16 && n <= 31) return false;
+    }
+  }
+  return /^[0-9a-f:.]+$/i.test(s);
+};
+
+const inferLocationFromNodeName = (name: string | undefined): string | null => {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes('msk') || n.includes('mosk') || n.includes('моск') || n.includes('msk-')) return 'msk';
+  if (n.includes('spb') || n.includes('piter') || n.includes('saint') || n.includes('спб') || n.includes('питер')) return 'spb';
+  if (n.includes('kazan') || n.includes('kaz') || n.includes('казан') || n.includes('каз')) return 'kaz';
+  if (n.includes('fra') || n.includes('frankfurt') || n.includes('франк')) return 'fra';
+  if (n.includes('ams') || n.includes('amsterdam') || n.includes('амстер')) return 'ams';
+  if (n.includes('hel') || n.includes('helsinki') || n.includes('хельс')) return 'hel';
+  return null;
+};
+
 export interface GameServerOrderPayload {
   game: string;
   location: string;
@@ -137,7 +164,26 @@ const GameServerConfigurator = ({
     fetch('/api/nodes/public')
       .then(r => (r.ok ? r.json() : []))
       .then(data => {
-        if (Array.isArray(data) && data.length) setInternalNodes(data);
+        if (Array.isArray(data) && data.length) {
+          const normalized: PublicNode[] = data
+            .filter((n: any) => isRoutablePublicIp(n?.ip))
+            .map((raw: any): PublicNode => {
+              const location = (raw?.location && LOCATIONS.some(l => l.id === raw.location))
+                ? raw.location
+                : inferLocationFromNodeName(raw?.name) || LOCATIONS[0].id;
+              return {
+                id: String(raw.id || ''),
+                name: String(raw.name || 'Node'),
+                ip: String(raw.ip || ''),
+                location,
+                supportedGames: Array.isArray(raw.supportedGames) ? raw.supportedGames : (raw.game ? [raw.game] : ['minecraft']),
+                slotPrices: typeof raw.slotPrices === 'object' && raw.slotPrices ? raw.slotPrices : { minecraft: 15, cs2: 25, cs16: 10 },
+                slotPrice: typeof raw.slotPrice === 'number' ? raw.slotPrice : 15,
+                maxSlots: typeof raw.maxSlots === 'number' ? raw.maxSlots : 100,
+              };
+            });
+          setInternalNodes(normalized);
+        }
       })
       .catch(() => {});
   }, [nodesProp]);

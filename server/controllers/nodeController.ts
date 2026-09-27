@@ -7,6 +7,31 @@ let publicNodesCache: any = null;
 let publicNodesCacheTime = 0;
 const PUBLIC_NODES_CACHE_TTL = 60 * 1000;
 
+const FAKE_IP_BLACKLIST = new Set([
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+  '1.1.1.1',
+  '255.255.255.255',
+  'localhost',
+]);
+const isRealNodeIp = (ip: unknown): boolean => {
+  if (!ip || typeof ip !== 'string') return false;
+  const normalized = ip.trim().toLowerCase();
+  if (FAKE_IP_BLACKLIST.has(normalized)) return false;
+  if (normalized.startsWith('127.')) return false;
+  if (normalized.startsWith('192.168.')) return false;
+  if (normalized.startsWith('10.')) return false;
+  if (normalized.startsWith('172.')) {
+    const parts = normalized.split('.');
+    if (parts.length >= 2) {
+      const secondOct = Number(parts[1]);
+      if (!Number.isNaN(secondOct) && secondOct >= 16 && secondOct <= 31) return false;
+    }
+  }
+  return /^[0-9a-f:.]+$/i.test(normalized);
+};
+
 const normalizeSupportedGames = (value: any) => {
     if (Array.isArray(value)) return value;
     if (typeof value === 'string') {
@@ -92,7 +117,11 @@ export const createNode = async (req: Request, res: Response) => {
 export const getNodes = async (req: Request, res: Response) => {
     try {
         const nodes = await ServerNode.findAll();
-        res.json(nodes.map(n => {
+        const filtered = nodes.filter(n => {
+            const data: any = n.toJSON();
+            return isRealNodeIp(data.ip);
+        });
+        res.json(filtered.map(n => {
             const data: any = n.toJSON();
             const normalized = normalizeSupportedGames(data.supportedGames);
             if (normalized) data.supportedGames = normalized;
@@ -112,19 +141,22 @@ export const getPublicNodes = async (req: Request, res: Response) => {
             return res.json(publicNodesCache);
         }
         const nodes = await ServerNode.findAll({
+            where: { status: 'active' },
             attributes: ['id', 'name', 'ip', 'totalRam', 'status', 'supportedGames', 'slotPrice', 'slotPrices']
         });
-        const result = nodes.map(n => {
-            const data: any = n.toJSON();
-            const normalized = normalizeSupportedGames(data.supportedGames);
-            data.supportedGames = normalized || [];
-            const slotPricesNorm = normalizeSlotPrices(data.slotPrices);
-            data.slotPrices = slotPricesNorm || {};
-            delete data.sshPassword;
-            delete data.sshUser;
-            delete data.sshPort;
-            return data;
-        });
+        const result = nodes
+            .filter(n => isRealNodeIp((n as any).ip))
+            .map(n => {
+                const data: any = n.toJSON();
+                const normalized = normalizeSupportedGames(data.supportedGames);
+                data.supportedGames = normalized || [];
+                const slotPricesNorm = normalizeSlotPrices(data.slotPrices);
+                data.slotPrices = slotPricesNorm || {};
+                delete data.sshPassword;
+                delete data.sshUser;
+                delete data.sshPort;
+                return data;
+            });
         publicNodesCache = result;
         publicNodesCacheTime = now;
         res.json(result);
