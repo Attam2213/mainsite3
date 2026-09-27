@@ -6,9 +6,9 @@ const Footer = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center">
           <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Wexa.su</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Wexa.su — Игровой хостинг</h3>
             <p className="text-gray-600 mb-4 max-w-sm mx-auto">
-              Создаем сайты, которые продают. Профессиональная веб-разработка, дизайн и продвижение.
+              Аренда игровых серверов Minecraft, CS2, CS 1.6. Быстрые ноды, защита от DDoS, SFTP-доступ и удобная панель управления.
             </p>
           </div>
         </div>

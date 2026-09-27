@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Invoice, User, Service, Project, GameServer } from '../models';
+import { applyGameServerPaidInvoice } from './gameServerController';
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -110,5 +111,62 @@ export const createSubscriptionInvoice = async (req: Request, res: Response): Pr
   } catch (error) {
     console.error('Create subscription invoice error:', error);
     res.status(500).json({ message: 'Ошибка при создании счета подписки' });
+  }
+};
+
+export const patchInvoiceStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { status } = req.body as { status?: string };
+    if (!status || !['paid', 'pending', 'cancelled'].includes(status)) {
+      res.status(400).json({ message: 'Invalid status. Allowed: paid | pending | cancelled' });
+      return;
+    }
+    const invoice = await Invoice.findByPk(id);
+    if (!invoice) {
+      res.status(404).json({ message: 'Счет не найден' });
+      return;
+    }
+    const oldStatus = invoice.status;
+    invoice.status = status as any;
+    await invoice.save();
+
+    if (status === 'paid' && oldStatus !== 'paid' && invoice.type === 'monthly' && invoice.gameServerId) {
+      try {
+        await applyGameServerPaidInvoice(invoice);
+      } catch (err) {
+        console.error('Admin patch provision error:', err);
+      }
+    }
+    res.json(invoice);
+  } catch (error) {
+    console.error('Patch invoice status error:', error);
+    res.status(500).json({ message: 'Ошибка при обновлении статуса счета' });
+  }
+};
+
+export const createManualInvoice = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, gameServerId, projectId, amount, title, periodMonths, type, dueDate } = req.body as any;
+    if (!userId || !amount || !title) {
+      res.status(400).json({ message: 'Обязательные поля: userId, amount, title' });
+      return;
+    }
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const invoice = await Invoice.create({
+      userId,
+      gameServerId: gameServerId || null,
+      projectId: projectId || null,
+      title: String(title),
+      amount: safeAmount,
+      status: 'pending',
+      type: (type && String(type)) || 'one_time',
+      dueDate: dueDate ? new Date(dueDate) : new Date(),
+      periodMonths: Math.max(0, Math.min(12, Number(periodMonths) || 1))
+    });
+    res.status(201).json(invoice);
+  } catch (error) {
+    console.error('Create manual invoice error:', error);
+    res.status(500).json({ message: 'Ошибка при ручном создании счета' });
   }
 };

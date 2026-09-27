@@ -8,6 +8,7 @@ export default defineConfig({
     include: ['react-fast-compare']
   },
   server: {
+    host: '0.0.0.0',
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

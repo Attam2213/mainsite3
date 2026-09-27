@@ -3,6 +3,10 @@ import { ServerNode } from '../models';
 import { encrypt, decrypt } from '../utils/crypto';
 import { execCommand } from '../services/sshService';
 
+let publicNodesCache: any = null;
+let publicNodesCacheTime = 0;
+const PUBLIC_NODES_CACHE_TTL = 60 * 1000;
+
 const normalizeSupportedGames = (value: any) => {
     if (Array.isArray(value)) return value;
     if (typeof value === 'string') {
@@ -103,18 +107,27 @@ export const getNodes = async (req: Request, res: Response) => {
 
 export const getPublicNodes = async (req: Request, res: Response) => {
     try {
+        const now = Date.now();
+        if (publicNodesCache && now - publicNodesCacheTime < PUBLIC_NODES_CACHE_TTL) {
+            return res.json(publicNodesCache);
+        }
         const nodes = await ServerNode.findAll({
             attributes: ['id', 'name', 'ip', 'totalRam', 'status', 'supportedGames', 'slotPrice', 'slotPrices']
         });
-        console.log('Returning public nodes:', nodes.length);
-        res.json(nodes.map(n => {
+        const result = nodes.map(n => {
             const data: any = n.toJSON();
             const normalized = normalizeSupportedGames(data.supportedGames);
             data.supportedGames = normalized || [];
             const slotPricesNorm = normalizeSlotPrices(data.slotPrices);
             data.slotPrices = slotPricesNorm || {};
+            delete data.sshPassword;
+            delete data.sshUser;
+            delete data.sshPort;
             return data;
-        }));
+        });
+        publicNodesCache = result;
+        publicNodesCacheTime = now;
+        res.json(result);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching nodes' });
     }

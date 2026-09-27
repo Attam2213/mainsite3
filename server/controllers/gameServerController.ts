@@ -542,12 +542,25 @@ export const controlServer = async (req: Request, res: Response) => {
     }
 };
 
+const PERIOD_DISCOUNTS: Record<number, number> = { 1: 0, 3: 0.05, 6: 0.10, 12: 0.15 };
+const VALID_PERIODS = [1, 3, 6, 12];
+
+const formatPeriodSuffix = (n: number) => {
+  if (n === 1) return '1 мес.';
+  if (n === 3) return '3 мес.';
+  if (n === 6) return '6 мес.';
+  return '12 мес.';
+};
+
 export const orderGameServer = async (req: Request, res: Response) => {
     try {
         const { nodeId, game, name, ram, slots } = req.body;
+        const periodRaw = Number(req.body.periodMonths) || 1;
+        const periodMonths = VALID_PERIODS.includes(periodRaw) ? periodRaw : 1;
+        const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
         // @ts-ignore
         const userId = req.user.id;
-        
+
         const node = await ServerNode.findByPk(nodeId);
         if (!node) {
             res.status(404).json({ message: 'Node not found' });
@@ -567,32 +580,35 @@ export const orderGameServer = async (req: Request, res: Response) => {
         }
 
         const now = new Date();
-        const monthlyPrice = calculateMonthlyPrice(ram || 1024, slots || 10, getSlotPriceForNodeGame(node as any, game));
+        const safeRam = Number(ram) || 1024;
+        const safeSlots = Math.max(10, Number(slots) || 10);
+        const monthlyPrice = calculateMonthlyPrice(safeRam, safeSlots, getSlotPriceForNodeGame(node as any, game));
+        const totalAmount = Math.ceil(monthlyPrice * periodMonths * (1 - discount));
 
         const server = await GameServer.create({
             userId,
             nodeId,
             game,
-            name,
-            ram: ram || 1024,
-            slots: slots || 10,
+            name: name || `${game} server`,
+            ram: safeRam,
+            slots: safeSlots,
             status: 'pending_payment',
             monthlyPrice,
             paidUntil: now
         });
 
         const invoice = await Invoice.create({
-            title: `Оплата игрового сервера: ${server.name} (1 мес.)`,
-            amount: monthlyPrice,
+            title: `Оплата игрового сервера: ${server.name} (${formatPeriodSuffix(periodMonths)}${discount > 0 ? `, -${Math.round(discount*100)}%` : ''})`,
+            amount: totalAmount,
             status: 'pending',
             type: 'monthly',
             dueDate: new Date(),
             userId,
             gameServerId: server.id,
-            periodMonths: 1
+            periodMonths
         });
 
-        res.status(201).json({ server, invoice });
+        res.status(201).json({ server, invoice, period: periodMonths, discount: Math.round(discount * 100) });
 
     } catch (error) {
         console.error('Order game server error:', error);
@@ -1296,7 +1312,9 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
     try {
         const id = getIdParam(req);
         const { months } = req.body || {};
-        const periodMonths = Math.max(1, Math.min(12, Number(months) || 1));
+        const periodRaw = Number(months) || 1;
+        const periodMonths = VALID_PERIODS.includes(periodRaw) ? periodRaw : Math.max(1, Math.min(12, periodRaw));
+        const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
 
         // @ts-ignore
         const userId = req.user.id;
@@ -1323,10 +1341,10 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
             void e;
         }
         const monthlyPrice = Number(server.monthlyPrice) || fallbackMonthly;
-        const amount = Math.max(0, Math.round(monthlyPrice * periodMonths));
+        const amount = Math.max(0, Math.ceil(monthlyPrice * periodMonths * (1 - discount)));
 
         const invoice = await Invoice.create({
-            title: `Продление игрового сервера: ${server.name} (${periodMonths} мес.)`,
+            title: `Продление игрового сервера: ${server.name} (${formatPeriodSuffix(periodMonths)}${discount > 0 ? `, -${Math.round(discount*100)}%` : ''})`,
             amount,
             status: 'pending',
             type: 'monthly',
@@ -1340,5 +1358,335 @@ export const createGameServerSubscriptionInvoice = async (req: Request, res: Res
     } catch (error) {
         console.error('Create game server subscription invoice error:', error);
         res.status(500).json({ message: 'Ошибка при создании счета подписки' });
+    }
+};
+
+export const applyGameServerPaidInvoice = async (invoice: any): Promise<void> => {
+    if (!invoice || !invoice.gameServerId) return;
+    if (invoice.type !== 'monthly') return;
+
+    const server = await GameServer.findByPk(invoice.gameServerId, { include: [{ model: ServerNode, as: 'node' }] });
+    if (!server) return;
+
+    let startDate = new Date();
+    const currentPaidUntil = server.paidUntil ? new Date(server.paidUntil as string) : null;
+    if (currentPaidUntil && currentPaidUntil > startDate) {
+        startDate = currentPaidUntil;
+    }
+
+    const monthsToAdd = Number(invoice.periodMonths) || 1;
+    const newPaidUntil = new Date(startDate);
+    newPaidUntil.setMonth(newPaidUntil.getMonth() + monthsToAdd);
+
+    const needsProvision = !server.containerId || !server.port;
+    const node = (server as unknown as { node?: ServerNode }).node;
+
+    if (needsProvision) {
+        if (!node) {
+            console.error('GameServer has no node loaded for provisioning');
+        } else if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
+            const basePortByGame: Record<string, number> = { minecraft: 25565, cs2: 27015, cs16: 27015 };
+            const basePort = basePortByGame[server.game] || 25565;
+            const last = await GameServer.findOne({ where: { nodeId: server.nodeId }, order: [['port', 'DESC']] });
+            const port = !last || !last.port || last.port < basePort ? basePort : last.port + 1;
+            await server.update({
+                port,
+                containerId: 'mock_' + Math.random().toString(36).substring(7),
+                status: 'running',
+                paidUntil: newPaidUntil
+            });
+        } else {
+            const basePortByGame: Record<string, number> = { minecraft: 25565, cs2: 27015, cs16: 27015 };
+            const basePort = basePortByGame[server.game] || 25565;
+            const last = await GameServer.findOne({ where: { nodeId: server.nodeId }, order: [['port', 'DESC']] });
+            const port = !last || !last.port || last.port < basePort ? basePort : last.port + 1;
+            const containerName = `gs_${server.userId.split('-')[0]}_${port}`;
+
+            const dockerCmd =
+                server.game === 'minecraft'
+                    ? `docker run -d -p ${port}:25565 -e EULA=TRUE -e MAX_PLAYERS=${server.slots || 20} --name ${containerName} -m ${server.ram || 1024}m itzg/minecraft-server`
+                    : server.game === 'cs2'
+                      ? `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN joedwards32/cs2 +maxplayers ${server.slots || 32}`
+                      : `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} archont94/counter-strike1.6:latest +map de_dust2 +maxplayers ${server.slots || 32}`;
+
+            const config = {
+                host: node.ip,
+                port: node.sshPort,
+                username: node.sshUser,
+                password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+            };
+
+            const output = await execCommand(config, dockerCmd);
+            const containerId = output.trim().substring(0, 12);
+            await server.update({ port, containerId, status: 'running', paidUntil: newPaidUntil });
+        }
+    } else {
+        await server.update({ paidUntil: newPaidUntil });
+    }
+    console.log(`GameServer ${server.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
+
+    if (node && node.ip !== '127.0.0.1' && node.ip !== '1.1.1.1') {
+        const config = {
+            host: node.ip,
+            port: node.sshPort,
+            username: node.sshUser,
+            password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+        };
+        const ident = server.containerId || `gs_${(server.userId as string).split('-')[0]}_${server.port}`;
+        await execCommand(config, `sh -lc "docker start ${ident} >/dev/null 2>&1 || true"`);
+        await server.update({ status: 'running' });
+    }
+};
+
+const readCString = (buf: Buffer, offset: number) => {
+    const end = buf.indexOf(0, offset);
+    if (end === -1) return { value: '', next: buf.length };
+    return { value: buf.toString('utf8', offset, end), next: end + 1 };
+};
+
+const getSourcePlayersDetailed = async (host: string, port: number): Promise<{ name: string; score: number; durationSec: number }[]> => {
+    return new Promise((resolve, reject) => {
+        const socket = dgram.createSocket('udp4');
+        let challenge = -1;
+        let stage: 'challenge' | 'player' = 'challenge';
+        let timer: NodeJS.Timeout | null = null;
+
+        const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            socket.removeAllListeners();
+        };
+
+        const sendChallenge = () => {
+            socket.send(Buffer.from([0xff, 0xff, 0xff, 0xff, 0x55, 0xff, 0xff, 0xff, 0xff]), port, host);
+        };
+        const sendPlayer = () => {
+            const b = Buffer.alloc(9);
+            b.writeInt32LE(-1, 0);
+            b[4] = 0x55;
+            b.writeInt32LE(challenge, 5);
+            socket.send(b, port, host);
+        };
+
+        timer = setTimeout(() => {
+            cleanup();
+            socket.close();
+            reject(new Error('timeout A2S_PLAYER'));
+        }, 2500);
+
+        socket.on('error', (err) => {
+            cleanup();
+            socket.close();
+            reject(err);
+        });
+
+        socket.on('message', (msg) => {
+            try {
+                if (msg.length < 6) return;
+                if (msg.readInt32LE(0) !== -1) return;
+
+                if (stage === 'challenge') {
+                    if (msg[4] === 0x41 && msg.length >= 9) {
+                        challenge = msg.readInt32LE(5);
+                        stage = 'player';
+                        sendPlayer();
+                        return;
+                    }
+                }
+
+                if (stage === 'player' && msg[4] === 0x44) {
+                    cleanup();
+                    socket.close();
+                    let offset = 5;
+                    const count = msg[offset++];
+                    const result: { name: string; score: number; durationSec: number }[] = [];
+                    for (let i = 0; i < count; i++) {
+                        offset += 1;
+                        const nameRes = readCString(msg, offset);
+                        const name = nameRes.value;
+                        offset = nameRes.next;
+                        const score = msg.readInt32LE(offset);
+                        offset += 4;
+                        const durationF = msg.readFloatLE(offset);
+                        offset += 4;
+                        result.push({ name, score, durationSec: Math.max(0, Math.round(durationF)) });
+                    }
+                    resolve(result);
+                }
+            } catch (e) {
+                cleanup();
+                socket.close();
+                reject(e);
+            }
+        });
+
+        socket.on('listening', () => {
+            sendChallenge();
+        });
+
+        socket.bind(0);
+    });
+};
+
+const getMinecraftPlayersDetailed = async (server: any, node: any): Promise<{ name: string; score: number; durationSec: number }[]> => {
+    const config = {
+        host: node.ip,
+        port: node.sshPort,
+        username: node.sshUser,
+        password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+    };
+    const ident = server.containerId || `gs_${(server.userId as string).split('-')[0]}_${server.port}`;
+    let out = '';
+    try {
+        out = await execCommand(config, `docker exec -i ${ident} rcon-cli list`);
+    } catch (e) {
+        out = '';
+    }
+    if (!out && (node.ip === '127.0.0.1' || node.ip === '1.1.1.1')) {
+        return [];
+    }
+    if (!out) return [];
+    const match = out.match(/[:]\s*(.+)$/m);
+    if (!match) return [];
+    const names = match[1].split(',').map((s) => s.trim()).filter(Boolean);
+    return names.map((name) => ({ name, score: 0, durationSec: 0 }));
+};
+
+export const getPlayersList = async (req: Request, res: Response) => {
+    try {
+        const id = getIdParam(req);
+        const userId = getUserIdFromReq(req);
+        const isAdmin = getIsAdminFromReq(req);
+        const server = await GameServer.findByPk(id, { include: ['node'] });
+        if (!server) {
+            res.status(404).json({ message: 'Server not found' });
+            return;
+        }
+        if (!isAdmin && userId && (server as any).userId !== userId) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+        // @ts-ignore
+        const node = server.node;
+        let players: { name: string; score: number; durationSec: number }[] = [];
+        let countOnly = false;
+
+        try {
+            if (server.game === 'minecraft') {
+                if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
+                    players = [];
+                } else {
+                    players = await getMinecraftPlayersDetailed(server, node);
+                }
+            } else if (server.game === 'cs2' || server.game === 'cs16') {
+                if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
+                    players = [];
+                } else {
+                    players = await getSourcePlayersDetailed(node.ip as string, server.port as number);
+                }
+            }
+        } catch (e) {
+            countOnly = true;
+        }
+
+        let fallback: { online: number; max: number } = { online: players.length, max: server.slots || 0 };
+        try {
+            if (server.game === 'minecraft') {
+                if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') fallback = { online: 0, max: server.slots || 0 };
+                else fallback = await getMinecraftPlayers(node.ip as string, server.port as number);
+            } else if (server.game === 'cs2' || server.game === 'cs16') {
+                if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') fallback = { online: 0, max: server.slots || 0 };
+                else fallback = await getSourcePlayers(node.ip as string, server.port as number);
+            }
+        } catch (_) { /* keep fallback */ }
+
+        res.json({ players, countOnly, online: fallback.online, max: fallback.max });
+    } catch (error) {
+        console.error('Players list error:', error);
+        res.status(500).json({ message: 'Error fetching players' });
+    }
+};
+
+export const kickPlayer = async (req: Request, res: Response) => {
+    try {
+        const id = getIdParam(req);
+        const userId = getUserIdFromReq(req);
+        const isAdmin = getIsAdminFromReq(req);
+        const { name, reason } = req.body;
+        if (!name) { res.status(400).json({ message: 'name required' }); return; }
+
+        const server = await GameServer.findByPk(id, { include: ['node'] });
+        if (!server) { res.status(404).json({ message: 'Server not found' }); return; }
+        if (!isAdmin && userId && (server as any).userId !== userId) { res.status(403).json({ message: 'Forbidden' }); return; }
+        // @ts-ignore
+        const node = server.node;
+
+        let cmd = '';
+        if (server.game === 'minecraft') {
+            cmd = `kick ${name}${reason ? ` ${reason}` : ''}`;
+        } else {
+            cmd = `sm_kick "${name}"${reason ? ` "${reason}"` : ''}`;
+        }
+
+        if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
+            res.json({ ok: true, output: `[Mock] ${cmd}` });
+            return;
+        }
+        const config = {
+            host: node.ip,
+            port: node.sshPort,
+            username: node.sshUser,
+            password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+        };
+        const fullCmd = server.game === 'minecraft'
+            ? `docker exec -i ${server.containerId} rcon-cli ${cmd}`
+            : `docker exec -i ${server.containerId} ${cmd}`;
+        const output = await execCommand(config, fullCmd);
+        res.json({ ok: true, output });
+    } catch (error) {
+        console.error('Kick player error:', error);
+        res.status(500).json({ message: 'Error kicking player' });
+    }
+};
+
+export const banPlayer = async (req: Request, res: Response) => {
+    try {
+        const id = getIdParam(req);
+        const userId = getUserIdFromReq(req);
+        const isAdmin = getIsAdminFromReq(req);
+        const { name, minutes, reason } = req.body;
+        if (!name) { res.status(400).json({ message: 'name required' }); return; }
+        const mins = Math.max(0, Number(minutes) || 0);
+
+        const server = await GameServer.findByPk(id, { include: ['node'] });
+        if (!server) { res.status(404).json({ message: 'Server not found' }); return; }
+        if (!isAdmin && userId && (server as any).userId !== userId) { res.status(403).json({ message: 'Forbidden' }); return; }
+        // @ts-ignore
+        const node = server.node;
+
+        let cmd = '';
+        if (server.game === 'minecraft') {
+            cmd = mins <= 0 ? `ban ${name}${reason ? ` ${reason}` : ''}` : `ban-ip ${name} ${mins}m${reason ? ` ${reason}` : ''}`;
+        } else {
+            cmd = mins <= 0 ? `banid 0 "${name}" kick` : `banid ${mins} "${name}" kick`;
+        }
+
+        if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
+            res.json({ ok: true, output: `[Mock] ${cmd}` });
+            return;
+        }
+        const config = {
+            host: node.ip,
+            port: node.sshPort,
+            username: node.sshUser,
+            password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+        };
+        const fullCmd = server.game === 'minecraft'
+            ? `docker exec -i ${server.containerId} rcon-cli ${cmd}`
+            : `docker exec -i ${server.containerId} ${cmd}`;
+        const output = await execCommand(config, fullCmd);
+        res.json({ ok: true, output });
+    } catch (error) {
+        console.error('Ban player error:', error);
+        res.status(500).json({ message: 'Error banning player' });
     }
 };

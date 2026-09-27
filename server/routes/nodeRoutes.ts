@@ -4,9 +4,9 @@ import { authenticateToken, isAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
+router.get('/public', getPublicNodes);
 router.post('/', authenticateToken, isAdmin, createNode);
 router.get('/', authenticateToken, isAdmin, getNodes);
-router.get('/public', authenticateToken, getPublicNodes);
 router.put('/:id', authenticateToken, isAdmin, updateNode);
 router.delete('/:id', authenticateToken, isAdmin, deleteNode);
 

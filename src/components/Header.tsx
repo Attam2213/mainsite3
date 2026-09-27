@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Code2, Briefcase, LogIn, User, LogOut } from 'lucide-react';
+import { Menu, X, Gamepad2, Server, MapPin, LogIn, User, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -11,11 +11,17 @@ const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
 
   const navItems = [
-    { name: 'Услуги', path: '/services', icon: Code2 },
-    { name: 'Портфолио', path: '/portfolio', icon: Briefcase },
+    { name: 'Тарифы', href: '/#pricing', icon: Server },
+    { name: 'Игры', href: '/#games', icon: Gamepad2 },
+    { name: 'Локации', href: '/#locations', icon: MapPin },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (href: string) => {
+    const [path, hash] = href.split('#');
+    if (location.pathname !== path) return false;
+    if (!hash) return true;
+    return location.hash === `#${hash}`;
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -28,7 +34,7 @@ const Header = () => {
               transition={{ duration: 0.5 }}
               className="p-2 bg-indigo-600 rounded-lg text-white"
             >
-              <Code2 size={24} />
+              <Gamepad2 size={24} />
             </motion.div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               Wexa.su
@@ -38,17 +44,17 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
+              <a
+                key={item.href}
+                href={item.href}
                 className={cn(
                   "flex items-center gap-2 text-sm font-medium transition-colors hover:text-indigo-600",
-                  isActive(item.path) ? "text-indigo-600" : "text-gray-600"
+                  isActive(item.href) ? "text-indigo-600" : "text-gray-600"
                 )}
               >
                 <item.icon size={18} />
                 {item.name}
-              </Link>
+              </a>
             ))}
             
             {isAuthenticated ? (
@@ -100,20 +106,20 @@ const Header = () => {
           >
             <div className="px-4 py-4 space-y-4">
               {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
+                <a
+                  key={item.href}
+                  href={item.href}
                   onClick={() => setIsOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-                    isActive(item.path)
+                    isActive(item.href)
                       ? "bg-indigo-50 text-indigo-600"
                       : "text-gray-600 hover:bg-gray-50"
                   )}
                 >
                   <item.icon size={20} />
                   {item.name}
-                </Link>
+                </a>
               ))}
               
               {isAuthenticated ? (

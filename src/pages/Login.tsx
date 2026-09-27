@@ -21,22 +21,47 @@ const Login = () => {
     
     try {
       const user = await login(email, password);
+
+      if (user.role !== 'admin') {
+        const rawIntent = localStorage.getItem('wexa_order_intent');
+        if (rawIntent) {
+          try {
+            const intent = JSON.parse(rawIntent);
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/game-servers/order', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify(intent),
+            });
+            if (res.ok) {
+              localStorage.removeItem('wexa_order_intent');
+              navigate('/dashboard?tab=game_servers');
+              setLoading(false);
+              return;
+            }
+          } catch (intentErr) {
+            console.warn('Failed to process order intent after login:', intentErr);
+          }
+          localStorage.removeItem('wexa_order_intent');
+        }
+      }
+
       navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err: any) {
       setError(err.message || 'Ошибка входа');
       setLoading(false);
       return;
     }
-    
-    // If successful (we need to know the role to navigate)
-    // I'll update the context first to return the user.
   };
 
   return (
     <Layout>
       <SEO 
         title="Вход" 
-        description="Wexa - вход в личный кабинет для управления проектами и услугами." 
+        description="Wexa.su — вход в личный кабинет для управления игровыми серверами, финансами и поддержкой." 
       />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <motion.div 

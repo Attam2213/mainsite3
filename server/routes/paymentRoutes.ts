@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { plategaService } from '../services/PlategaService';
 import { execCommand, startPM2Process } from '../services/sshService';
 import { decrypt } from '../utils/crypto';
+import { applyGameServerPaidInvoice } from '../controllers/gameServerController';
 import { Request, Response } from 'express';
 
 const router = express.Router();
@@ -112,76 +113,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
         }
 
         if (invoice.type === 'monthly' && invoice.gameServerId) {
-            const server = await GameServer.findByPk(invoice.gameServerId, { include: [{ model: ServerNode, as: 'node' }] });
-            if (server) {
-                let startDate = new Date();
-                const currentPaidUntil = server.paidUntil ? new Date(server.paidUntil) : null;
-                if (currentPaidUntil && currentPaidUntil > startDate) {
-                    startDate = currentPaidUntil;
-                }
-
-                const monthsToAdd = invoice.periodMonths || 1;
-                const newPaidUntil = new Date(startDate);
-                newPaidUntil.setMonth(newPaidUntil.getMonth() + monthsToAdd);
-
-                const needsProvision = !server.containerId || !server.port;
-                const node = (server as unknown as { node?: ServerNode }).node;
-
-                if (needsProvision) {
-                    if (!node) {
-                        console.error('GameServer has no node loaded for provisioning');
-                    } else if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
-                        const basePortByGame: Record<string, number> = { minecraft: 25565, cs2: 27015, cs16: 27015 };
-                        const basePort = basePortByGame[server.game] || 25565;
-                        const last = await GameServer.findOne({ where: { nodeId: server.nodeId }, order: [['port', 'DESC']] });
-                        const port = !last || !last.port || last.port < basePort ? basePort : last.port + 1;
-                        await server.update({
-                            port,
-                            containerId: 'mock_' + Math.random().toString(36).substring(7),
-                            status: 'running',
-                            paidUntil: newPaidUntil
-                        });
-                    } else {
-                        const basePortByGame: Record<string, number> = { minecraft: 25565, cs2: 27015, cs16: 27015 };
-                        const basePort = basePortByGame[server.game] || 25565;
-                        const last = await GameServer.findOne({ where: { nodeId: server.nodeId }, order: [['port', 'DESC']] });
-                        const port = !last || !last.port || last.port < basePort ? basePort : last.port + 1;
-                        const containerName = `gs_${server.userId.split('-')[0]}_${port}`;
-
-                        const dockerCmd =
-                            server.game === 'minecraft'
-                                ? `docker run -d -p ${port}:25565 -e EULA=TRUE -e MAX_PLAYERS=${server.slots || 20} --name ${containerName} -m ${server.ram || 1024}m itzg/minecraft-server`
-                                : server.game === 'cs2'
-                                  ? `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN joedwards32/cs2 +maxplayers ${server.slots || 32}`
-                                  : `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} archont94/counter-strike1.6:latest +map de_dust2 +maxplayers ${server.slots || 32}`;
-
-                        const config = {
-                            host: node.ip,
-                            port: node.sshPort,
-                            username: node.sshUser,
-                            password: node.sshPassword ? decrypt(node.sshPassword) : undefined
-                        };
-
-                        const output = await execCommand(config, dockerCmd);
-                        const containerId = output.trim().substring(0, 12);
-                        await server.update({ port, containerId, status: 'running', paidUntil: newPaidUntil });
-                    }
-                } else {
-                    await server.update({ paidUntil: newPaidUntil });
-                }
-                console.log(`GameServer ${server.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
-
-                if (node && node.ip !== '127.0.0.1' && node.ip !== '1.1.1.1') {
-                    const config = {
-                        host: node.ip,
-                        port: node.sshPort,
-                        username: node.sshUser,
-                        password: node.sshPassword ? decrypt(node.sshPassword) : undefined
-                    };
-                    const ident = server.containerId || `gs_${server.userId.split('-')[0]}_${server.port}`;
-                    await execCommand(config, `sh -lc "docker start ${ident} >/dev/null 2>&1 || true"`);
-                    await server.update({ status: 'running' });
-                }
+            try {
+                await applyGameServerPaidInvoice(invoice);
+            } catch (err) {
+                console.error('Error applying paid invoice to game server:', err);
             }
         }
       } else if (invoice) {

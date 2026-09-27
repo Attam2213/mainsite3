@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
+import GameServerConfigurator, {
+  type GameServerOrderPayload,
+  type PublicNode,
+} from '../../components/GameServerConfigurator';
 import { motion } from 'framer-motion';
 import { 
   FileText, 
@@ -17,6 +21,8 @@ import {
   Settings,
   Users,
   Search,
+  Copy,
+  Check,
   MessageSquare,
   Server,
   Folder,
@@ -24,7 +30,9 @@ import {
   Upload,
   Trash,
   Trash2,
-  Minus
+  Ban,
+  UserMinus,
+  Clock,
 } from 'lucide-react';
 
 interface Lead {
@@ -48,6 +56,8 @@ interface Invoice {
   type: 'one_time' | 'monthly';
   dueDate: string;
   createdAt: string;
+  periodMonths?: number;
+  gameServerId?: string | null;
   service?: {
     id: string;
     title: string;
@@ -84,6 +94,8 @@ interface Order {
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   createdAt: string;
   unreadCount?: number;
+  topic?: string;
+  gameServerId?: string | null;
   service?: {
     title: string;
   };
@@ -93,6 +105,8 @@ interface HostingNode {
   id: string;
   name: string;
   ip: string;
+  location?: string;
+  maxSlots?: number;
   supportedGames?: string[];
   slotPrice?: number;
   slotPrices?: Record<string, number>;
@@ -122,6 +136,61 @@ const formatDate = (date: string | Date) => {
   });
 };
 
+const formatGameLabel = (game: string) => {
+  if (game === 'minecraft') return 'Minecraft';
+  if (game === 'cs2') return 'Counter-Strike 2';
+  if (game === 'cs16') return 'Counter-Strike 1.6';
+  return game;
+};
+
+const getGameServerStatusMeta = (status: string) => {
+  if (status === 'running') {
+    return {
+      label: 'Активен',
+      badgeClassName: 'bg-green-100 text-green-800',
+      panelClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    };
+  }
+
+  if (status === 'installing') {
+    return {
+      label: 'Установка',
+      badgeClassName: 'bg-yellow-100 text-yellow-800',
+      panelClassName: 'border-amber-200 bg-amber-50 text-amber-700'
+    };
+  }
+
+  if (status === 'stopped') {
+    return {
+      label: 'Остановлен',
+      badgeClassName: 'bg-red-100 text-red-800',
+      panelClassName: 'border-rose-200 bg-rose-50 text-rose-700'
+    };
+  }
+
+  if (status === 'suspended') {
+    return {
+      label: 'Не оплачен',
+      badgeClassName: 'bg-red-100 text-red-800',
+      panelClassName: 'border-rose-200 bg-rose-50 text-rose-700'
+    };
+  }
+
+  if (status === 'pending_payment') {
+    return {
+      label: 'Ожидает оплаты',
+      badgeClassName: 'bg-yellow-100 text-yellow-800',
+      panelClassName: 'border-amber-200 bg-amber-50 text-amber-700'
+    };
+  }
+
+  return {
+    label: status,
+    badgeClassName: 'bg-gray-100 text-gray-800',
+    panelClassName: 'border-slate-200 bg-slate-50 text-slate-700'
+  };
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -147,7 +216,7 @@ const ClientDashboard = () => {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isServerPanelOpen, setIsServerPanelOpen] = useState(false);
   const [currentPanelServer, setCurrentPanelServer] = useState<GameServer | null>(null);
-  const [serverPanelTab, setServerPanelTab] = useState<'console' | 'files' | 'settings' | 'access'>('console');
+  const [serverPanelTab, setServerPanelTab] = useState<'overview' | 'console' | 'files' | 'settings' | 'access' | 'players'>('overview');
   const [currentConsoleServer, setCurrentConsoleServer] = useState<GameServer | null>(null);
   const [currentSettingsServer, setCurrentSettingsServer] = useState<GameServer | null>(null);
   const [currentFileServer, setCurrentFileServer] = useState<GameServer | null>(null);
@@ -158,19 +227,37 @@ const ClientDashboard = () => {
   const [editingFile, setEditingFile] = useState<string | null>(null);
   const [consoleLogs, setConsoleLogs] = useState('');
   const [consoleCommand, setConsoleCommand] = useState('');
+  const [serverSearch, setServerSearch] = useState('');
+  const [copiedValue, setCopiedValue] = useState('');
   const consoleLogsRef = useRef<HTMLDivElement | null>(null);
   const currentConsoleServerId = currentConsoleServer?.id;
   const [nodes, setNodes] = useState<HostingNode[]>([]);
   const [gameServers, setGameServers] = useState<GameServer[]>([]);
   const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number }>>({});
+  const [playersList, setPlayersList] = useState<Record<string, {
+    players: Array<{ name: string; score?: number; durationSec?: number; ping?: number }>;
+    countOnly?: boolean;
+    online: number;
+    max: number;
+  }>>({});
+  const [playersListLoading, setPlayersListLoading] = useState<Record<string, boolean>>({});
   const [sftpAccess, setSftpAccess] = useState<Record<string, { enabled: boolean; host?: string; port?: number | null; username?: string; password?: string; path?: string }>>({});
   const [sftpLoading, setSftpLoading] = useState<Record<string, boolean>>({});
-  const [orderConfig, setOrderConfig] = useState({
-      game: 'minecraft',
-      nodeId: '',
-      ram: 1024,
-      slots: 10
-  });
+  const [gsStatusFilter, setGsStatusFilter] = useState<string>('all');
+  const [gsGameFilter, setGsGameFilter] = useState<string>('all');
+  const [gsNodeFilter, setGsNodeFilter] = useState<string>('all');
+  const [kickModal, setKickModal] = useState<{ open: boolean; serverId: string; name: string }>({ open: false, serverId: '', name: '' });
+  const [banModal, setBanModal] = useState<{ open: boolean; serverId: string; name: string }>({ open: false, serverId: '', name: '' });
+  const [kickReason, setKickReason] = useState('Нарушение правил');
+  const [banMinutes, setBanMinutes] = useState(60);
+  const [banReason, setBanReason] = useState('Нарушение правил');
+  const [confirmPayOpen, setConfirmPayOpen] = useState(false);
+  const [invoiceToPay, setInvoiceToPay] = useState<string | null>(null);
+  const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
+  const [ticketTopic, setTicketTopic] = useState('');
+  const [ticketServerId, setTicketServerId] = useState<string>('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [sendingTicket, setSendingTicket] = useState(false);
   const gameOptions = [
     { id: 'minecraft', label: 'Minecraft (Java)' },
     { id: 'cs2', label: 'CS 2' },
@@ -181,19 +268,85 @@ const ClientDashboard = () => {
   const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
 
-  const selectedOrderNode = nodes.find(n => n.id === orderConfig.nodeId);
-  const supportedGamesForOrderNode = Array.isArray(selectedOrderNode?.supportedGames)
-    ? selectedOrderNode.supportedGames
-    : gameOptions.map(g => g.id);
-  const availableOrderGames = gameOptions.filter(g => supportedGamesForOrderNode.includes(g.id));
-  const slotPricesForOrderNode = selectedOrderNode?.slotPrices && typeof selectedOrderNode.slotPrices === 'object' ? selectedOrderNode.slotPrices : null;
-  const slotPriceForOrderNodeGame = Number.isFinite(Number(slotPricesForOrderNode?.[orderConfig.game]))
-    ? Number(slotPricesForOrderNode?.[orderConfig.game])
-    : (Number.isFinite(Number(selectedOrderNode?.slotPrice)) ? Number(selectedOrderNode?.slotPrice) : 10);
-  const monthlyOrderPrice = Math.ceil(orderConfig.slots * slotPriceForOrderNodeGame);
+  const getServerNode = (server?: GameServer | null) =>
+    server ? nodes.find(n => n.id === server.node?.id || (server.node as any)?.id === n.id) : undefined;
+  const openServerPanel = (
+    server: GameServer,
+    tab: 'overview' | 'console' | 'files' | 'settings' | 'access' = 'overview'
+  ) => {
+    setCurrentPanelServer(server);
+    setServerPanelTab(tab);
+    setIsServerPanelOpen(true);
+  };
+  const runningGameServersCount = gameServers.filter(gs => gs.status === 'running').length;
+  const suspendedGameServersCount = gameServers.filter(gs => gs.status === 'suspended' || gs.status === 'pending_payment').length;
+  const totalPlayersOnline = gameServers.reduce((sum, gs) => sum + (playerCounts[gs.id]?.online ?? 0), 0);
+  const filteredGameServers = gameServers.filter((gs) => {
+    const query = serverSearch.trim().toLowerCase();
+    const node = getServerNode(gs);
+    const haystack = [
+      gs.name,
+      formatGameLabel(gs.game),
+      gs.game,
+      gs.status,
+      getGameServerStatusMeta(gs.status).label,
+      String(gs.port),
+      node?.name || '',
+      node?.ip || ''
+    ]
+      .join(' ')
+      .toLowerCase();
+    if (query && !haystack.includes(query)) return false;
+    if (gsStatusFilter !== 'all' && gs.status !== gsStatusFilter) return false;
+    if (gsGameFilter !== 'all' && gs.game !== gsGameFilter) return false;
+    if (gsNodeFilter !== 'all' && node?.id !== gsNodeFilter) return false;
+    return true;
+  });
+
+  const copyToClipboard = async (value: string, successLabel: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = value;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+
+      setCopiedValue(successLabel);
+      window.setTimeout(() => {
+        setCopiedValue(prev => (prev === successLabel ? '' : prev));
+      }, 1800);
+    } catch (error) {
+      console.error('Copy failed:', error);
+      alert('Не удалось скопировать значение');
+    }
+  };
+
+  const getGameServerActionState = (status: string) => {
+    const isRunning = status === 'running';
+    const isInstalling = status === 'installing';
+    const isBlocked = status === 'suspended' || status === 'pending_payment';
+
+    return {
+      canStart: !isRunning && !isInstalling && !isBlocked,
+      canStop: isRunning,
+      canRestart: isRunning
+    };
+  };
 
   // Payment action
   const handlePayInvoice = async (invoiceId: string) => {
+    setInvoiceToPay(invoiceId);
+    setConfirmPayOpen(true);
+  };
+
+  const executePayInvoice = async () => {
+    const invoiceId = invoiceToPay;
+    if (!invoiceId) return;
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/payments/create', {
@@ -219,6 +372,9 @@ const ClientDashboard = () => {
     } catch (error) {
       console.error('Payment error:', error);
       alert('Ошибка соединения с сервером');
+    } finally {
+      setConfirmPayOpen(false);
+      setInvoiceToPay(null);
     }
   };
 
@@ -269,6 +425,134 @@ const ClientDashboard = () => {
       alert('Ошибка соединения с сервером');
     }
   };
+
+  const submitOrderFromConfiguratorModal = async (payload: GameServerOrderPayload) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/game-servers/order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setIsCreateServerModalOpen(false);
+        await fetchData();
+        if (data?.invoice?.id) {
+          handlePayInvoice(data.invoice.id);
+        } else if (!data?.invoice) {
+          alert('Сервер создан, но счет не был сформирован автоматически');
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Order error response:', errorData);
+        alert(`Ошибка: ${errorData.message || 'Не удалось создать сервер'}`);
+      }
+    } catch (e) {
+      console.error('Order network error:', e);
+      alert('Ошибка сети или сервера');
+    }
+  };
+
+  const fetchPlayersList = async (serverId: string) => {
+    try {
+      setPlayersListLoading(prev => ({ ...prev, [serverId]: true }));
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/game-servers/${serverId}/players`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlayersList(prev => ({
+          ...prev,
+          [serverId]: {
+            players: Array.isArray(data?.players) ? data.players : [],
+            countOnly: Boolean(data?.countOnly),
+            online: Number(data?.online) || 0,
+            max: Number(data?.max) || 0,
+          }
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPlayersListLoading(prev => ({ ...prev, [serverId]: false }));
+    }
+  };
+
+  const handleKickPlayer = async () => {
+    if (!kickModal.serverId || !kickModal.name) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/game-servers/${kickModal.serverId}/players/kick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: kickModal.name, reason: kickReason })
+      });
+      if (res.ok) {
+        alert(`Игрок ${kickModal.name} кикнут`);
+        fetchPlayersList(kickModal.serverId);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка кика');
+      }
+    } catch (e) {
+      alert('Ошибка соединения');
+    } finally {
+      setKickModal({ open: false, serverId: '', name: '' });
+    }
+  };
+
+  const handleBanPlayer = async () => {
+    if (!banModal.serverId || !banModal.name) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/game-servers/${banModal.serverId}/players/ban`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: banModal.name, minutes: banMinutes, reason: banReason })
+      });
+      if (res.ok) {
+        alert(`Игрок ${banModal.name} забанен на ${banMinutes} мин.`);
+        fetchPlayersList(banModal.serverId);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка бана');
+      }
+    } catch (e) {
+      alert('Ошибка соединения');
+    } finally {
+      setBanModal({ open: false, serverId: '', name: '' });
+    }
+  };
+
+  const isPaidSoon = (paidUntil?: string) => {
+    if (!paidUntil) return true;
+    const d = new Date(paidUntil).getTime();
+    const now = Date.now();
+    const daysLeft = (d - now) / (1000 * 60 * 60 * 24);
+    return daysLeft >= 0 && daysLeft <= 5;
+  };
+  const isOverdue = (paidUntil?: string, status?: string) => {
+    if (status === 'suspended' || status === 'pending_payment') return true;
+    if (!paidUntil) return false;
+    return new Date(paidUntil).getTime() < Date.now();
+  };
+  const sftpEnabledCount = Object.values(sftpAccess).filter(v => v.enabled).length;
+
+  const warningGameServers = gameServers.filter(gs => isPaidSoon(gs.paidUntil) || isOverdue(gs.paidUntil, gs.status));
+  const overdueGameServers = gameServers.filter(gs => isOverdue(gs.paidUntil, gs.status));
+  const pendingInvoices = invoices.filter(i => i.status === 'pending');
+  const pendingSum = pendingInvoices.reduce((s, i) => s + (i.amount || 0), 0);
+  const paidLast30Sum = invoices.filter(i => {
+    if (i.status !== 'paid') return false;
+    const dt = new Date(i.createdAt || 0).getTime();
+    return dt > Date.now() - 30 * 24 * 60 * 60 * 1000;
+  }).reduce((s, i) => s + (i.amount || 0), 0);
 
   // Lead actions
   const updateLeadStatus = async (id: string, status: string) => {
@@ -363,26 +647,11 @@ const ClientDashboard = () => {
     const serviceType = params.get('service');
     
     if (serviceType === 'game' && nodes.length > 0) {
-        const game = params.get('game') || 'minecraft';
-        setOrderConfig({
-            game: game,
-            nodeId: nodes[0].id,
-            ram: 1024,
-            slots: 10
-        });
         setIsCreateServerModalOpen(true);
         // Clear params
         window.history.replaceState({}, '', '/dashboard');
     }
   }, [nodes, location]);
-
-  useEffect(() => {
-    if (!orderConfig.nodeId) return;
-    const node = nodes.find(n => n.id === orderConfig.nodeId);
-    const supported = Array.isArray(node?.supportedGames) ? node.supportedGames : gameOptions.map(g => g.id);
-    if (!supported.length) return;
-    setOrderConfig(prev => (supported.includes(prev.game) ? prev : { ...prev, game: supported[0] }));
-  }, [orderConfig.nodeId, nodes]);
 
   useEffect(() => {
     fetchData();
@@ -491,7 +760,7 @@ const ClientDashboard = () => {
   const fetchPlayersCount = async (serverId: string) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/game-servers/${serverId}/players`, {
+      const res = await fetch(`/api/game-servers/${serverId}/players-count`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -719,10 +988,22 @@ const ClientDashboard = () => {
       setCurrentSettingsServer(currentPanelServer);
       fetchServerSettings(currentPanelServer.id);
     }
-    if (serverPanelTab === 'access') {
+    if (serverPanelTab === 'overview' || serverPanelTab === 'access') {
       fetchSftpAccess(currentPanelServer.id);
     }
+    if (serverPanelTab === 'players') {
+      fetchPlayersList(currentPanelServer.id);
+    }
   }, [isServerPanelOpen, currentPanelServer?.id, serverPanelTab]);
+
+  useEffect(() => {
+    const shouldPoll = isServerPanelOpen && serverPanelTab === 'players' && currentPanelServer;
+    if (!shouldPoll) return;
+    const id = currentPanelServer!.id;
+    fetchPlayersList(id);
+    const intervalId = setInterval(() => fetchPlayersList(id), 6000);
+    return () => clearInterval(intervalId);
+  }, [isServerPanelOpen, serverPanelTab, currentPanelServer?.id]);
 
   const handleSendConsoleCommand = async () => {
     if (!currentConsoleServer || !consoleCommand) return;
@@ -897,9 +1178,46 @@ const ClientDashboard = () => {
     }
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    setOrderToCancel(orderId);
-    setIsConfirmCancelOpen(true);
+  const handleSubmitNewTicket = async () => {
+    if (!ticketTopic.trim()) return alert('Укажите тему обращения');
+    if (!ticketMessage.trim()) return alert('Напишите сообщение');
+
+    try {
+      setSendingTicket(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          serviceId: null,
+          topic: ticketTopic.trim(),
+          gameServerId: ticketServerId || null,
+          firstMessage: ticketMessage.trim()
+        })
+      });
+
+      if (res.ok) {
+        const newOrder = await res.json();
+        await fetchData();
+        setIsNewTicketOpen(false);
+        setTicketTopic('');
+        setTicketServerId('');
+        setTicketMessage('');
+        setSelectedOrder(newOrder);
+        setIsChatOpen(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка создания обращения');
+      }
+    } catch (e) {
+      console.error('Ticket submit error:', e);
+      alert('Ошибка соединения');
+    } finally {
+      setSendingTicket(false);
+    }
   };
 
   const confirmCancel = async () => {
@@ -934,9 +1252,6 @@ const ClientDashboard = () => {
     );
   }
 
-  // Filter orders for Overview tab (only active ones)
-  const activeOrders = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
-
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50 py-10">
@@ -955,83 +1270,60 @@ const ClientDashboard = () => {
               {/* Overview Tab Content */}
               {activeTab === 'overview' && (
                 <>
-                  {/* Orders (Active Only) */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden mb-6"
-                  >
-                    <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center gap-4">
-                      <h2 className="text-xl font-semibold text-gray-900">Активные заказы</h2>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => navigate('/services')}
-                          className="inline-flex items-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
-                        >
-                          Перейти к услугам
-                        </button>
-                        <Briefcase className="h-5 w-5 text-indigo-600" />
-                      </div>
-                    </div>
-                    
-                    <div className="divide-y divide-gray-100">
-                      {activeOrders.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500">
-                          У вас пока нет активных заказов
-                        </div>
-                      ) : (
-                        activeOrders.map((order) => (
-                          <div key={order.id} className="p-6 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center justify-between mb-4">
-                              <div>
-                                <h3 className="font-medium text-gray-900">
-                                  {order.service?.title || 'Чат с менеджером'}
-                                </h3>
-                                <p className="text-sm text-gray-500">
-                                от {formatDate(order.createdAt)}
-                              </p>
+                  {warningGameServers.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 space-y-3"
+                    >
+                      {overdueGameServers.length > 0 && (
+                        <div className="rounded-2xl border-2 border-rose-200 bg-rose-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-rose-500 p-2 text-white"><AlertCircle className="h-5 w-5" /></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold text-rose-900">Требуется оплата ({overdueGameServers.length})</div>
+                              <div className="mt-1 text-xs text-rose-700">
+                                У вас {overdueGameServers.length} серверов с просроченной оплатой или приостановлено.
                               </div>
-                              <div className="flex items-center gap-3">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  order.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {order.status === 'pending' ? 'Ожидает' : 'В работе'}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCancelOrder(order.id);
-                                  }}
-                                  className="text-gray-400 hover:text-red-500 transition-colors"
-                                  title="Закрыть обращение"
-                                >
-                                  <X className="h-5 w-5" />
-                                </button>
-                              </div>
+                              <button onClick={() => setActiveTab('billing')} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
+                                К оплате →
+                              </button>
                             </div>
-                            
-                            <button
-                              onClick={() => {
-                                setSelectedOrder(order);
-                                setIsChatOpen(true);
-                              }}
-                              className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
-                            >
-                              <MessageCircle className="mr-2 h-4 w-4" />
-                              Открыть чат с администратором
-                              {order.unreadCount ? (
-                                <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                                  {order.unreadCount}
-                                </span>
-                              ) : null}
-                            </button>
                           </div>
-                        ))
+                        </div>
                       )}
-                    </div>
-                  </motion.div>
+                      {gameServers.filter(gs => isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status)).length > 0 && (
+                        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-amber-500 p-2 text-white"><Clock className="h-5 w-5" /></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold text-amber-900">Скоро окончание оплаты ({gameServers.filter(gs => isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status)).length})</div>
+                              <div className="mt-1 text-xs text-amber-700">
+                                Срок оплаты истекает менее чем через 5 дней. Рекомендуем продлить заранее.
+                              </div>
+                              <button onClick={() => setActiveTab('game_servers')} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                                Продлить серверы →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {pendingInvoices.length > 0 && (
+                        <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-indigo-500 p-2 text-white"><CreditCard className="h-5 w-5" /></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold text-indigo-900">Непогашенные счета ({pendingInvoices.length}) на сумму {pendingSum} ₽</div>
+                              <div className="mt-1 text-xs text-indigo-700">Оплатите счета, чтобы серверы не были приостановлены.</div>
+                              <button onClick={() => setActiveTab('billing')} className="mt-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                                Оплатить →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
 
                   {/* Game Servers Summary */}
                   <motion.div 
@@ -1042,15 +1334,7 @@ const ClientDashboard = () => {
                     <div className="mb-4 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-gray-900">Игровые серверы</h2>
                       <button
-                        onClick={() => {
-                          setOrderConfig({
-                            game: 'minecraft',
-                            nodeId: nodes.length > 0 ? nodes[0].id : '',
-                            ram: 1024,
-                            slots: 10
-                          });
-                          setIsCreateServerModalOpen(true);
-                        }}
+                        onClick={() => setIsCreateServerModalOpen(true)}
                         className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -1059,127 +1343,95 @@ const ClientDashboard = () => {
                     </div>
 
                     {gameServers.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                        <Server className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-gray-500">
+                        <Server className="mx-auto mb-3 h-8 w-8 text-gray-400" />
                         <p>У вас пока нет игровых серверов</p>
+                        <button
+                          onClick={() => setActiveTab('game_servers')}
+                          className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                        >
+                          Перейти к управлению →
+                        </button>
                       </div>
                     ) : (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {gameServers.slice(0, 4).map((gs) => (
-                          <div key={gs.id} className="rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-medium text-gray-900 flex items-center">
-                                <Server className="w-4 h-4 mr-2 text-indigo-500" />
-                                {gs.name}
-                              </h3>
-                              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                gs.status === 'running' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                              }`}>
-                                {gs.status}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500 mb-3">
-                                {gs.game} | Port: {gs.port}
-                            </div>
-                            <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end">
-                              <button 
-                                onClick={() => setActiveTab('game_servers')}
-                                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center"
-                              >
-                                <Settings className="w-3 h-3 mr-1" />
-                                Управление
-                              </button>
-                            </div>
+                      <div className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Всего серверов</div>
+                            <div className="mt-1 text-2xl font-semibold text-gray-900">{gameServers.length}</div>
                           </div>
-                        ))}
+                          <div className="rounded-2xl bg-emerald-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-emerald-700">Активны</div>
+                            <div className="mt-1 text-2xl font-semibold text-emerald-900">{runningGameServersCount}</div>
+                          </div>
+                          <div className="rounded-2xl bg-rose-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-rose-700">Приостановлено</div>
+                            <div className="mt-1 text-2xl font-semibold text-rose-900">{suspendedGameServersCount}</div>
+                          </div>
+                          <div className="rounded-2xl bg-indigo-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-indigo-700">SFTP доступ</div>
+                            <div className="mt-1 text-2xl font-semibold text-indigo-900">{sftpEnabledCount}</div>
+                          </div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {gameServers.slice(0, 4).map((gs) => {
+                            const node = getServerNode(gs);
+                            return (
+                              <button
+                                key={gs.id}
+                                type="button"
+                                onClick={() => openServerPanel(gs)}
+                                className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg"
+                              >
+                                <div className="mb-4 flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="mb-2 flex items-center gap-2">
+                                      <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
+                                        <Server className="h-4 w-4" />
+                                      </div>
+                                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getGameServerStatusMeta(gs.status).badgeClassName}`}>
+                                        {getGameServerStatusMeta(gs.status).label}
+                                      </span>
+                                      {isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status) && (
+                                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Скоро окончание</span>
+                                      )}
+                                      {isOverdue(gs.paidUntil, gs.status) && (
+                                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">Требуется оплата</span>
+                                      )}
+                                    </div>
+                                    <h3 className="truncate text-base font-semibold text-gray-900">{gs.name}</h3>
+                                    <p className="mt-1 text-sm text-gray-500">{formatGameLabel(gs.game)} · {node?.ip || 'IP не назначен'}:{gs.port}</p>
+                                  </div>
+                                  <span className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-gray-700">
+                                    {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? gs.slots}
+                                  </span>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                    <div className="text-xs uppercase tracking-wide text-gray-500">Слоты</div>
+                                    <div className="mt-1 text-sm font-semibold text-gray-900">
+                                      {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? gs.slots}
+                                    </div>
+                                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-200">
+                                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, (playerCounts[gs.id]?.online ?? 0) / Math.max(1, (playerCounts[gs.id]?.max ?? gs.slots)) * 100)}%` }} />
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                    <div className="text-xs uppercase tracking-wide text-gray-500">Оплата до</div>
+                                    <div className="mt-1 text-sm font-semibold text-gray-900">{gs.paidUntil ? formatDate(gs.paidUntil) : 'Не указано'}</div>
+                                  </div>
+                                </div>
+                                <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+                                  <span className="text-sm font-medium text-indigo-600">Открыть панель</span>
+                                  <span className="text-xs text-gray-500">Файлы, консоль, доступ</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </motion.div>
-
-                  {/* Active Projects Summary */}
-                  {projects.filter(p => p.status !== 'completed' && p.status !== 'cancelled').map(project => (
-                    <motion.div 
-                      key={project.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
-                    >
-                      <div className="mb-4 flex items-center justify-between">
-                        <h2 className="text-xl font-semibold text-gray-900">Текущий проект</h2>
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                            project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                            project.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            project.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {project.status === 'pending' ? 'Ожидает' :
-                             project.status === 'in_progress' ? 'В работе' :
-                             project.status === 'completed' ? 'Готов' : 'Отменен'}
-                          </span>
-                      </div>
-                      
-                      <div className="mb-6">
-                        <h3 className="text-lg font-medium text-gray-900">{project.title}</h3>
-                      </div>
-
-
-
-                        <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          {project.serverIp && (
-                            <div>
-                              <span className="block text-gray-400 text-xs">IP Сервера</span>
-                              <span className="font-mono">{project.serverIp}</span>
-                            </div>
-                          )}
-                          {project.websiteUrl && (
-                            <div>
-                              <span className="block text-gray-400 text-xs">Домен</span>
-                              <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                                {project.websiteUrl}
-                              </a>
-                            </div>
-                          )}
-                          {project.siteStatus && (
-                            <div>
-                              <span className="block text-gray-400 text-xs">Статус сайта</span>
-                              <span className={`font-medium ${
-                                project.siteStatus === 'up' ? 'text-green-600' : 
-                                project.siteStatus === 'down' ? 'text-red-600' : 'text-gray-600'
-                              }`}>
-                                {project.siteStatus === 'up' ? 'Работает' : 
-                                 project.siteStatus === 'down' ? 'Не работает' : 'Неизвестно'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {(project.paidUntil || (project.monthlyRate && project.monthlyRate > 0)) && (
-                            <div className="mt-4 pt-4 border-t border-gray-100">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-sm text-gray-500">Оплачено до:</span>
-                                    <span className={`font-medium ${project.paidUntil && new Date(project.paidUntil) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
-                                        {project.paidUntil ? formatDate(project.paidUntil) : 'Не оплачено'}
-                                    </span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => handleExtend(project.id, 1)}
-                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
-                                    >
-                                        Продлить (1 мес) - {project.monthlyRate || 0} ₽
-                                    </button>
-                                    <button 
-                                        onClick={() => handleExtend(project.id, 3)}
-                                        className="flex-1 text-xs bg-indigo-50 text-indigo-700 py-2 rounded hover:bg-indigo-100 transition-colors"
-                                    >
-                                        Продлить (3 мес) - {(project.monthlyRate || 0) * 3} ₽
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </motion.div>
-                  ))}
                 </>
               )}
 
@@ -1280,6 +1532,39 @@ const ClientDashboard = () => {
               {activeTab === 'billing' && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-bold text-gray-900">Финансы</h2>
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="rounded-3xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-rose-700">К оплате</div>
+                          <div className="mt-2 text-3xl font-black text-gray-900">{pendingSum} <span className="text-lg font-semibold text-rose-700">₽</span></div>
+                        </div>
+                        <div className="rounded-2xl bg-rose-500 p-3 text-white shadow-lg"><AlertCircle className="h-6 w-6" /></div>
+                      </div>
+                      <div className="mt-3 text-sm text-gray-500">{pendingInvoices.length} счёт(ов)</div>
+                    </div>
+                    <div className="rounded-3xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Оплачено за 30 дней</div>
+                          <div className="mt-2 text-3xl font-black text-gray-900">{paidLast30Sum} <span className="text-lg font-semibold text-emerald-700">₽</span></div>
+                        </div>
+                        <div className="rounded-2xl bg-emerald-500 p-3 text-white shadow-lg"><CheckCircle className="h-6 w-6" /></div>
+                      </div>
+                      <div className="mt-3 text-sm text-gray-500">Всего пополнений за месяц</div>
+                    </div>
+                    <div className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Всего счетов</div>
+                          <div className="mt-2 text-3xl font-black text-gray-900">{invoices.length} <span className="text-lg font-semibold text-indigo-700">шт.</span></div>
+                        </div>
+                        <div className="rounded-2xl bg-indigo-500 p-3 text-white shadow-lg"><CreditCard className="h-6 w-6" /></div>
+                      </div>
+                      <div className="mt-3 text-sm text-gray-500">За всё время существования</div>
+                    </div>
+                  </div>
+
                   {invoices.length === 0 ? (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
                       <CreditCard className="mx-auto h-12 w-12 text-gray-400" />
@@ -1293,19 +1578,27 @@ const ClientDashboard = () => {
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Услуга</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Период</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Создан</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Срок</th>
                               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действие</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {invoices.map((invoice) => (
-                              <tr key={invoice.id}>
+                              <tr key={invoice.id} className="hover:bg-slate-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                   {invoice.title || invoice.service?.title || 'Счет'}
+                                  {invoice.gameServerId && (
+                                    <div className="mt-0.5 text-xs font-normal text-gray-500">#{invoice.gameServerId}</div>
+                                  )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                  {invoice.periodMonths ? `${invoice.periodMonths} мес.` : '—'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                                   {invoice.amount} ₽
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1321,12 +1614,16 @@ const ClientDashboard = () => {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   {formatDate(invoice.createdAt)}
                                 </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {invoice.dueDate ? formatDate(invoice.dueDate) : '—'}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                   {invoice.status === 'pending' && (
                                     <button
                                       onClick={() => handlePayInvoice(invoice.id)}
-                                      className="text-indigo-600 hover:text-indigo-900"
+                                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
                                     >
+                                      <CreditCard className="h-3.5 w-3.5" />
                                       Оплатить
                                     </button>
                                   )}
@@ -1456,195 +1753,399 @@ const ClientDashboard = () => {
                 </div>
               )}
 
-              {/* Requests Tab (All Orders) */}
+              {/* Support Tab */}
               {activeTab === 'requests' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden"
-                >
-                  <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">Все обращения</h2>
-                    <MessageSquare className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  
-                  <div className="divide-y divide-gray-100">
-                    {orders.length === 0 ? (
-                      <div className="p-6 text-center text-gray-500">
-                        У вас пока нет обращений
+                <div className="space-y-6">
+                  <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="mb-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-cyan-100">
+                          Поддержка
+                        </div>
+                        <h2 className="text-2xl font-semibold">Обращения в поддержку</h2>
+                        <p className="mt-2 max-w-2xl text-sm text-cyan-100">
+                          Напишите нам — среднее время ответа меньше часа. Привяжите игровой сервер, чтобы мы быстрее нашли причину проблемы.
+                        </p>
                       </div>
-                    ) : (
-                      orders.map((order) => (
-                        <div key={order.id} className="p-6 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <h3 className="font-medium text-gray-900">
-                                {order.service?.title || 'Чат с менеджером'}
-                              </h3>
-                              <p className="text-sm text-gray-500">
-                                от {formatDate(order.createdAt)}
-                              </p>
-                            </div>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              order.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                              order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {order.status === 'pending' ? 'Ожидает' :
-                               order.status === 'in_progress' ? 'В работе' :
-                               order.status === 'completed' ? 'Выполнен' : 'Закрыт'}
-                            </span>
-                          </div>
-                          
+                      <button
+                        onClick={() => setIsNewTicketOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-md transition hover:bg-slate-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Новое обращение
+                      </button>
+                    </div>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden"
+                  >
+                    <div className="divide-y divide-gray-100">
+                      {orders.length === 0 ? (
+                        <div className="p-12 text-center">
+                          <MessageSquare className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                          <div className="text-gray-500 mb-4">У вас пока нет обращений</div>
                           <button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setIsChatOpen(true);
-                            }}
-                            className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+                            onClick={() => setIsNewTicketOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                           >
-                            <MessageCircle className="mr-2 h-4 w-4" />
-                            Открыть чат с администратором
-                            {order.unreadCount ? (
-                              <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                                {order.unreadCount}
-                              </span>
-                            ) : null}
+                            <Plus className="h-4 w-4" />
+                            Создать первое обращение
                           </button>
                         </div>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
-              )}
-
-              {activeTab === 'game_servers' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">Мои игровые серверы</h2>
-                    <button 
-                        onClick={() => {
-                          setOrderConfig({
-                            game: 'minecraft',
-                            nodeId: nodes.length > 0 ? nodes[0].id : '',
-                            ram: 1024,
-                            slots: 10
-                          });
-                          setIsCreateServerModalOpen(true);
-                        }}
-                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Создать сервер
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {gameServers.length === 0 ? (
-                        <div className="p-12 text-center text-gray-500">
-                            У вас нет активных серверов. Создайте свой первый сервер!
-                        </div>
-                    ) : (
-                        gameServers.map(gs => (
+                      ) : (
+                        orders.map((order) => {
+                          const linkedServer = order.gameServerId
+                            ? gameServers.find((g) => g.id === order.gameServerId)
+                            : null;
+                          const displayTitle =
+                            order.topic || order.service?.title || 'Обращение без темы';
+                          return (
                             <div
-                              key={gs.id}
-                              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                              key={order.id}
+                              className="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
                               onClick={() => {
-                                setCurrentPanelServer(gs);
-                                setServerPanelTab('console');
-                                setIsServerPanelOpen(true);
+                                setSelectedOrder(order);
+                                setIsChatOpen(true);
                               }}
                             >
-                                <div className="flex justify-between items-center mb-4">
-                                    <div>
-                                        <h3 className="text-lg font-bold">{gs.name}</h3>
-                                        <p className="text-sm text-gray-500 mb-1">{gs.game} | Port: {gs.port}</p>
-                                        <p className="text-xs text-gray-500 flex items-center gap-2">
-                                            <span className="bg-gray-100 px-2 py-0.5 rounded">Игроки: {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? (gs.slots || 10)}</span>
-                                            {gs.rconPassword && <span className="bg-gray-100 px-2 py-0.5 rounded">RCON: {gs.rconPassword}</span>}
-                                            {gs.paidUntil && (
-                                              <span className={`px-2 py-0.5 rounded ${new Date(gs.paidUntil) < new Date() ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                Оплачено до: {formatDate(gs.paidUntil)}
-                                              </span>
-                                            )}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                          gs.status === 'running' ? 'bg-green-100 text-green-800' : 
-                                          gs.status === 'installing' ? 'bg-yellow-100 text-yellow-800' :
-                                          gs.status === 'stopped' ? 'bg-red-100 text-red-800' :
-                                          gs.status === 'suspended' ? 'bg-red-100 text-red-800' :
-                                          gs.status === 'pending_payment' ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-gray-100 text-gray-800'
-                                      }`}>
-                                          {gs.status === 'running' ? 'Активен' : 
-                                           gs.status === 'installing' ? 'Установка' :
-                                           gs.status === 'stopped' ? 'Остановлен' :
-                                           gs.status === 'suspended' ? 'Не оплачен' :
-                                           gs.status === 'pending_payment' ? 'Ожидает оплаты' :
-                                           gs.status}
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold text-gray-900">
+                                      {displayTitle}
+                                    </h3>
+                                    {order.unreadCount ? (
+                                      <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                        {order.unreadCount}
                                       </span>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setCurrentPanelServer(gs);
-                                          setServerPanelTab('console');
-                                          setIsServerPanelOpen(true);
-                                        }}
-                                        className="p-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                        title="Открыть панель"
-                                      >
-                                        <Minus className="w-4 h-4" />
-                                      </button>
-                                    </div>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      от {formatDate(order.createdAt)}
+                                    </span>
+                                    {linkedServer && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                                        <Server className="h-3 w-3" />
+                                        {linkedServer.name}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleControlGameServer(gs.id, 'start');
-                                        }}
-                                        className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
-                                    >
-                                        Запустить
-                                    </button>
-                                    <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleControlGameServer(gs.id, 'stop');
-                                        }}
-                                        className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
-                                    >
-                                        Остановить
-                                    </button>
-                                    <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleControlGameServer(gs.id, 'restart');
-                                        }}
-                                        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
-                                    >
-                                        Перезагрузить
-                                    </button>
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    order.status === 'completed'
+                                      ? 'bg-green-100 text-green-800'
+                                      : order.status === 'in_progress'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : order.status === 'cancelled'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}
+                                >
+                                  {order.status === 'pending'
+                                    ? 'Ожидает'
+                                    : order.status === 'in_progress'
+                                    ? 'В работе'
+                                    : order.status === 'completed'
+                                    ? 'Выполнен'
+                                    : 'Закрыт'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrder(order);
+                                    setIsChatOpen(true);
+                                  }}
+                                  className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+                                >
+                                  <MessageCircle className="mr-2 h-4 w-4" />
+                                  Открыть чат
+                                </button>
+                                <div className="flex gap-2">
+                                  {order.status !== 'completed' && order.status !== 'cancelled' && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleExtendGameServer(gs.id, 1);
+                                        setOrderToCancel(order.id);
+                                        setIsConfirmCancelOpen(true);
                                       }}
-                                      className="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700"
+                                      className="text-xs text-gray-500 hover:text-red-600"
                                     >
-                                      Продлить (1 мес)
+                                      Закрыть
                                     </button>
+                                  )}
                                 </div>
-                                <div className="mt-4 p-4 bg-gray-900 text-gray-100 rounded text-sm font-mono">
-                                    <p>IP: {nodes.find(n => n.id === gs.node?.id || (gs.node as any)?.id === n.id)?.ip}:{gs.port}</p>
-                                    {gs.rconPassword && <p>RCON: {gs.rconPassword}</p>}
-                                </div>
+                              </div>
                             </div>
-                        ))
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
+              {activeTab === 'game_servers' && (
+                <div className="space-y-6">
+                  <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-indigo-700 p-6 text-white shadow-lg">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="mb-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-indigo-100">
+                          Игровой хостинг
+                        </div>
+                        <h2 className="text-2xl font-semibold">Мои игровые серверы</h2>
+                        <p className="mt-2 max-w-2xl text-sm text-indigo-100">
+                          Управляйте серверами из единой панели: консоль, файлы, настройки, оплата и доступы собраны в одном месте.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsCreateServerModalOpen(true)}
+                        className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Создать сервер
+                      </button>
+                    </div>
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-wide text-indigo-200">Всего серверов</div>
+                        <div className="mt-1 text-2xl font-semibold">{gameServers.length}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-wide text-indigo-200">Активны</div>
+                        <div className="mt-1 text-2xl font-semibold">{runningGameServersCount}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-wide text-indigo-200">Нуждаются во внимании</div>
+                        <div className="mt-1 text-2xl font-semibold">{suspendedGameServersCount}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="text-xs uppercase tracking-wide text-indigo-200">Игроков онлайн</div>
+                        <div className="mt-1 text-2xl font-semibold">{totalPlayersOnline}</div>
+                      </div>
+                    </div>
                   </div>
+
+                  {gameServers.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center text-gray-500 shadow-sm">
+                      <Server className="mx-auto mb-3 h-9 w-9 text-gray-400" />
+                      <p className="text-base font-medium text-gray-700">У вас нет активных серверов</p>
+                      <p className="mt-2 text-sm text-gray-500">Создайте первый сервер и панель управления появится здесь автоматически.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-stretch gap-3 flex-1 min-w-[260px]">
+                          <div className="relative flex-1 min-w-[200px]">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="text"
+                              value={serverSearch}
+                              onChange={(e) => setServerSearch(e.target.value)}
+                              placeholder="Поиск по названию, игре, IP, порту..."
+                              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pr-4 pl-10 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                            />
+                          </div>
+                          <select
+                            value={gsStatusFilter}
+                            onChange={(e) => setGsStatusFilter(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-gray-800 outline-none transition focus:border-indigo-300 focus:bg-white"
+                          >
+                            <option value="all">Все статусы</option>
+                            <option value="running">Активны</option>
+                            <option value="stopped">Остановлены</option>
+                            <option value="installing">Установка</option>
+                            <option value="suspended">Приостановлено</option>
+                            <option value="pending_payment">Ожидают оплаты</option>
+                          </select>
+                          <select
+                            value={gsGameFilter}
+                            onChange={(e) => setGsGameFilter(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-gray-800 outline-none transition focus:border-indigo-300 focus:bg-white"
+                          >
+                            <option value="all">Все игры</option>
+                            {gameOptions.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+                          </select>
+                          <select
+                            value={gsNodeFilter}
+                            onChange={(e) => setGsNodeFilter(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-gray-800 outline-none transition focus:border-indigo-300 focus:bg-white"
+                          >
+                            <option value="all">Все ноды</option>
+                            {nodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.ip})</option>)}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="rounded-xl bg-slate-50 px-3 py-2 text-gray-600">
+                            Найдено: <span className="font-semibold text-gray-900">{filteredGameServers.length}</span>
+                          </div>
+                          {copiedValue && (
+                            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700">
+                              Скопировано: <span className="font-semibold">{copiedValue}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {filteredGameServers.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500 shadow-sm">
+                          Ничего не найдено по текущему запросу.
+                        </div>
+                      ) : (
+                        <div className="grid gap-5 xl:grid-cols-2">
+                      {filteredGameServers.map((gs) => {
+                        const node = getServerNode(gs);
+                        const statusMeta = getGameServerStatusMeta(gs.status);
+                        const actionState = getGameServerActionState(gs.status);
+                        const connectionValue = `${node?.ip || 'IP не назначен'}:${gs.port}`;
+                        return (
+                          <div
+                            key={gs.id}
+                            className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                          >
+                            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusMeta.badgeClassName}`}>
+                                    {statusMeta.label}
+                                  </span>
+                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                    {formatGameLabel(gs.game)}
+                                  </span>
+                                </div>
+                                <h3 className="truncate text-xl font-semibold text-gray-900">{gs.name}</h3>
+                                <p className="mt-2 text-sm text-gray-500">{node?.ip || 'IP не назначен'}:{gs.port}</p>
+                              </div>
+                              <button
+                                onClick={() => openServerPanel(gs)}
+                                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                Открыть панель
+                              </button>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Игроки</div>
+                                <div className="mt-1 text-lg font-semibold text-gray-900">
+                                  {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? (gs.slots || 10)}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Слоты</div>
+                                <div className="mt-1 text-lg font-semibold text-gray-900">{gs.slots}</div>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Оплата до</div>
+                                <div className="mt-1 text-sm font-semibold text-gray-900">{gs.paidUntil ? formatDate(gs.paidUntil) : 'Не указано'}</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <div className="mb-3 text-sm font-medium text-gray-900">Подключение</div>
+                                <div className="space-y-2 text-sm text-gray-600">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span>Узел</span>
+                                    <span className="font-medium text-gray-900">{node?.name || 'Не указан'}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span>Адрес</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs text-gray-900">{connectionValue}</span>
+                                      {node?.ip && (
+                                        <button
+                                          onClick={() => copyToClipboard(connectionValue, 'IP сервера')}
+                                          className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                          title="Скопировать IP"
+                                        >
+                                          {copiedValue === 'IP сервера' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span>SFTP</span>
+                                    <span className="font-medium text-gray-900">{sftpAccess[gs.id]?.enabled ? 'Включен' : 'Выключен'}</span>
+                                  </div>
+                                  {gs.rconPassword && (
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span>RCON</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono text-xs text-gray-900">{gs.rconPassword}</span>
+                                        <button
+                                          onClick={() => copyToClipboard(gs.rconPassword || '', 'RCON')}
+                                          className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                          title="Скопировать RCON"
+                                        >
+                                          {copiedValue === 'RCON' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                                <div className="mb-3 text-sm font-medium text-gray-900">Быстрые действия</div>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    onClick={() => handleControlGameServer(gs.id, 'start')}
+                                    disabled={!actionState.canStart}
+                                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                                  >
+                                    Запустить
+                                  </button>
+                                  <button
+                                    onClick={() => handleControlGameServer(gs.id, 'stop')}
+                                    disabled={!actionState.canStop}
+                                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                                  >
+                                    Остановить
+                                  </button>
+                                  <button
+                                    onClick={() => handleControlGameServer(gs.id, 'restart')}
+                                    disabled={!actionState.canRestart}
+                                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                                  >
+                                    Перезапуск
+                                  </button>
+                                  <button
+                                    onClick={() => handleExtendGameServer(gs.id, 1)}
+                                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                                  >
+                                    Продлить
+                                  </button>
+                                  <button
+                                    onClick={() => openServerPanel(gs, 'console')}
+                                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                  >
+                                    Консоль
+                                  </button>
+                                  <button
+                                    onClick={() => openServerPanel(gs, 'files')}
+                                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                  >
+                                    Файлы
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1664,17 +2165,6 @@ const ClientDashboard = () => {
                   >
                     <Briefcase className="mr-3 h-5 w-5" />
                     Обзор
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('projects')}
-                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
-                      activeTab === 'projects' 
-                        ? 'bg-indigo-50 text-indigo-700' 
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <FileText className="mr-3 h-5 w-5" />
-                    Проекты
                   </button>
                   <button
                     onClick={() => setActiveTab('game_servers')}
@@ -1699,17 +2189,6 @@ const ClientDashboard = () => {
                     Финансы
                   </button>
                   <button
-                    onClick={() => setActiveTab('leads')}
-                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
-                      activeTab === 'leads' 
-                        ? 'bg-indigo-50 text-indigo-700' 
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Users className="mr-3 h-5 w-5" />
-                    Заявки
-                  </button>
-                  <button
                     onClick={() => setActiveTab('requests')}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'requests' 
@@ -1718,7 +2197,7 @@ const ClientDashboard = () => {
                     }`}
                   >
                     <MessageSquare className="mr-3 h-5 w-5" />
-                    Обращения
+                    Поддержка
                   </button>
                 </nav>
               </div>
@@ -1755,106 +2234,21 @@ const ClientDashboard = () => {
               </div>
               <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
               
-              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-5xl sm:align-middle">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Заказать игровой сервер</h3>
-                    
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Игра</label>
-                            <select className="w-full p-3 border rounded-lg" value={orderConfig.game} onChange={e => setOrderConfig({...orderConfig, game: e.target.value})}>
-                                {availableOrderGames.length === 0 ? (
-                                  <option value="" disabled>Нет доступных игр</option>
-                                ) : (
-                                  availableOrderGames.map(g => (
-                                    <option key={g.id} value={g.id}>{g.label}</option>
-                                  ))
-                                )}
-                            </select>
-                        </div>
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-gray-700">Локация</label>
-                                <button onClick={() => fetchData()} className="text-xs text-indigo-600 hover:text-indigo-800">Обновить список</button>
-                            </div>
-                            <select className="w-full p-3 border rounded-lg" value={orderConfig.nodeId} onChange={e => setOrderConfig({...orderConfig, nodeId: e.target.value})}>
-                                <option value="">Выберите локацию</option>
-                                {nodes.map(n => <option key={n.id} value={n.id}>{n.name} ({n.ip})</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Слоты (мин. 10)</label>
-                            <input 
-                                type="number" 
-                                className="w-full p-3 border rounded-lg" 
-                                value={orderConfig.slots} 
-                                onChange={e => {
-                                    const slots = parseInt(e.target.value) || 0;
-                                    setOrderConfig({...orderConfig, slots, ram: slots * 100});
-                                }} 
-                                onBlur={() => {
-                                    if (orderConfig.slots < 10) {
-                                        const slots = 10;
-                                        setOrderConfig({...orderConfig, slots, ram: slots * 100});
-                                    }
-                                }}
-                                min="10" 
-                            />
-                        </div>
-                        
-                        <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-center mt-4">
-                             <span className="text-gray-700 font-medium">Ежемесячный платеж:</span>
-                             <span className="text-xl font-bold text-indigo-600">{monthlyOrderPrice} ₽</span>
-                         </div>
-                     </div>
-
-                    <div className="mt-6 flex justify-end gap-2">
-                        <button onClick={() => setIsCreateServerModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
-                        <button 
-                            onClick={async () => {
-                                if (!orderConfig.nodeId) return alert('Выберите локацию');
-                                if (availableOrderGames.length === 0) return alert('На этой локации нет доступных игр');
-                                if (orderConfig.slots < 10) return alert('Минимальное количество слотов: 10');
-                                
-                                try {
-                                    const token = localStorage.getItem('token');
-                                    console.log('Sending order request:', orderConfig);
-                                    
-                                    const res = await fetch('/api/game-servers/order', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                        body: JSON.stringify({ 
-                                            ...orderConfig, 
-                                            name: `${orderConfig.game} server`,
-                                            slots: Number(orderConfig.slots), // Ensure number
-                                            ram: Number(orderConfig.ram)      // Ensure number
-                                        })
-                                    });
-                                    
-                                    if (res.ok) {
-                                        const data = await res.json().catch(() => ({}));
-                                        if (data?.invoice?.id) {
-                                          setIsCreateServerModalOpen(false);
-                                          await fetchData();
-                                          handlePayInvoice(data.invoice.id);
-                                        } else {
-                                          alert('Счет не создан, попробуйте еще раз');
-                                        }
-                                    } else {
-                                        const errorData = await res.json().catch(() => ({}));
-                                        console.error('Order error response:', errorData);
-                                        alert(`Ошибка: ${errorData.message || 'Не удалось создать сервер'}`);
-                                    }
-                                } catch (e) { 
-                                    console.error('Order network error:', e);
-                                    alert('Ошибка сети или сервера');
-                                }
-                            }}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-                        >
-                            Создать
-                        </button>
-                    </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium leading-6 text-gray-900">Заказать игровой сервер</h3>
+                    <button onClick={() => setIsCreateServerModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <GameServerConfigurator
+                    compact={true}
+                    showNameField={true}
+                    nodes={nodes as PublicNode[]}
+                    isAuthenticated={true}
+                    onOrder={submitOrderFromConfiguratorModal}
+                  />
                 </div>
               </div>
             </div>
@@ -2100,38 +2494,103 @@ const ClientDashboard = () => {
               </div>
               <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
 
-              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-6xl sm:align-middle">
+              <div className="inline-block transform overflow-hidden rounded-3xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-6xl sm:align-middle">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="flex justify-between items-start gap-4 mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">Панель: {currentPanelServer.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{currentPanelServer.game} | Port: {currentPanelServer.port}</p>
+                  <div className="mb-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-indigo-700 p-6 text-white shadow-lg">
+                    <div className="mb-6 flex justify-between items-start gap-4">
+                      <div>
+                        <div className="mb-3 flex flex-wrap items-center gap-3">
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getGameServerStatusMeta(currentPanelServer.status).panelClassName}`}>
+                            {getGameServerStatusMeta(currentPanelServer.status).label}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-indigo-100">
+                            {formatGameLabel(currentPanelServer.game)}
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-semibold leading-6">Панель: {currentPanelServer.name}</h3>
+                        <p className="mt-2 text-sm text-indigo-100">
+                          {getServerNode(currentPanelServer)?.ip || 'IP не назначен'}:{currentPanelServer.port}
+                        </p>
+                        <p className="mt-1 text-sm text-indigo-200">
+                          Слоты: {currentPanelServer.slots}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setIsServerPanelOpen(false)} className="rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20">
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setIsServerPanelOpen(false)} className="text-gray-500 hover:text-gray-700">
-                        <X className="w-6 h-6" />
-                      </button>
+
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-indigo-200">
+                          <Users className="h-4 w-4" />
+                          Игроки
+                        </div>
+                        <div className="text-2xl font-semibold">
+                          {playerCounts[currentPanelServer.id]?.online ?? 0}
+                          <span className="ml-1 text-sm font-medium text-indigo-200">/ {playerCounts[currentPanelServer.id]?.max ?? currentPanelServer.slots ?? 0}</span>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-indigo-200">
+                          <Server className="h-4 w-4" />
+                          Статус
+                        </div>
+                        <div className="text-2xl font-semibold">{getGameServerStatusMeta(currentPanelServer.status).label}</div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-indigo-200">
+                          <CreditCard className="h-4 w-4" />
+                          Оплата
+                        </div>
+                        <div className="text-lg font-semibold">
+                          {currentPanelServer.paidUntil ? formatDate(currentPanelServer.paidUntil) : 'Не указано'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-indigo-200">
+                          <Settings className="h-4 w-4" />
+                          Доступ
+                        </div>
+                        <div className="text-lg font-semibold">
+                          {sftpAccess[currentPanelServer.id]?.enabled ? 'SFTP включен' : 'Только панель'}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="mb-5 flex flex-wrap gap-2">
                     <button
                       onClick={() => handleControlGameServer(currentPanelServer.id, 'start')}
-                      className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
                     >
                       Запустить
                     </button>
                     <button
                       onClick={() => handleControlGameServer(currentPanelServer.id, 'stop')}
-                      className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                      className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700"
                     >
                       Остановить
                     </button>
                     <button
                       onClick={() => handleControlGameServer(currentPanelServer.id, 'restart')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                      className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
                     >
                       Перезагрузить
+                    </button>
+                    <button
+                      onClick={() => setServerPanelTab('files')}
+                      className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-200"
+                    >
+                      Открыть файлы
+                    </button>
+                    <button
+                      onClick={() => setServerPanelTab('settings')}
+                      className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-200"
+                    >
+                      Настройки
                     </button>
                     <button
                       onClick={() => {
@@ -2140,49 +2599,216 @@ const ClientDashboard = () => {
                           handleDeleteServer(currentPanelServer.id);
                         }
                       }}
-                      className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 flex items-center"
+                      className="flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Удалить
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-6">
+                  <div className="mb-6 flex flex-wrap gap-2 rounded-2xl bg-slate-50 p-2">
+                    <button
+                      onClick={() => setServerPanelTab('overview')}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'overview' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
+                    >
+                      Обзор
+                    </button>
                     <button
                       onClick={() => setServerPanelTab('console')}
-                      className={`px-4 py-2 rounded text-sm font-medium ${serverPanelTab === 'console' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'console' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
                     >
                       Консоль
                     </button>
                     <button
+                      onClick={() => setServerPanelTab('players')}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'players' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
+                    >
+                      Игроки
+                    </button>
+                    <button
                       onClick={() => setServerPanelTab('files')}
-                      className={`px-4 py-2 rounded text-sm font-medium ${serverPanelTab === 'files' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'files' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
                     >
                       Файлы
                     </button>
                     <button
                       onClick={() => setServerPanelTab('settings')}
-                      className={`px-4 py-2 rounded text-sm font-medium ${serverPanelTab === 'settings' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'settings' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
                     >
                       Настройки
                     </button>
                     <button
                       onClick={() => setServerPanelTab('access')}
-                      className={`px-4 py-2 rounded text-sm font-medium ${serverPanelTab === 'access' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${serverPanelTab === 'access' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-700 hover:bg-white'}`}
                     >
                       Доступ
                     </button>
                   </div>
 
+                  {serverPanelTab === 'overview' && (
+                    <div className="space-y-6">
+                      <div className="grid gap-4 lg:grid-cols-3">
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-4 flex items-center gap-3">
+                            <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
+                              <Server className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Подключение</div>
+                              <div className="text-xs text-gray-500">Основные сетевые данные сервера</div>
+                            </div>
+                          </div>
+                          <div className="space-y-3 text-sm text-gray-700">
+                            <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
+                              <span>IP и порт</span>
+                              <span className="font-mono text-xs text-gray-900">{getServerNode(currentPanelServer)?.ip || 'не назначен'}:{currentPanelServer.port}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
+                              <span>Игра</span>
+                              <span className="font-medium text-gray-900">{formatGameLabel(currentPanelServer.game)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
+                              <span>Узел</span>
+                              <span className="font-medium text-gray-900">{getServerNode(currentPanelServer)?.name || 'Не указан'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-4 flex items-center gap-3">
+                            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+                              <Users className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Ресурсы</div>
+                              <div className="text-xs text-gray-500">Текущая конфигурация сервера</div>
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">Слоты</div>
+                              <div className="mt-1 text-lg font-semibold text-gray-900">{currentPanelServer.slots}</div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">Игроки онлайн</div>
+                              <div className="mt-1 text-lg font-semibold text-gray-900">{playerCounts[currentPanelServer.id]?.online ?? 0}</div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">Лимит игроков</div>
+                              <div className="mt-1 text-lg font-semibold text-gray-900">{playerCounts[currentPanelServer.id]?.max ?? currentPanelServer.slots}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-4 flex items-center gap-3">
+                            <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
+                              <CreditCard className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Подписка и доступ</div>
+                              <div className="text-xs text-gray-500">Оплата, RCON и файл-доступ</div>
+                            </div>
+                          </div>
+                          <div className="space-y-3 text-sm text-gray-700">
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">Оплачено до</div>
+                              <div className="mt-1 font-semibold text-gray-900">{currentPanelServer.paidUntil ? formatDate(currentPanelServer.paidUntil) : 'Не указано'}</div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">RCON</div>
+                              <div className="mt-1 font-mono text-xs text-gray-900">{currentPanelServer.rconPassword || 'Не используется'}</div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">SFTP</div>
+                              <div className="mt-1 font-semibold text-gray-900">{sftpAccess[currentPanelServer.id]?.enabled ? 'Включен' : 'Выключен'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-4">
+                            <div className="text-sm font-medium text-gray-900">Быстрые действия</div>
+                            <div className="text-xs text-gray-500">Все основные операции без переходов между вкладками</div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <button onClick={() => handleControlGameServer(currentPanelServer.id, 'start')} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-left transition hover:bg-emerald-100">
+                              <div className="text-sm font-semibold text-emerald-800">Запустить</div>
+                              <div className="mt-1 text-xs text-emerald-700">Поднимает контейнер сервера</div>
+                            </button>
+                            <button onClick={() => handleControlGameServer(currentPanelServer.id, 'restart')} className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-left transition hover:bg-sky-100">
+                              <div className="text-sm font-semibold text-sky-800">Перезагрузить</div>
+                              <div className="mt-1 text-xs text-sky-700">Перезапуск без перехода в консоль</div>
+                            </button>
+                            <button onClick={() => setServerPanelTab('console')} className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-4 text-left transition hover:bg-indigo-100">
+                              <div className="text-sm font-semibold text-indigo-800">Открыть консоль</div>
+                              <div className="mt-1 text-xs text-indigo-700">Логи и команды сервера</div>
+                            </button>
+                            <button onClick={() => setServerPanelTab('files')} className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-left transition hover:bg-gray-100">
+                              <div className="text-sm font-semibold text-gray-900">Файлы сервера</div>
+                              <div className="mt-1 text-xs text-gray-600">Редактор и загрузка файлов</div>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-4 text-sm font-medium text-gray-900">Состояние доступа</div>
+                          <div className="space-y-3 text-sm text-gray-700">
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">Файлы</div>
+                              <div className="mt-1">Управление через вкладку `Файлы`</div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-gray-500">SFTP</div>
+                              <div className="mt-1">
+                                {sftpAccess[currentPanelServer.id]?.enabled
+                                  ? `${sftpAccess[currentPanelServer.id]?.host}:${sftpAccess[currentPanelServer.id]?.port}`
+                                  : 'Не включен'}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => setServerPanelTab('access')}
+                                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+                              >
+                                Открыть доступы
+                              </button>
+                              <button
+                                onClick={() => setServerPanelTab('settings')}
+                                className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 transition hover:bg-gray-200"
+                              >
+                                Изменить настройки
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {serverPanelTab === 'console' && (
-                    <div className="rounded-lg bg-gray-900 border border-gray-700 p-4">
-                      <div ref={consoleLogsRef} className="bg-black rounded p-4 h-96 overflow-y-auto font-mono text-sm text-green-400 mb-4 whitespace-pre-wrap border border-gray-700">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-inner">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-white">Консоль сервера</div>
+                          <div className="text-xs text-slate-400">Логи обновляются автоматически, пока открыта вкладка</div>
+                        </div>
+                        <button
+                          onClick={() => fetchConsoleLogs(currentPanelServer.id)}
+                          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800"
+                        >
+                          Обновить логи
+                        </button>
+                      </div>
+                      <div ref={consoleLogsRef} className="mb-4 h-96 overflow-y-auto whitespace-pre-wrap rounded border border-gray-700 bg-black p-4 font-mono text-sm text-green-400">
                         {consoleLogs || 'Нет логов для отображения'}
                       </div>
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          className="flex-1 bg-black text-gray-100 border border-gray-700 rounded p-2 font-mono text-sm focus:outline-none focus:border-indigo-500"
+                          className="flex-1 rounded border border-gray-700 bg-black p-2 font-mono text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
                           placeholder="Введите команду..."
                           value={consoleCommand}
                           onChange={e => setConsoleCommand(e.target.value)}
@@ -2190,7 +2816,7 @@ const ClientDashboard = () => {
                         />
                         <button
                           onClick={handleSendConsoleCommand}
-                          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm font-medium"
+                          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                         >
                           Отправить
                         </button>
@@ -2198,73 +2824,232 @@ const ClientDashboard = () => {
                     </div>
                   )}
 
+                  {serverPanelTab === 'players' && currentPanelServer && (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">Список игроков</div>
+                          <div className="text-xs text-gray-500">
+                            Всего онлайн: {playersList[currentPanelServer.id]?.online ?? playerCounts[currentPanelServer.id]?.online ?? 0}
+                            {' / '}
+                            {playersList[currentPanelServer.id]?.max ?? playerCounts[currentPanelServer.id]?.max ?? currentPanelServer.slots}
+                            {playersList[currentPanelServer.id]?.countOnly && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                Подробный список временно недоступен
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => fetchPlayersList(currentPanelServer.id)}
+                            disabled={playersListLoading[currentPanelServer.id]}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            {playersListLoading[currentPanelServer.id] ? 'Загрузка...' : 'Обновить'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                        {playersListLoading[currentPanelServer.id] && !playersList[currentPanelServer.id] ? (
+                          <div className="p-12 text-center text-gray-500">
+                            <Loader className="mx-auto h-8 w-8 animate-spin text-indigo-500" />
+                            <div className="mt-2 text-sm">Загрузка списка игроков...</div>
+                          </div>
+                        ) : !playersList[currentPanelServer.id]?.players?.length ? (
+                          <div className="p-12 text-center text-gray-500">
+                            <Users className="mx-auto h-10 w-10 text-gray-400" />
+                            <div className="mt-2 text-sm font-medium text-gray-700">На сервере нет игроков</div>
+                            <div className="mt-1 text-xs text-gray-500">Они появятся здесь сразу после подключения.</div>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">#</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Ник</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Время на сервере</th>
+                                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Ping</th>
+                                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Действия</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-100">
+                                {playersList[currentPanelServer.id].players.map((p, idx) => (
+                                  <tr key={p.name + idx} className="hover:bg-slate-50">
+                                    <td className="px-6 py-3 whitespace-nowrap text-xs font-medium text-gray-400">{idx + 1}</td>
+                                    <td className="px-6 py-3 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center text-xs font-bold">
+                                          {p.name.slice(0, 1).toUpperCase()}
+                                        </div>
+                                        <span className="font-semibold text-gray-900">{p.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-3 whitespace-nowrap text-sm font-semibold text-gray-800">
+                                      {typeof p.score === 'number' ? p.score : '—'}
+                                    </td>
+                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                                      {typeof p.durationSec === 'number'
+                                        ? `${Math.floor(p.durationSec / 3600)}ч ${Math.floor((p.durationSec % 3600) / 60)}м ${p.durationSec % 60}с`
+                                        : '—'}
+                                    </td>
+                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                                      {typeof (p as any).ping === 'number' ? `${(p as any).ping} мс` : '—'}
+                                    </td>
+                                    <td className="px-6 py-3 whitespace-nowrap text-right">
+                                      <div className="inline-flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            setKickModal({ open: true, serverId: currentPanelServer.id, name: p.name });
+                                            setKickReason('Нарушение правил');
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                                          title="Кикнуть игрока"
+                                        >
+                                          <UserMinus className="h-3.5 w-3.5" />
+                                          Кик
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setBanModal({ open: true, serverId: currentPanelServer.id, name: p.name });
+                                            setBanMinutes(60);
+                                            setBanReason('Нарушение правил');
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                                          title="Забанить игрока"
+                                        >
+                                          <Ban className="h-3.5 w-3.5" />
+                                          Бан
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {serverPanelTab === 'files' && currentFileServer && (
-                    <div className="h-[600px] flex flex-col">
+                    <div className="flex h-[600px] flex-col gap-4">
+                      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">Файловый менеджер</div>
+                            <div className="text-xs text-gray-500">
+                              Просмотр, загрузка и редактирование файлов сервера без выхода из панели
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-gray-600">
+                            Сервер: <span className="font-medium text-gray-900">{currentFileServer.name}</span>
+                          </div>
+                        </div>
+                      </div>
+
                       {editorContent !== null ? (
-                        <div className="flex-1 flex flex-col">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-mono text-sm text-gray-600">{editingFile}</span>
+                        <div className="flex flex-1 flex-col rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Редактор файла</div>
+                              <div className="font-mono text-xs text-gray-500">{editingFile}</div>
+                            </div>
                             <div className="flex gap-2">
-                              <button onClick={() => { setEditorContent(null); setEditingFile(null); }} className="px-3 py-1 border rounded text-sm">Закрыть</button>
-                              <button onClick={handleSaveFile} className="px-3 py-1 bg-indigo-600 text-white rounded text-sm">Сохранить</button>
+                              <button
+                                onClick={() => {
+                                  setEditorContent(null);
+                                  setEditingFile(null);
+                                }}
+                                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                Закрыть
+                              </button>
+                              <button
+                                onClick={handleSaveFile}
+                                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                              >
+                                Сохранить
+                              </button>
                             </div>
                           </div>
                           <textarea
-                            className="flex-1 w-full p-2 border rounded font-mono text-sm resize-none bg-gray-50"
+                            className="min-h-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-sm text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white"
                             value={editorContent}
                             onChange={e => setEditorContent(e.target.value)}
                           />
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col">
-                          <div className="flex items-center gap-2 mb-4 p-2 bg-gray-100 rounded">
-                            <button onClick={() => fetchFiles(currentFileServer.id, '/')} className="hover:text-indigo-600"><Home className="w-4 h-4" /></button>
-                            <span className="text-gray-400">/</span>
-                            <span className="font-mono text-sm text-gray-700">{currentPath === '/' ? '' : currentPath}</span>
-                            <div className="ml-auto flex items-center gap-4">
-                              <label className="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1 px-2 py-1 hover:bg-gray-200 rounded transition-colors">
-                                <Upload className="w-4 h-4" /> Загрузить
-                                <input type="file" className="hidden" onChange={handleFileUpload} />
-                              </label>
-                              {currentPath !== '/' && (
-                                <button onClick={() => {
+                        <div className="flex flex-1 flex-col rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 p-3">
+                            <button
+                              onClick={() => fetchFiles(currentFileServer.id, '/')}
+                              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:text-indigo-600"
+                            >
+                              <Home className="h-4 w-4" />
+                            </button>
+                            <div className="min-w-0 flex-1 rounded-xl bg-white px-3 py-2 font-mono text-sm text-gray-700">
+                              /{currentPath === '/' ? '' : currentPath.replace(/^\//, '')}
+                            </div>
+                            <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100">
+                              <Upload className="h-4 w-4" />
+                              Загрузить файл
+                              <input type="file" className="hidden" onChange={handleFileUpload} />
+                            </label>
+                            {currentPath !== '/' && (
+                              <button
+                                onClick={() => {
                                   const parts = currentPath.split('/').filter(Boolean);
                                   parts.pop();
                                   const newPath = parts.length > 0 ? '/' + parts.join('/') : '/';
                                   fetchFiles(currentFileServer.id, newPath);
-                                }} className="text-sm text-gray-600 hover:text-gray-900">.. Наверх</button>
-                              )}
-                            </div>
+                                }}
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                На уровень выше
+                              </button>
+                            )}
                           </div>
 
-                          <div className="flex-1 overflow-y-auto border rounded">
+                          <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200">
                             <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
+                              <thead className="bg-slate-50">
                                 <tr>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Имя</th>
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Размер / Действия</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Имя</th>
+                                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Размер / действия</th>
                                 </tr>
                               </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
+                              <tbody className="divide-y divide-gray-100 bg-white">
                                 {serverFiles.map((file, idx) => (
-                                  <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => {
-                                    const newPath = (currentPath === '/' ? '' : currentPath) + '/' + file.name;
-                                    if (file.isDirectory || file.isDir) fetchFiles(currentFileServer.id, newPath);
-                                    else fetchFileContent(currentFileServer.id, newPath);
-                                  }}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 flex items-center gap-2">
-                                      {(file.isDirectory || file.isDir) ? <Folder className="w-4 h-4 text-yellow-500" /> : <FileText className="w-4 h-4 text-gray-400" />}
-                                      {file.name}
+                                  <tr
+                                    key={idx}
+                                    className="cursor-pointer transition hover:bg-slate-50"
+                                    onClick={() => {
+                                      const newPath = (currentPath === '/' ? '' : currentPath) + '/' + file.name;
+                                      if (file.isDirectory || file.isDir) fetchFiles(currentFileServer.id, newPath);
+                                      else fetchFileContent(currentFileServer.id, newPath);
+                                    }}
+                                  >
+                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`rounded-xl p-2 ${(file.isDirectory || file.isDir) ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                                          {(file.isDirectory || file.isDir) ? <Folder className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                        </div>
+                                        <div className="font-medium">{file.name}</div>
+                                      </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                                    <td className="px-6 py-4 text-right text-sm text-gray-500">
                                       <div className="flex items-center justify-end gap-4">
                                         <span>{(file.isDirectory || file.isDir) ? '-' : (file.size / 1024).toFixed(1) + ' KB'}</span>
                                         <button
                                           onClick={(e) => handleDeleteFile(file.name, e)}
-                                          className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                          className="rounded-lg p-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                                           title="Удалить"
                                         >
-                                          <Trash className="w-4 h-4" />
+                                          <Trash className="h-4 w-4" />
                                         </button>
                                       </div>
                                     </td>
@@ -2272,7 +3057,9 @@ const ClientDashboard = () => {
                                 ))}
                                 {serverFiles.length === 0 && (
                                   <tr>
-                                    <td colSpan={2} className="px-6 py-4 text-center text-sm text-gray-500">Нет файлов</td>
+                                    <td colSpan={2} className="px-6 py-10 text-center text-sm text-gray-500">
+                                      В этой папке пока нет файлов
+                                    </td>
                                   </tr>
                                 )}
                               </tbody>
@@ -2285,150 +3072,347 @@ const ClientDashboard = () => {
 
                   {serverPanelTab === 'settings' && currentSettingsServer && (
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Описание (MOTD)</label>
-                        <input type="text" className="w-full p-2 border rounded" value={serverSettings.motd || serverSettings.hostname || ''} onChange={e => setServerSettings({ ...serverSettings, motd: e.target.value, hostname: e.target.value })} />
+                      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">Настройки сервера</div>
+                            <div className="text-xs text-gray-500">
+                              Изменения применяются через конфигурацию игры и сохраняются на сервере
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-gray-600">
+                            Игра: <span className="font-medium text-gray-900">{formatGameLabel(currentSettingsServer.game)}</span>
+                          </div>
+                        </div>
                       </div>
 
-                      {currentSettingsServer.game === 'minecraft' && (
-                        <>
+                      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700">Режим игры</label>
-                            <select className="w-full p-2 border rounded" value={serverSettings.gamemode || 'survival'} onChange={e => setServerSettings({ ...serverSettings, gamemode: e.target.value })}>
-                              <option value="survival">Выживание</option>
-                              <option value="creative">Творческий</option>
-                              <option value="adventure">Приключение</option>
-                              <option value="spectator">Наблюдатель</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Сложность</label>
-                            <select className="w-full p-2 border rounded" value={serverSettings.difficulty || 'easy'} onChange={e => setServerSettings({ ...serverSettings, difficulty: e.target.value })}>
-                              <option value="peaceful">Мирная</option>
-                              <option value="easy">Легкая</option>
-                              <option value="normal">Нормальная</option>
-                              <option value="hard">Сложная</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Ядро (Требуется переустановка)</label>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Описание (MOTD)</label>
                             <input
-                              list="core-options-panel"
-                              className="w-full p-2 border rounded"
-                              value={serverSettings.core || 'vanilla'}
-                              onChange={e => setServerSettings({ ...serverSettings, core: e.target.value })}
-                              placeholder="Выберите или введите название ядра"
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                              value={serverSettings.motd || serverSettings.hostname || ''}
+                              onChange={e => setServerSettings({ ...serverSettings, motd: e.target.value, hostname: e.target.value })}
                             />
-                            <datalist id="core-options-panel">
-                              <option value="vanilla">Vanilla (Стандартное)</option>
-                              <option value="paper">Paper (Оптимизированное)</option>
-                              <option value="spigot">Spigot</option>
-                              <option value="forge">Forge (Моды)</option>
-                              <option value="fabric">Fabric (Моды)</option>
-                              <option value="velocity">Velocity</option>
-                              <option value="purpur">Purpur</option>
-                            </datalist>
                           </div>
-                          <div className="flex flex-col gap-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={serverSettings.pvp === 'true'} onChange={e => setServerSettings({ ...serverSettings, pvp: e.target.checked ? 'true' : 'false' })} />
-                              <span className="text-sm font-medium text-gray-700">PvP (Бой между игроками)</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={serverSettings['online-mode'] === 'true'} onChange={e => setServerSettings({ ...serverSettings, 'online-mode': e.target.checked ? 'true' : 'false' })} />
-                              <span className="text-sm font-medium text-gray-700">Лицензия (Online Mode)</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={serverSettings['white-list'] === 'true'} onChange={e => setServerSettings({ ...serverSettings, 'white-list': e.target.checked ? 'true' : 'false' })} />
-                              <span className="text-sm font-medium text-gray-700">White List (Белый список)</span>
-                            </label>
-                          </div>
-                        </>
-                      )}
 
-                      {(currentSettingsServer.game === 'cs2' || currentSettingsServer.game === 'cs16') && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">RCON Пароль</label>
-                            <input
-                              type="text"
-                              className="w-full p-2 border rounded"
-                              value={serverSettings.rcon_password || ''}
-                              onChange={e => setServerSettings({ ...serverSettings, rcon_password: e.target.value })}
-                              placeholder="Пароль для управления сервером"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Карта при запуске</label>
-                            <input
-                              type="text"
-                              className="w-full p-2 border rounded"
-                              value={serverSettings.map || 'de_dust2'}
-                              onChange={e => setServerSettings({ ...serverSettings, map: e.target.value })}
-                              placeholder="de_dust2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Пароль на сервер (sv_password)</label>
-                            <input
-                              type="text"
-                              className="w-full p-2 border rounded"
-                              value={serverSettings.sv_password || ''}
-                              onChange={e => setServerSettings({ ...serverSettings, sv_password: e.target.value })}
-                              placeholder="Оставьте пустым для публичного входа"
-                            />
-                          </div>
-                        </>
-                      )}
+                          {currentSettingsServer.game === 'minecraft' && (
+                            <>
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                  <label className="mb-2 block text-sm font-medium text-gray-700">Режим игры</label>
+                                  <select
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                    value={serverSettings.gamemode || 'survival'}
+                                    onChange={e => setServerSettings({ ...serverSettings, gamemode: e.target.value })}
+                                  >
+                                    <option value="survival">Выживание</option>
+                                    <option value="creative">Творческий</option>
+                                    <option value="adventure">Приключение</option>
+                                    <option value="spectator">Наблюдатель</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="mb-2 block text-sm font-medium text-gray-700">Сложность</label>
+                                  <select
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                    value={serverSettings.difficulty || 'easy'}
+                                    onChange={e => setServerSettings({ ...serverSettings, difficulty: e.target.value })}
+                                  >
+                                    <option value="peaceful">Мирная</option>
+                                    <option value="easy">Легкая</option>
+                                    <option value="normal">Нормальная</option>
+                                    <option value="hard">Сложная</option>
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">Ядро</label>
+                                <input
+                                  list="core-options-panel"
+                                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                  value={serverSettings.core || 'vanilla'}
+                                  onChange={e => setServerSettings({ ...serverSettings, core: e.target.value })}
+                                  placeholder="Выберите или введите название ядра"
+                                />
+                                <div className="mt-2 text-xs text-amber-600">Смена ядра может потребовать переустановку сервера.</div>
+                                <datalist id="core-options-panel">
+                                  <option value="vanilla">Vanilla (Стандартное)</option>
+                                  <option value="paper">Paper (Оптимизированное)</option>
+                                  <option value="spigot">Spigot</option>
+                                  <option value="forge">Forge (Моды)</option>
+                                  <option value="fabric">Fabric (Моды)</option>
+                                  <option value="velocity">Velocity</option>
+                                  <option value="purpur">Purpur</option>
+                                </datalist>
+                              </div>
+                              <div className="grid gap-3">
+                                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={serverSettings.pvp === 'true'}
+                                    onChange={e => setServerSettings({ ...serverSettings, pvp: e.target.checked ? 'true' : 'false' })}
+                                  />
+                                  <span className="text-sm font-medium text-gray-700">PvP включен</span>
+                                </label>
+                                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={serverSettings['online-mode'] === 'true'}
+                                    onChange={e => setServerSettings({ ...serverSettings, 'online-mode': e.target.checked ? 'true' : 'false' })}
+                                  />
+                                  <span className="text-sm font-medium text-gray-700">Лицензионный режим (Online Mode)</span>
+                                </label>
+                                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={serverSettings['white-list'] === 'true'}
+                                    onChange={e => setServerSettings({ ...serverSettings, 'white-list': e.target.checked ? 'true' : 'false' })}
+                                  />
+                                  <span className="text-sm font-medium text-gray-700">Белый список</span>
+                                </label>
+                              </div>
+                            </>
+                          )}
 
-                      <div className="flex justify-end gap-2 pt-2">
-                        <button onClick={handleUpdateSettings} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Сохранить</button>
+                          {(currentSettingsServer.game === 'cs2' || currentSettingsServer.game === 'cs16') && (
+                            <div className="grid gap-4">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">RCON пароль</label>
+                                <input
+                                  type="text"
+                                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                  value={serverSettings.rcon_password || ''}
+                                  onChange={e => setServerSettings({ ...serverSettings, rcon_password: e.target.value })}
+                                  placeholder="Пароль для управления сервером"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">Карта при запуске</label>
+                                <input
+                                  type="text"
+                                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                  value={serverSettings.map || 'de_dust2'}
+                                  onChange={e => setServerSettings({ ...serverSettings, map: e.target.value })}
+                                  placeholder="de_dust2"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">Пароль на сервер</label>
+                                <input
+                                  type="text"
+                                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-300 focus:bg-white"
+                                  value={serverSettings.sv_password || ''}
+                                  onChange={e => setServerSettings({ ...serverSettings, sv_password: e.target.value })}
+                                  placeholder="Оставьте пустым для публичного входа"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                            <div className="mb-3 text-sm font-medium text-gray-900">Что можно изменить</div>
+                            <div className="space-y-3 text-sm text-gray-600">
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">Описание сервера и основные игровые параметры</div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">Ядро и режим запуска для Minecraft</div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">RCON, карту и пароль для Counter-Strike</div>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+                            <div className="text-sm font-medium text-indigo-900">Применение настроек</div>
+                            <div className="mt-2 text-sm text-indigo-700">
+                              После сохранения часть параметров может вступить в силу только после перезапуска сервера.
+                            </div>
+                            <button
+                              onClick={handleUpdateSettings}
+                              className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-indigo-700"
+                            >
+                              Сохранить настройки
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
 
                   {serverPanelTab === 'access' && (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-gray-900 text-gray-100 rounded text-sm font-mono">
-                        <p>IP: {nodes.find(n => n.id === currentPanelServer.node?.id || (currentPanelServer.node as any)?.id === n.id)?.ip}:{currentPanelServer.port}</p>
-                      </div>
-                      <div className="p-4 bg-gray-50 border rounded">
-                        <div className="text-sm text-gray-700">
-                          <div className="font-medium text-gray-900 mb-2">Доступ к файлам</div>
-                          <div>Используйте вкладку "Файлы" в панели.</div>
-                          <div className="font-medium text-gray-900 mt-4 mb-2">Доступ (FTP/SFTP)</div>
-                          {sftpAccess[currentPanelServer.id]?.enabled ? (
-                            <>
-                              <div>SFTP Host: {sftpAccess[currentPanelServer.id]?.host}</div>
-                              <div>SFTP Port: {sftpAccess[currentPanelServer.id]?.port}</div>
-                              <div>User: {sftpAccess[currentPanelServer.id]?.username}</div>
-                              <div>Pass: {sftpAccess[currentPanelServer.id]?.password}</div>
-                              <div>Path: {sftpAccess[currentPanelServer.id]?.path || '/files'}</div>
-                              <div className="mt-3 flex gap-2">
-                                <button
-                                  onClick={() => handleDisableSftp(currentPanelServer.id)}
-                                  disabled={Boolean(sftpLoading[currentPanelServer.id])}
-                                  className="px-4 py-2 bg-gray-800 text-white rounded text-sm hover:bg-gray-700 disabled:opacity-50"
-                                >
-                                  Отключить SFTP
-                                </button>
+                    <div className="space-y-4">
+                      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm">
+                          <div className="mb-4 flex items-center gap-3">
+                            <div className="rounded-xl bg-white/10 p-3 text-indigo-200">
+                              <Server className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">Данные подключения</div>
+                              <div className="text-xs text-slate-400">Используйте эти данные для прямого доступа к серверу</div>
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-slate-400">IP и порт</div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <div className="font-mono text-sm text-white">
+                                  {getServerNode(currentPanelServer)?.ip || 'не назначен'}:{currentPanelServer.port}
+                                </div>
+                                {getServerNode(currentPanelServer)?.ip && (
+                                  <button
+                                    onClick={() => copyToClipboard(`${getServerNode(currentPanelServer)?.ip}:${currentPanelServer.port}`, 'IP сервера')}
+                                    className="rounded-lg p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+                                    title="Скопировать IP"
+                                  >
+                                    {copiedValue === 'IP сервера' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                )}
                               </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-xs text-gray-500">Нажмите кнопку, чтобы включить SFTP-доступ к /data вашего сервера.</div>
-                              <div className="mt-3 flex gap-2">
-                                <button
-                                  onClick={() => handleEnableSftp(currentPanelServer.id)}
-                                  disabled={Boolean(sftpLoading[currentPanelServer.id])}
-                                  className="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                  Включить SFTP
-                                </button>
-                              </div>
-                            </>
-                          )}
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-slate-400">Узел</div>
+                              <div className="mt-1 text-sm text-white">{getServerNode(currentPanelServer)?.name || 'Не указан'}</div>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-slate-400">Игра</div>
+                              <div className="mt-1 text-sm text-white">{formatGameLabel(currentPanelServer.game)}</div>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wide text-slate-400">Файлы</div>
+                              <div className="mt-1 text-sm text-white">Через панель или SFTP</div>
+                            </div>
+                          </div>
                         </div>
+
+                        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <div className="mb-3 text-sm font-medium text-gray-900">Рекомендации по доступу</div>
+                          <div className="space-y-3 text-sm text-gray-600">
+                            <div className="rounded-xl bg-slate-50 px-4 py-3">Для быстрого редактирования конфигов используйте вкладку `Файлы`.</div>
+                            <div className="rounded-xl bg-slate-50 px-4 py-3">SFTP удобно подключать для крупных сборок, карт и модов.</div>
+                            <div className="rounded-xl bg-slate-50 px-4 py-3">После загрузки файлов при необходимости перезапустите сервер из верхней панели.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">SFTP-доступ</div>
+                            <div className="text-xs text-gray-500">Внешнее подключение к каталогу данных сервера</div>
+                          </div>
+                          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${sftpAccess[currentPanelServer.id]?.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {sftpAccess[currentPanelServer.id]?.enabled ? 'Активен' : 'Выключен'}
+                          </div>
+                        </div>
+
+                        {sftpAccess[currentPanelServer.id]?.enabled ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Host</div>
+                                <div className="mt-1 flex items-start justify-between gap-2">
+                                  <div className="break-all font-mono text-sm text-gray-900">{sftpAccess[currentPanelServer.id]?.host}</div>
+                                  <button
+                                    onClick={() => copyToClipboard(sftpAccess[currentPanelServer.id]?.host || '', 'SFTP host')}
+                                    className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                    title="Скопировать host"
+                                  >
+                                    {copiedValue === 'SFTP host' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Port</div>
+                                <div className="mt-1 flex items-start justify-between gap-2">
+                                  <div className="font-mono text-sm text-gray-900">{sftpAccess[currentPanelServer.id]?.port}</div>
+                                  <button
+                                    onClick={() => copyToClipboard(String(sftpAccess[currentPanelServer.id]?.port || ''), 'SFTP port')}
+                                    className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                    title="Скопировать port"
+                                  >
+                                    {copiedValue === 'SFTP port' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">User</div>
+                                <div className="mt-1 flex items-start justify-between gap-2">
+                                  <div className="break-all font-mono text-sm text-gray-900">{sftpAccess[currentPanelServer.id]?.username}</div>
+                                  <button
+                                    onClick={() => copyToClipboard(sftpAccess[currentPanelServer.id]?.username || '', 'SFTP user')}
+                                    className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                    title="Скопировать user"
+                                  >
+                                    {copiedValue === 'SFTP user' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Pass</div>
+                                <div className="mt-1 flex items-start justify-between gap-2">
+                                  <div className="break-all font-mono text-sm text-gray-900">{sftpAccess[currentPanelServer.id]?.password}</div>
+                                  <button
+                                    onClick={() => copyToClipboard(sftpAccess[currentPanelServer.id]?.password || '', 'SFTP пароль')}
+                                    className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                    title="Скопировать пароль"
+                                  >
+                                    {copiedValue === 'SFTP пароль' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <div className="text-xs uppercase tracking-wide text-gray-500">Path</div>
+                                <div className="mt-1 flex items-start justify-between gap-2">
+                                  <div className="break-all font-mono text-sm text-gray-900">{sftpAccess[currentPanelServer.id]?.path || '/files'}</div>
+                                  <button
+                                    onClick={() => copyToClipboard(sftpAccess[currentPanelServer.id]?.path || '/files', 'SFTP путь')}
+                                    className="rounded-lg p-1 text-gray-400 transition hover:bg-white hover:text-indigo-600"
+                                    title="Скопировать путь"
+                                  >
+                                    {copiedValue === 'SFTP путь' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleDisableSftp(currentPanelServer.id)}
+                                disabled={Boolean(sftpLoading[currentPanelServer.id])}
+                                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Отключить SFTP
+                              </button>
+                              <button
+                                onClick={() => setServerPanelTab('files')}
+                                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                Открыть файлы
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+                            <div className="text-sm text-gray-700">
+                              Включите SFTP, чтобы получить внешний доступ к `/data` вашего сервера через любой SFTP-клиент.
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleEnableSftp(currentPanelServer.id)}
+                                disabled={Boolean(sftpLoading[currentPanelServer.id])}
+                                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Включить SFTP
+                              </button>
+                              <button
+                                onClick={() => setServerPanelTab('files')}
+                                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                Перейти в файлы
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2526,6 +3510,274 @@ const ClientDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setIsConfirmCancelOpen(false)}
+                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Confirm Pay Modal */}
+        {confirmPayOpen && invoiceToPay && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity"
+                aria-hidden="true"
+                onClick={() => { setConfirmPayOpen(false); setInvoiceToPay(null); }}
+              >
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <CreditCard className="h-6 w-6 text-indigo-600" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg font-medium leading-6 text-gray-900">
+                        Оплата счета №{invoiceToPay.slice(0, 8)}
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Вы будете перенаправлены на страницу безопасной оплаты. После успешной оплаты сервис будет автоматически активирован или продлен.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    onClick={executePayInvoice}
+                    className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Оплатить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmPayOpen(false); setInvoiceToPay(null); }}
+                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kick Player Modal */}
+        {kickModal.open && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity"
+                aria-hidden="true"
+                onClick={() => setKickModal({ open: false, serverId: '', name: '' })}
+              >
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-orange-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <UserMinus className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg font-medium leading-6 text-gray-900">
+                        Кикнуть игрока {kickModal.name}
+                      </h3>
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm text-gray-500">
+                          Игрок будет немедленно отключен от сервера. Укажите причину (отображается игроку).
+                        </p>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Причина кика</label>
+                          <textarea
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            rows={3}
+                            value={kickReason}
+                            onChange={(e) => setKickReason(e.target.value)}
+                            placeholder="Нарушение правил..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    onClick={handleKickPlayer}
+                    className="inline-flex w-full justify-center rounded-md border border-transparent bg-orange-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Кикнуть
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKickModal({ open: false, serverId: '', name: '' })}
+                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ban Player Modal */}
+        {banModal.open && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity"
+                aria-hidden="true"
+                onClick={() => setBanModal({ open: false, serverId: '', name: '' })}
+              >
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <Ban className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg font-medium leading-6 text-gray-900">
+                        Забанить игрока {banModal.name}
+                      </h3>
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm text-gray-500">
+                          Игрок будет отключен и не сможет подключиться до окончания бана.
+                        </p>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Длительность бана (минут)</label>
+                          <input
+                            type="number"
+                            step={10}
+                            min={1}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            value={banMinutes}
+                            onChange={(e) => setBanMinutes(Math.max(1, Number(e.target.value) || 1))}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            0 = перманентный бан (если поддерживается игрой)
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Причина бана</label>
+                          <textarea
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            rows={3}
+                            value={banReason}
+                            onChange={(e) => setBanReason(e.target.value)}
+                            placeholder="Нарушение правил..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    onClick={handleBanPlayer}
+                    className="inline-flex w-full justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Забанить на {banMinutes} мин
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBanModal({ open: false, serverId: '', name: '' })}
+                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Support Ticket Modal */}
+        {isNewTicketOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity"
+                aria-hidden="true"
+                onClick={() => setIsNewTicketOpen(false)}
+              >
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium leading-6 text-gray-900">Новое обращение в поддержку</h3>
+                    <button onClick={() => setIsNewTicketOpen(false)} className="text-gray-500 hover:text-gray-700">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Тема обращения</label>
+                      <input
+                        type="text"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Не работает сервер..."
+                        value={ticketTopic}
+                        onChange={(e) => setTicketTopic(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Связанный сервер (необязательно)</label>
+                      <select
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        value={ticketServerId}
+                        onChange={(e) => setTicketServerId(e.target.value)}
+                      >
+                        <option value="">Без привязки к серверу</option>
+                        {gameServers.map((gs) => (
+                          <option key={gs.id} value={gs.id}>
+                            {gs.name} — {gs.game} [{gs.status}]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Сообщение</label>
+                      <textarea
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        rows={5}
+                        placeholder="Опишите вашу проблему или вопрос..."
+                        value={ticketMessage}
+                        onChange={(e) => setTicketMessage(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    onClick={handleSubmitNewTicket}
+                    disabled={sendingTicket || !ticketTopic.trim() || !ticketMessage.trim()}
+                    className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingTicket ? 'Отправка...' : 'Отправить обращение'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewTicketOpen(false)}
                     className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Отмена

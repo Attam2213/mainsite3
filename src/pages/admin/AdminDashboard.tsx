@@ -3,14 +3,11 @@ import Layout from '../../components/Layout';
 import { motion } from 'framer-motion';
 import { 
   Users, 
-  Briefcase, 
-  TrendingUp, 
   FileText,
   Plus,
   Trash2,
   Edit2,
   X,
-  Image as ImageIcon,
   CreditCard,
   CheckCircle,
   Send,
@@ -18,8 +15,14 @@ import {
   Server,
   Terminal,
   RefreshCw,
-  MessageCircle,
-  Settings
+  Settings,
+  Zap,
+  Clock,
+  Globe,
+  Search,
+  UserCog,
+  ChevronDown,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface ServerNode {
@@ -74,6 +77,7 @@ interface HostingNode {
   sshUser?: string;
   sshPassword?: string;
   totalRam: number;
+  usedRam?: number;
   supportedGames?: string[];
   slotPrice?: number;
   slotPrices?: Record<string, number>;
@@ -86,11 +90,15 @@ interface GameServerItem {
   game: string;
   port: number;
   ram?: number;
+  slots?: number;
+  monthlyPrice?: number;
+  paidUntil?: string;
   status: string;
   userId: string;
   nodeId: string;
   user?: User;
   node?: HostingNode;
+  createdAt?: string;
 }
 
 interface User {
@@ -98,6 +106,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  createdAt?: string;
 }
 
 interface Invoice {
@@ -109,6 +118,9 @@ interface Invoice {
   dueDate: string;
   userId: string;
   serviceId?: string;
+  periodMonths?: number;
+  gameServerId?: string | null;
+  createdAt?: string;
   user?: User;
   service?: Service;
 }
@@ -177,6 +189,31 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [servers, setServers] = useState<ServerNode[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Game Servers: Filters + Mass Selection
+  const [selectedGameServerIds, setSelectedGameServerIds] = useState<Set<string>>(new Set());
+  const [gsStatusFilter, setGsStatusFilter] = useState<string>('all');
+  const [gsGameFilter, setGsGameFilter] = useState<string>('all');
+  const [gsNodeFilter, setGsNodeFilter] = useState<string>('all');
+  const [gsSearch, setGsSearch] = useState('');
+  const [massActionMenuOpen, setMassActionMenuOpen] = useState(false);
+  const [massActionLoading, setMassActionLoading] = useState(false);
+
+  // Manual Invoice Modal
+  const [isManualInvoiceOpen, setIsManualInvoiceOpen] = useState(false);
+  const [manualInvoice, setManualInvoice] = useState<{
+    userId: string;
+    title: string;
+    amount: number;
+    periodMonths: number;
+    gameServerId: string | undefined;
+  }>({
+    userId: '',
+    title: 'Пополнение баланса / Услуги',
+    amount: 100,
+    periodMonths: 1,
+    gameServerId: undefined,
+  });
 
   // Chat State
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -696,10 +733,15 @@ const AdminDashboard = () => {
   const handleSaveGameServer = async () => {
     try {
         const token = localStorage.getItem('token');
+        const safePayload = {
+          ram: 1024,
+          slots: 10,
+          ...currentGameServer,
+        };
         const res = await fetch('/api/game-servers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(currentGameServer)
+            body: JSON.stringify(safePayload)
         });
         if (res.ok) {
             setIsGameServerModalOpen(false);
@@ -727,14 +769,202 @@ const AdminDashboard = () => {
       }
   };
 
+  // =============== GAME SERVERS FILTERS & SELECTION ===============
+  const filteredGameServers = gameServers.filter(gs => {
+    if (gsSearch.trim()) {
+      const q = gsSearch.toLowerCase();
+      const hay = `${gs.name} ${gs.game} ${gs.id} ${gs.userId} ${gs.port} ${gs.user?.name || ''} ${gs.user?.email || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (gsStatusFilter !== 'all' && gs.status !== gsStatusFilter) return false;
+    if (gsGameFilter !== 'all' && gs.game !== gsGameFilter) return false;
+    if (gsNodeFilter !== 'all' && gs.nodeId !== gsNodeFilter) return false;
+    return true;
+  });
+
+  const toggleGameServerSelection = (id: string) => {
+    setSelectedGameServerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearGameServerSelection = () => setSelectedGameServerIds(new Set());
+
+  const handleMassAction = async (
+    action: 'start' | 'stop' | 'restart' | 'extend_1' | 'delete'
+  ) => {
+    const ids = Array.from(selectedGameServerIds);
+    if (ids.length === 0) {
+      alert('Не выбрано ни одного сервера');
+      return;
+    }
+    if (!confirm(`Применить «${action}» к ${ids.length} серверам?`)) return;
+
+    try {
+      setMassActionLoading(true);
+      setMassActionMenuOpen(false);
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const chunk of chunks) {
+        const tasks = chunk.map(async (id) => {
+          try {
+            if (action === 'delete') {
+              const r = await fetch(`/api/game-servers/${id}`, { method: 'DELETE', headers });
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+            } else if (action === 'extend_1') {
+              const r = await fetch(`/api/game-servers/${id}/subscription`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ months: 1 })
+              });
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+            } else {
+              const r = await fetch(`/api/game-servers/${id}/control`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ action })
+              });
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+            }
+            return true;
+          } catch (e) {
+            console.error(`Failed ${action} on ${id}:`, e);
+            return false;
+          }
+        });
+        const results = await Promise.allSettled(tasks);
+        results.forEach(r => {
+          if (r.status === 'fulfilled' && r.value === true) succeeded++;
+          else failed++;
+        });
+      }
+
+      clearGameServerSelection();
+      alert(`Массовая операция завершена: успешно ${succeeded}, ошибок ${failed}`);
+      fetchData();
+    } catch (e) {
+      console.error('Mass action failed:', e);
+      alert('Ошибка массовой операции');
+    } finally {
+      setMassActionLoading(false);
+    }
+  };
+
+  // =============== USERS ROLE ===============
+  const handlePromoteUser = async (userId: string) => {
+    if (!confirm('Назначить пользователя администратором?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ role: 'admin' })
+      });
+      if (res.ok) fetchData();
+      else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка назначения прав');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка соединения');
+    }
+  };
+
+  const handleDemoteUser = async (userId: string) => {
+    if (!confirm('Снять права администратора?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ role: 'client' })
+      });
+      if (res.ok) fetchData();
+      else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка снятия прав');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка соединения');
+    }
+  };
+
+  // =============== MANUAL INVOICE ===============
+  const openManualInvoiceModal = (userId = '') => {
+    setManualInvoice({
+      userId: userId || (users[0]?.id || ''),
+      title: 'Оплата услуг',
+      amount: 500,
+      periodMonths: 1,
+      gameServerId: undefined,
+    });
+    setIsManualInvoiceOpen(true);
+  };
+
+  const handleSubmitManualInvoice = async () => {
+    if (!manualInvoice.userId) return alert('Выберите клиента');
+    if (!manualInvoice.title.trim()) return alert('Заполните название');
+    const amount = Number(manualInvoice.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return alert('Неверная сумма');
+    const periodMonths = Math.max(1, Number(manualInvoice.periodMonths) || 1);
+
+    try {
+      setMassActionLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/invoices/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: manualInvoice.userId,
+          title: manualInvoice.title.trim(),
+          amount,
+          periodMonths,
+          gameServerId: manualInvoice.gameServerId || undefined,
+        })
+      });
+
+      if (res.ok) {
+        const inv = await res.json().catch(() => ({}));
+        setIsManualInvoiceOpen(false);
+        fetchData();
+        alert(`Счет создан: #${inv.id?.slice(0, 8) || ''} на ${amount} ₽`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка создания счета');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка соединения');
+    } finally {
+      setMassActionLoading(false);
+    }
+  };
+
+  const gameServersRunning = gameServers.filter(gs => gs.status === 'running').length;
+  const gameServersSuspended = gameServers.filter(gs => gs.status === 'suspended').length;
+  const revenue30d = invoices
+    .filter((inv: any) => inv.status === 'paid' && inv.createdAt && new Date(inv.createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+    .reduce((sum: number, inv: any) => sum + (Number(inv.amount) || 0), 0);
+
   const stats = [
-    { title: 'Активные услуги', value: services.length, icon: Briefcase, color: 'bg-blue-500' },
-    { title: 'Работы в портфолио', value: portfolioItems.length, icon: ImageIcon, color: 'bg-purple-500' },
-    { title: 'Пользователи', value: users.length, icon: Users, color: 'bg-green-500' },
-    { title: 'Заказы', value: orders.length, icon: CheckCircle, color: 'bg-indigo-500' },
-    { title: 'Выставлено счетов', value: invoices.length, icon: FileText, color: 'bg-yellow-500' },
-    { title: 'Активные проекты', value: projects.length, icon: TrendingUp, color: 'bg-red-500' },
-    { title: 'Новые сообщения', value: feedbacks.filter(f => f.status === 'new').length, icon: MessageCircle, color: 'bg-pink-500' },
+    { title: 'Игровых серверов', value: gameServers.length, icon: Server, color: 'bg-indigo-500' },
+    { title: 'Активных (RUNNING)', value: gameServersRunning, icon: Zap, color: 'bg-emerald-500' },
+    { title: 'Приостановлено', value: gameServersSuspended, icon: Clock, color: 'bg-amber-500' },
+    { title: 'Нод (локаций)', value: hostingNodes.length, icon: Globe, color: 'bg-blue-500' },
+    { title: 'Пользователей', value: users.length, icon: Users, color: 'bg-green-500' },
+    { title: 'Счетов всего', value: invoices.length, icon: FileText, color: 'bg-purple-500' },
+    { title: 'Доход за 30 дней', value: `${revenue30d} ₽`, icon: CreditCard, color: 'bg-pink-500' },
   ];
 
   if (loading) {
@@ -765,16 +995,13 @@ const AdminDashboard = () => {
             <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {[
                 { id: 'dashboard', label: 'Обзор' },
-                { id: 'services', label: 'Услуги' },
-                { id: 'portfolio', label: 'Портфолио' },
-                { id: 'orders', label: 'Заказы' },
-                { id: 'discussions', label: 'Обсуждения' },
                 { id: 'users', label: 'Пользователи' },
                 { id: 'invoices', label: 'Счета' },
-                { id: 'projects', label: 'Проекты' },
+                { id: 'hosting_nodes', label: 'Ноды (локации)' },
+                { id: 'game_servers', label: 'Игровые серверы' },
+                { id: 'orders', label: 'Заказы (услуги)' },
+                { id: 'discussions', label: 'Обсуждения' },
                 { id: 'feedback', label: 'Обратная связь' },
-                { id: 'hosting_nodes', label: 'Локации (VDS)' },
-                { id: 'game_servers', label: 'Игровые серверы' }
               ].map((tab) => {
                 let badgeCount = 0;
                 let badgeColor = 'bg-red-500';
@@ -812,26 +1039,182 @@ const AdminDashboard = () => {
 
           {/* Content */}
           {activeTab === 'dashboard' && (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100"
-                >
-                  <div className="flex items-center">
-                    <div className={`rounded-lg ${stat.color} p-3 text-white`}>
-                      <stat.icon className="h-6 w-6" />
+            <div className="space-y-8">
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {stats.map((stat, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100"
+                  >
+                    <div className="flex items-center">
+                      <div className={`rounded-lg ${stat.color} p-3 text-white`}>
+                        <stat.icon className="h-6 w-6" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-500">{stat.title}</p>
+                        <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                      </div>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                      <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Last 5 Game Servers */}
+                <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Последние игровые серверы</h3>
+                      <p className="text-sm text-gray-500">Контроль статуса и быстрые действия</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('game_servers')}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      Все серверы →
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase text-gray-500">
+                          <th className="px-2 py-2">Название</th>
+                          <th className="px-2 py-2">Игра</th>
+                          <th className="px-2 py-2">Статус</th>
+                          <th className="px-2 py-2">Клиент</th>
+                          <th className="px-2 py-2 text-right">Управление</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {gameServers.slice(0, 5).map((gs) => (
+                          <tr key={gs.id} className="hover:bg-gray-50">
+                            <td className="px-2 py-3 font-medium text-gray-900">{gs.name}</td>
+                            <td className="px-2 py-3 text-gray-600">{gs.game}</td>
+                            <td className="px-2 py-3">
+                              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                gs.status === 'running' ? 'bg-green-100 text-green-800'
+                                : gs.status === 'pending_payment' || gs.status === 'suspended' ? 'bg-amber-100 text-amber-800'
+                                : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {gs.status}
+                              </span>
+                            </td>
+                            <td className="px-2 py-3 text-gray-600 truncate max-w-[140px]">
+                              {gs.user?.name || gs.userId.slice(0, 8)}
+                            </td>
+                            <td className="px-2 py-3 text-right space-x-1 whitespace-nowrap">
+                              <button onClick={() => handleControlGameServer(gs.id, 'start')} className="text-green-600 hover:text-green-900 px-2 py-1 text-xs">Start</button>
+                              <button onClick={() => handleControlGameServer(gs.id, 'restart')} className="text-blue-600 hover:text-blue-900 px-2 py-1 text-xs">Restart</button>
+                              <button onClick={() => handleControlGameServer(gs.id, 'stop')} className="text-red-600 hover:text-red-900 px-2 py-1 text-xs">Stop</button>
+                            </td>
+                          </tr>
+                        ))}
+                        {gameServers.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-2 py-8 text-center text-gray-500">
+                              Нет игровых серверов
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Last 5 Invoices */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Последние счета</h3>
+                        <p className="text-sm text-gray-500">Оплата и история</p>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('invoices')}
+                        className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        Все счета →
+                      </button>
+                    </div>
+                    <ul className="space-y-3">
+                      {invoices.slice(0, 5).map((inv) => {
+                        const u = users.find(x => x.id === inv.userId);
+                        return (
+                          <li key={inv.id} className="flex items-start justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{inv.title}</div>
+                              <div className="text-xs text-gray-500">
+                                №{inv.id.slice(0, 6)} · {u?.name || '—'} · {formatDate(inv.dueDate || inv.createdAt || '')}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-semibold text-gray-900">{inv.amount} ₽</div>
+                              <span className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                                inv.status === 'paid' ? 'bg-green-100 text-green-800'
+                                : inv.status === 'cancelled' ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {inv.status === 'paid' ? 'Оплачен' : inv.status === 'cancelled' ? 'Отменен' : 'Ожидает'}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                      {invoices.length === 0 && (
+                        <li className="py-6 text-center text-gray-500 text-sm">Счетов пока нет</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Nodes RAM Summary */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Ноды — загрузка RAM</h3>
+                      <p className="text-sm text-gray-500">Распределение по локациям</p>
+                    </div>
+                    <div className="space-y-4">
+                      {hostingNodes.length === 0 && (
+                        <div className="py-6 text-center text-gray-500 text-sm">Ноды не добавлены</div>
+                      )}
+                      {hostingNodes.map((node) => {
+                        const gsCount = gameServers.filter(g => g.nodeId === node.id).length;
+                        const total = Math.max(0, Number(node.totalRam) || 0);
+                        const used = typeof node.usedRam === 'number' ? node.usedRam : gsCount * 2048;
+                        const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+                        return (
+                          <div key={node.id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{node.name}</div>
+                                <div className="text-xs text-gray-500">
+                                  {node.ip} · {gsCount} серверов · статус {node.status}
+                                </div>
+                              </div>
+                              <div className="text-right text-xs font-semibold text-gray-700">
+                                {pct}%
+                                <span className="font-normal text-gray-500 ml-1">
+                                  {used >= 1024 ? `${(used/1024).toFixed(1)}/${(total/1024).toFixed(1)} ГБ` : `${used}/${total} МБ`}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                </motion.div>
-              ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1316,7 +1699,26 @@ const AdminDashboard = () => {
                             {user.role === 'admin' ? 'Администратор' : 'Клиент'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                          {user.role !== 'admin' ? (
+                            <button
+                              onClick={() => handlePromoteUser(user.id)}
+                              className="text-purple-600 hover:text-purple-900 inline-flex items-center"
+                              title="Назначить администратором"
+                            >
+                              <ShieldAlert className="h-4 w-4 mr-1" />
+                              Админ
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDemoteUser(user.id)}
+                              className="text-orange-600 hover:text-orange-900 inline-flex items-center"
+                              title="Снять права администратора"
+                            >
+                              <UserCog className="h-4 w-4 mr-1" />
+                              Клиент
+                            </button>
+                          )}
                           <button
                             onClick={() => openInvoiceModal(user)}
                             className="text-indigo-600 hover:text-indigo-900 inline-flex items-center"
@@ -1334,9 +1736,20 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'invoices' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div></div>
+                <button
+                  onClick={() => openManualInvoiceModal()}
+                  className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Создать ручной счёт
+                </button>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1404,6 +1817,7 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
 
@@ -1996,45 +2410,204 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'game_servers' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-gray-900">Игровые серверы (Все клиенты)</h2>
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div className="flex flex-wrap items-center gap-3 justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Поиск по названию..."
+                        value={gsSearch}
+                        onChange={(e) => setGsSearch(e.target.value)}
+                        className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-64"
+                      />
+                    </div>
+                    <select
+                      value={gsStatusFilter}
+                      onChange={(e) => setGsStatusFilter(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="all">Все статусы</option>
+                      <option value="running">Работает</option>
+                      <option value="stopped">Остановлен</option>
+                      <option value="pending_payment">Ожидает оплаты</option>
+                      <option value="provisioning">Настройка</option>
+                      <option value="suspended">Приостановлен</option>
+                    </select>
+                    <select
+                      value={gsGameFilter}
+                      onChange={(e) => setGsGameFilter(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="all">Все игры</option>
+                      {Array.from(new Set(gameServers.map((g) => g.game))).map((game) => (
+                        <option key={game} value={game}>{game}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={gsNodeFilter}
+                      onChange={(e) => setGsNodeFilter(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="all">Все ноды</option>
+                      {hostingNodes.map((n) => (
+                        <option key={n.id} value={n.id}>{n.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedGameServerIds.size > 0 && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setMassActionMenuOpen(!massActionMenuOpen)}
+                          disabled={massActionLoading}
+                          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          Массовые действия ({selectedGameServerIds.size})
+                          <ChevronDown className="ml-2 h-4 w-4" />
+                        </button>
+                        {massActionMenuOpen && (
+                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="py-1">
+                              <button
+                                onClick={() => handleMassAction('start')}
+                                disabled={massActionLoading}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                ▶ Запустить
+                              </button>
+                              <button
+                                onClick={() => handleMassAction('stop')}
+                                disabled={massActionLoading}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                ⏹ Остановить
+                              </button>
+                              <button
+                                onClick={() => handleMassAction('restart')}
+                                disabled={massActionLoading}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                🔄 Перезапустить
+                              </button>
+                              <button
+                                onClick={() => handleMassAction('extend_1')}
+                                disabled={massActionLoading}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                📅 Продлить на 1 мес
+                              </button>
+                              <button
+                                onClick={() => handleMassAction('delete')}
+                                disabled={massActionLoading}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                🗑 Удалить
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {selectedGameServerIds.size > 0 && (
+                      <button
+                        onClick={clearGameServerSelection}
+                        className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                      >
+                        Снять выделение
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Игра</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Порт</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Нода</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Управление</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {gameServers.map((gs) => (
-                      <tr key={gs.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{gs.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.game}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.port}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              gs.status === 'running' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {gs.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.node?.name || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => handleControlGameServer(gs.id, 'start')} className="text-green-600 hover:text-green-900 mr-2">Start</button>
-                          <button onClick={() => handleControlGameServer(gs.id, 'stop')} className="text-red-600 hover:text-red-900 mr-2">Stop</button>
-                          <button onClick={() => handleControlGameServer(gs.id, 'restart')} className="text-blue-600 hover:text-blue-900">Restart</button>
-                        </td>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 w-12">
+                          <input
+                            type="checkbox"
+                            checked={filteredGameServers.length > 0 && selectedGameServerIds.size === filteredGameServers.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                filteredGameServers.forEach((gs) => selectedGameServerIds.add(gs.id));
+                                setSelectedGameServerIds(new Set(selectedGameServerIds));
+                              } else {
+                                clearGameServerSelection();
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Игра</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Слоты</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Порт</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Нода</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Оплачен до</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Управление</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredGameServers.map((gs) => (
+                        <tr key={gs.id} className={selectedGameServerIds.has(gs.id) ? 'bg-indigo-50' : 'hover:bg-gray-50'}>
+                          <td className="px-4 py-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedGameServerIds.has(gs.id)}
+                              onChange={() => toggleGameServerSelection(gs.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <div>{gs.name}</div>
+                            <div className="text-xs text-gray-500">{users.find(u => u.id === gs.userId)?.name || 'Unknown'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.game}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {gs.slots || '-'} слотов
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.port || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                gs.status === 'running' ? 'bg-green-100 text-green-800' :
+                                gs.status === 'stopped' ? 'bg-gray-100 text-gray-800' :
+                                gs.status === 'pending_payment' ? 'bg-yellow-100 text-yellow-800' :
+                                gs.status === 'provisioning' ? 'bg-blue-100 text-blue-800' :
+                                'bg-red-100 text-red-800'
+                            }`}>
+                              {gs.status === 'running' ? 'Работает' :
+                               gs.status === 'stopped' ? 'Остановлен' :
+                               gs.status === 'pending_payment' ? 'Ожидает оплаты' :
+                               gs.status === 'provisioning' ? 'Настройка' :
+                               gs.status === 'suspended' ? 'Приостановлен' : gs.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{gs.node?.name || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {gs.paidUntil ? formatDate(gs.paidUntil) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onClick={() => handleControlGameServer(gs.id, 'start')} className="text-green-600 hover:text-green-900 mr-2">Start</button>
+                            <button onClick={() => handleControlGameServer(gs.id, 'stop')} className="text-red-600 hover:text-red-900 mr-2">Stop</button>
+                            <button onClick={() => handleControlGameServer(gs.id, 'restart')} className="text-blue-600 hover:text-blue-900">Restart</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredGameServers.length === 0 && (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                            Нет игровых серверов
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -2062,8 +2635,6 @@ const AdminDashboard = () => {
                         {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
                     </select>
 
-                    <input type="number" placeholder="RAM (MB)" className="w-full p-2 border rounded" value={currentGameServer.ram || 1024} onChange={e => setCurrentGameServer({...currentGameServer, ram: parseInt(e.target.value)})} />
-                    
                     <div className="flex justify-end gap-2 pt-4">
                         <button onClick={() => setIsGameServerModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
                         <button onClick={handleSaveGameServer} className="px-4 py-2 bg-indigo-600 text-white rounded">Создать</button>
@@ -2252,6 +2823,113 @@ const AdminDashboard = () => {
                       className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
                     >
                       Выставить счет
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Manual Invoice Modal */}
+          {isManualInvoiceOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Создать ручной счёт</h2>
+                  <button onClick={() => setIsManualInvoiceOpen(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <form onSubmit={handleSubmitManualInvoice} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Клиент *</label>
+                    <select
+                      required
+                      value={manualInvoice.userId}
+                      onChange={(e) => setManualInvoice({ ...manualInvoice, userId: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    >
+                      <option value="">Выберите клиента</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Название счёта *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Например: Подписка на сервер"
+                      value={manualInvoice.title}
+                      onChange={(e) => setManualInvoice({ ...manualInvoice, title: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Сумма (₽) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={manualInvoice.amount}
+                        onChange={(e) => setManualInvoice({ ...manualInvoice, amount: parseFloat(e.target.value) || 0 })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Период (месяцев) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={manualInvoice.periodMonths}
+                        onChange={(e) => setManualInvoice({ ...manualInvoice, periodMonths: parseInt(e.target.value) || 1 })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Привязать к игровому серверу (необязательно)
+                    </label>
+                    <select
+                      value={manualInvoice.gameServerId || ''}
+                      onChange={(e) =>
+                        setManualInvoice({
+                          ...manualInvoice,
+                          gameServerId: e.target.value ? e.target.value : undefined,
+                        })
+                      }
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                    >
+                      <option value="">Без привязки</option>
+                      {gameServers
+                        .filter((gs) => gs.userId === manualInvoice.userId || !manualInvoice.userId)
+                        .map((gs) => (
+                          <option key={gs.id} value={gs.id}>
+                            {gs.name} ({gs.game}) — {users.find((u) => u.id === gs.userId)?.name || 'Unknown'}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsManualInvoiceOpen(false)}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+                    >
+                      Создать счёт
                     </button>
                   </div>
                 </form>

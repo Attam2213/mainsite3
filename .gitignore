@@ -28,3 +28,6 @@ database.sqlite
 
 # Uploads
 uploads/
+
+# TRAE agent memory & docs
+.trae/

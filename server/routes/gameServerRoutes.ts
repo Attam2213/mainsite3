@@ -1,5 +1,5 @@
 import express from 'express';
-import { createGameServer, getGameServers, controlServer, orderGameServer, getConsoleLogs, sendCommand, getServerSettings, updateServerSettings, getGameServerFiles, getGameServerFileContent, saveGameServerFileContent, deleteGameServerFile, uploadGameServerFileStream, deleteGameServer, getPlayersCount, getSftpAccess, enableSftpAccess, disableSftpAccess, createGameServerSubscriptionInvoice } from '../controllers/gameServerController';
+import { createGameServer, getGameServers, controlServer, orderGameServer, getConsoleLogs, sendCommand, getServerSettings, updateServerSettings, getGameServerFiles, getGameServerFileContent, saveGameServerFileContent, deleteGameServerFile, uploadGameServerFileStream, deleteGameServer, getPlayersCount, getPlayersList, kickPlayer, banPlayer, getSftpAccess, enableSftpAccess, disableSftpAccess, createGameServerSubscriptionInvoice } from '../controllers/gameServerController';
 import { authenticateToken, isAdmin } from '../middleware/auth';
 
 const router = express.Router();
@@ -9,7 +9,10 @@ router.post('/', authenticateToken, isAdmin, createGameServer);
 router.post('/order', authenticateToken, orderGameServer);
 router.get('/', authenticateToken, getGameServers);
 router.get('/:id/logs', authenticateToken, getConsoleLogs);
-router.get('/:id/players', authenticateToken, getPlayersCount);
+router.get('/:id/players', authenticateToken, getPlayersList);
+router.get('/:id/players-count', authenticateToken, getPlayersCount);
+router.post('/:id/players/kick', authenticateToken, kickPlayer);
+router.post('/:id/players/ban', authenticateToken, banPlayer);
 router.get('/:id/sftp', authenticateToken, getSftpAccess);
 router.post('/:id/sftp/enable', authenticateToken, enableSftpAccess);
 router.post('/:id/sftp/disable', authenticateToken, disableSftpAccess);
