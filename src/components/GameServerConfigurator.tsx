@@ -284,19 +284,52 @@ const GameServerConfigurator = ({
 
   const setWebsiteSubdomainNameStable = (next: string) => {
     const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    const activeEl = document.activeElement as HTMLElement | null;
+    const inputEl = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') ? (activeEl as HTMLInputElement) : null;
+    let caretStart: number | null = null;
+    let caretEnd: number | null = null;
+    if (inputEl) { try { caretStart = inputEl.selectionStart; caretEnd = inputEl.selectionEnd; } catch {} }
     setWebsiteSubdomainName(next);
     queueMicrotask(() => {
       try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
-      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+      if (inputEl && document.body.contains(inputEl)) {
+        try {
+          inputEl.focus({ preventScroll: true });
+          if (caretStart !== null && caretEnd !== null) {
+            try { inputEl.setSelectionRange(Math.min(caretStart, next.length), Math.min(caretEnd, next.length)); } catch {}
+          }
+        } catch {}
+      }
+      requestAnimationFrame(() => {
+        try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+        if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
+          try {
+            inputEl.focus({ preventScroll: true });
+            if (caretStart !== null && caretEnd !== null) {
+              try { inputEl.setSelectionRange(Math.min(caretStart, next.length), Math.min(caretEnd, next.length)); } catch {}
+            }
+          } catch {}
+        }
+      });
     });
   };
 
   const setSubdomainCheckStable = (next: { status: 'idle' | 'loading' | 'ok' | 'error'; message?: string; full?: string }) => {
     const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    const activeEl = document.activeElement as HTMLElement | null;
+    const inputEl = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') ? (activeEl as HTMLInputElement) : null;
     setSubdomainCheck(next);
     queueMicrotask(() => {
       try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
-      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+      if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
+        try { inputEl.focus({ preventScroll: true }); } catch {}
+      }
+      requestAnimationFrame(() => {
+        try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+        if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
+          try { inputEl.focus({ preventScroll: true }); } catch {}
+        }
+      });
     });
   };
 
