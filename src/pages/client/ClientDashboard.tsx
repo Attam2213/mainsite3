@@ -4766,7 +4766,8 @@ const ClientDashboard = () => {
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
               <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
-              <div className="inline-block w-full max-w-5xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
+              <div className="inline-block w-full max-w-7xl max-h-[90vh] transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-6 sm:align-middle overflow-y-auto">
+                <div className="flex flex-col h-full max-h-[90vh]">
                 <div className="border-b border-slate-200 bg-slate-50/60 px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -4822,7 +4823,7 @@ const ClientDashboard = () => {
                   </div>
                 </div>
 
-                <div className="bg-white px-6 py-5 min-h-[520px]">
+                <div className="bg-white px-6 py-5 min-h-[520px] flex-1 overflow-y-auto">
                   {webSettingsTab === 'overview' && (
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-5">
@@ -5170,7 +5171,7 @@ const ClientDashboard = () => {
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5">
+                <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5 shrink-0">
                   <div className="mr-auto text-xs text-slate-500">
                     ID: <code className="rounded bg-white px-1.5 py-0.5 font-mono">{currentWebSite.id?.slice(0, 8)}</code>
                   </div>
@@ -5181,6 +5182,7 @@ const ClientDashboard = () => {
                     Закрыть
                   </button>
                 </div>
+              </div>
               </div>
             </div>
           </div>
