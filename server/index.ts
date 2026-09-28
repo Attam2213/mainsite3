@@ -258,8 +258,6 @@ const startServer = async () => {
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_domain_type ON web_sites("domainType");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
-        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "domainType" VARCHAR(16) DEFAULT 'custom';`); } catch (_) {}
-        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "subdomainName" VARCHAR(64) UNIQUE;`); } catch (_) {}
       } else if (dialect === 'sqlite') {
         await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
           id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
@@ -303,8 +301,6 @@ const startServer = async () => {
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_domain_type ON web_sites("domainType");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
-        try { await ensureSqliteColumn('web_sites','domainType','TEXT DEFAULT \'custom\''); } catch(_){}
-        try { await ensureSqliteColumn('web_sites','subdomainName','TEXT UNIQUE'); } catch(_){}
       } else {
         await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
           id VARCHAR(36) PRIMARY KEY,
@@ -347,6 +343,21 @@ const startServer = async () => {
       }
     } catch (e) {
       console.error('[DB] ensure web_sites + web_site_backups tables failed:', e);
+    }
+
+    try {
+      if (dialect === 'postgres') {
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "domainType" VARCHAR(16) DEFAULT 'custom';`); } catch (_) {}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "subdomainName" VARCHAR(64) UNIQUE;`); } catch (_) {}
+      } else if (dialect === 'sqlite') {
+        try { await ensureSqliteColumn('web_sites','domainType',"TEXT DEFAULT 'custom'"); } catch(_){}
+        try { await ensureSqliteColumn('web_sites','subdomainName','TEXT UNIQUE'); } catch(_){}
+      } else {
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN domainType VARCHAR(16) DEFAULT 'custom';`); } catch(_){}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN subdomainName VARCHAR(64) UNIQUE;`); } catch(_){}
+      }
+    } catch (e) {
+      console.error('[DB] ensure web_sites domainType/subdomainName columns failed:', e);
     }
 
     await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });
