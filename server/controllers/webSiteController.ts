@@ -172,7 +172,7 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
   }
 });
 
-router.param('id', authenticateToken, async (req: any, res: Response, next: any, id: string) => {
+router.param('id', async (req: any, res: Response, next: any, id: string) => {
   try {
     const isAdmin = getIsAdminFromReq(req);
     const userId = req.user?.id;
@@ -181,12 +181,14 @@ router.param('id', authenticateToken, async (req: any, res: Response, next: any,
       include: [{ model: ServerNode as any, as: 'node' }],
     });
     if (!site) return res.status(404).json({ message: 'Сайт не найден' });
-    if (!isAdmin && userId && (site as any).userId !== userId) return res.status(403).json({ message: 'Forbidden' });
+    if (userId && !isAdmin && (site as any).userId !== userId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
     if (!(site as any).node && (site as any).nodeId) {
-      site = await WebSite.findOne({
+      site = (await WebSite.findOne({
         where: { id: (site as any).id },
         include: [{ model: ServerNode as any, as: 'node' }],
-      }) as any;
+      })) as any;
     }
     req.site = site;
     return next();
