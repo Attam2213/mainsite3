@@ -496,6 +496,11 @@ const getGameContainerIdentifier = (server: any) => {
     return null;
 };
 
+const getGameHostDir = (server: any) => {
+    if (server && server.id) return `/var/lib/wexa/game-servers/${String(server.id)}`;
+    return null;
+};
+
 const getMountPathForGame = (game: string) => {
     if (game === 'minecraft') return '/data';
     if (game === 'cs16') return '/hlds';
@@ -844,9 +849,17 @@ export const controlServer = async (req: Request, res: Response) => {
         const id = getIdParam(req);
         const { action } = req.body; // start, stop, restart
         
+        const userId = getUserIdFromReq(req);
+        const isAdmin = getIsAdminFromReq(req);
+
         const server = await GameServer.findByPk(id, { include: ['node'] });
         if (!server) {
             res.status(404).json({ message: 'Server not found' });
+            return;
+        }
+
+        if (!isAdmin && userId && (server as any).userId !== userId) {
+            res.status(403).json({ message: 'Forbidden' });
             return;
         }
 
@@ -858,6 +871,16 @@ export const controlServer = async (req: Request, res: Response) => {
         
         // @ts-ignore
         const node = server.node;
+        if (!node || !node.ip) {
+            res.status(400).json({ message: 'Нет назначенной ноды. Обратитесь к администратору.' });
+            return;
+        }
+        const ident = getGameContainerIdentifier(server as any);
+        if (action !== 'stop' && !ident) {
+            res.status(400).json({ message: 'Container is not ready yet' });
+            return;
+        }
+
         const config = {
             host: node.ip,
             port: node.sshPort,
@@ -865,21 +888,18 @@ export const controlServer = async (req: Request, res: Response) => {
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
 
-        const ident = getGameContainerIdentifier(server as any);
-        if (!ident) {
-            res.status(400).json({ message: 'Container is not ready yet' });
-            return;
-        }
         let cmd = '';
-        if (action === 'start') cmd = `docker start ${ident}`;
-        if (action === 'stop') cmd = `docker stop ${ident}`;
-        if (action === 'restart') cmd = `docker restart ${ident}`;
+        if (action === 'start' && ident) cmd = `docker start ${ident}`;
+        if (action === 'stop' && ident) cmd = `docker stop ${ident}`;
+        if (action === 'restart' && ident) cmd = `docker restart ${ident}`;
 
         if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
             console.log(`[Mock] ${action} server ${server.containerId}`);
         } else {
-             if (cmd) {
-                await execCommand(config, cmd);
+            try {
+                if (cmd) await execCommand(config, cmd);
+            } catch (dce: any) {
+                console.warn(`docker ${action} warning:`, dce?.message || dce);
             }
         }
         
@@ -1683,14 +1703,27 @@ export const uploadGameServerFileStream = async (req: Request, res: Response) =>
 export const deleteGameServer = async (req: Request, res: Response) => {
     try {
         const id = getIdParam(req);
+        const userId = getUserIdFromReq(req);
+        const isAdmin = getIsAdminFromReq(req);
+
         const server = await GameServer.findByPk(id, { include: ['node'] });
         if (!server) {
             res.status(404).json({ message: 'Server not found' });
             return;
         }
 
+        if (!isAdmin && userId && (server as any).userId !== userId) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+
         // @ts-ignore
         const node = server.node;
+        if (!node) {
+            await server.destroy();
+            return res.json({ message: 'Server deleted (orphan, no node)' });
+        }
+
         const config = {
             host: node.ip,
             port: node.sshPort,
@@ -1698,19 +1731,25 @@ export const deleteGameServer = async (req: Request, res: Response) => {
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
 
+        const ident = getGameContainerIdentifier(server as any);
+        const sftpIdent = getSftpContainerName(server as any);
+        const hostDir = getGameHostDir(server as any);
+
         if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
-            console.log(`[Mock] Deleting server container ${server.containerId}...`);
+            console.log(`[Mock] Deleting server container ${ident || server.containerId}...`);
         } else {
             try {
-                // Stop and remove container
-                await execCommand(config, `docker stop ${server.containerId}`);
-                await execCommand(config, `docker rm ${server.containerId}`);
-                // Optional: remove data volume or folder?
-                // For now, let's keep data or remove it? Usually we remove it to save space.
-                // await execCommand(config, `rm -rf /opt/wexa/servers/${server.containerId}`); // If we used bind mounts
+                if (ident) {
+                    await execCommand(config, `docker stop ${ident} 2>/dev/null; docker rm -f ${ident} 2>/dev/null; true`);
+                }
+                if (sftpIdent) {
+                    await execCommand(config, `docker stop ${sftpIdent} 2>/dev/null; docker rm -f ${sftpIdent} 2>/dev/null; true`);
+                }
+                if (hostDir) {
+                    await execCommand(config, `rm -rf "${hostDir}" 2>/dev/null; true`);
+                }
             } catch (err) {
-                console.error('Error removing docker container:', err);
-                // Continue to delete from DB even if docker fails (maybe it's already gone)
+                console.error('Error removing docker container / dir (continuing DB destroy):', err);
             }
         }
 
