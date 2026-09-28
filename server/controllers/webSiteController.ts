@@ -581,11 +581,25 @@ const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domai
     ? `server {
   listen 80;
   server_name ${domain};
-  root ${siteDir}/public ${siteDir};
+  root ${siteDir}/public;
+  index index.html index.htm;
   access_log /var/log/nginx/wexa-site-${shortId}-access.log;
   error_log /var/log/nginx/wexa-site-${shortId}-error.log;
-  location /assets { alias ${siteDir}/public/assets; }
-  location / { proxy_pass http://127.0.0.1:${port}; proxy_http_version 1.1; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; }
+  location ~* \.(?:js|css|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
+    root ${siteDir}/public;
+    expires 7d;
+    add_header Cache-Control "public";
+    try_files \$uri =404;
+  }
+  location / {
+    proxy_pass http://127.0.0.1:${port};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
 }`
     : `server {
   listen 80;
@@ -595,7 +609,10 @@ const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domai
   access_log /var/log/nginx/wexa-site-${shortId}-access.log;
   error_log /var/log/nginx/wexa-site-${shortId}-error.log;
 }`;
-  const cmd = `mkdir -p /etc/nginx/sites-enabled && cat > /etc/nginx/sites-enabled/wexa-site-${shortId}.conf <<'NGINXEOF'\n${conf}\nNGINXEOF\n`;
+  const cmd = `mkdir -p /etc/nginx/sites-enabled && cat > /etc/nginx/sites-enabled/wexa-site-${shortId}.conf <<'NGINXEOF'
+${conf}
+NGINXEOF
+`;
   await execCommand(cfg, cmd);
 };
 
