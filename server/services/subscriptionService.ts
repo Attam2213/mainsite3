@@ -38,6 +38,86 @@ export const checkSubscriptions = async () => {
             await stopPM2Process(project);
         }
 
+        // ========== AWAITING PAYMENT: DELETE WEBSITES OLDER THAN 3 DAYS ==========
+        const unpaidAwaitingSites = await WebSite.findAll({
+            where: {
+                createdAt: { [Op.lt]: overdueDeleteBefore },
+                status: { [Op.in]: ['pending', 'pending_payment', 'awaiting_payment'] as any },
+                paidUntil: { [Op.is]: null },
+            },
+            include: [{ model: ServerNode, as: 'node' }],
+        });
+        for (const s of unpaidAwaitingSites) {
+            const node = (s as any).node;
+            try {
+                if (node && node.ip && node.ip !== '127.0.0.1') {
+                    const cfg = {
+                        host: node.ip, port: node.sshPort || 22, username: node.sshUser || 'root',
+                        password: node.sshPassword ? decrypt(node.sshPassword) : undefined,
+                    };
+                    const shortId = String(s.id || '').slice(0, 8);
+                    const user = (s as any).sftpUsername;
+                    if (user) {
+                        await execCommand(cfg, `
+( umount "/srv/sftp/${user}/public_html" 2>/dev/null || true );
+( sed -i "\#/var/lib/wexa/sites/${s.id}#d" /etc/fstab 2>/dev/null || true );
+( userdel -f -r "${user}" 2>/dev/null || true );
+( pm2 delete "wexa-site-${shortId}" 2>/dev/null || true );
+( rm -f "/etc/nginx/sites-enabled/wexa-site-${shortId}.conf" );
+( rm -rf "/var/lib/wexa/sites/${s.id}" 2>/dev/null || true );
+pm2 save 2>/dev/null || true;
+nginx -t && systemctl reload nginx || true
+`);
+                    }
+                    if (s.nodeId) {
+                        try {
+                            const remaining = await WebSite.count({ where: { nodeId: s.nodeId, status: { [Op.not]: 'deleted' as any } } });
+                            await ServerNode.update({ usedWebSites: Math.max(0, remaining - 1) }, { where: { id: s.nodeId } });
+                        } catch (_) { /* ignore */ }
+                    }
+                }
+            } catch (e) { console.error('Delete unpaid website resources error:', s.id, e); }
+            try {
+                await s.update({
+                    status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, nginxConfPath: null,
+                });
+            } catch (_) { try { await s.destroy(); } catch (_e) {} }
+            console.log(`[webSite] DELETED (unpaid >3d) id=${s.id}, domain=${(s as any).domain || '-'}.`);
+        }
+
+        // ========== AWAITING PAYMENT: DELETE GAME SERVERS OLDER THAN 3 DAYS ==========
+        const unpaidGameServers = await GameServer.findAll({
+            where: {
+                createdAt: { [Op.lt]: overdueDeleteBefore },
+                status: { [Op.in]: ['pending_payment', 'awaiting_payment', 'pending'] as any },
+                paidUntil: { [Op.is]: null },
+            },
+            include: [{ model: ServerNode, as: 'node' }],
+        });
+        for (const server of unpaidGameServers) {
+            const node = getNodeFromIncluded(server);
+            try {
+                if (node && node.ip && node.ip !== '127.0.0.1' && node.ip !== '1.1.1.1') {
+                    const config = {
+                        host: node.ip,
+                        port: node.sshPort,
+                        username: node.sshUser,
+                        password: node.sshPassword ? decrypt(node.sshPassword) : undefined
+                    };
+                    const ident = getContainerIdent(server);
+                    const sftpName = getSftpContainerName(server);
+                    const hostDir = `/var/lib/wexa/game-servers/${server.id}`;
+                    if (ident) {
+                        await execCommand(config, `sh -lc "docker rm -f ${ident} >/dev/null 2>&1 || true"`);
+                    }
+                    await execCommand(config, `sh -lc "docker rm -f ${sftpName} >/dev/null 2>&1 || true"`);
+                    await execCommand(config, `sh -lc "rm -rf ${hostDir} >/dev/null 2>&1 || true"`);
+                }
+            } catch (e) { console.error('Delete unpaid game server resources error:', server.id, e); }
+            try { await server.destroy(); } catch (_) {}
+            console.log(`[GameServer] DELETED (unpaid >3d) id=${server.id}, name=${server.name}.`);
+        }
+
         // ========== WEBSITES SUSPEND EXPIRED ==========
         const expiredSites = await WebSite.findAll({
             where: {

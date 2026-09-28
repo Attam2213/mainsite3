@@ -1890,56 +1890,82 @@ const ClientDashboard = () => {
                         <div className="grid gap-4 sm:grid-cols-2">
                           {gameServers.slice(0, 4).map((gs) => {
                             const node = getServerNode(gs);
+                            const pendingInv = gs.status === 'pending_payment'
+                              ? invoices.find(i => i.status === 'pending' && ((i as any).gameServerId === gs.id || (i as any).serverId === gs.id))
+                              : null;
+                            const payBtn = pendingInv
+                              ? (e: any) => { e.stopPropagation(); handlePayInvoice(pendingInv.id); }
+                              : gs.status === 'pending_payment'
+                                ? (e: any) => { e.stopPropagation(); setActiveTab('billing'); alert('Перейдите в раздел «Финансы», чтобы оплатить счёт за этот сервер'); }
+                                : null;
                             return (
-                              <button
+                              <div
                                 key={gs.id}
-                                type="button"
-                                onClick={() => openServerPanel(gs)}
-                                className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg"
+                                className="rounded-2xl border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
                               >
-                                <div className="mb-4 flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="mb-2 flex items-center gap-2">
-                                      <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
-                                        <Server className="h-4 w-4" />
+                                <div className="cursor-pointer" onClick={() => openServerPanel(gs)}>
+                                  <div className="mb-4 flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="mb-2 flex items-center gap-2 flex-wrap">
+                                        <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
+                                          <Server className="h-4 w-4" />
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getGameServerStatusMeta(gs.status).badgeClassName}`}>
+                                          {getGameServerStatusMeta(gs.status).label}
+                                        </span>
+                                        {isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status) && (
+                                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Скоро окончание</span>
+                                        )}
+                                        {isOverdue(gs.paidUntil, gs.status) && (
+                                          <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">Требуется оплата</span>
+                                        )}
                                       </div>
-                                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getGameServerStatusMeta(gs.status).badgeClassName}`}>
-                                        {getGameServerStatusMeta(gs.status).label}
-                                      </span>
-                                      {isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status) && (
-                                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Скоро окончание</span>
-                                      )}
-                                      {isOverdue(gs.paidUntil, gs.status) && (
-                                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">Требуется оплата</span>
-                                      )}
+                                      <h3 className="truncate text-base font-semibold text-gray-900">{gs.name}</h3>
+                                      <p className="mt-1 text-sm text-gray-500">{formatGameLabel(gs.game)} · {node?.ip || 'IP не назначен'}:{gs.port}</p>
                                     </div>
-                                    <h3 className="truncate text-base font-semibold text-gray-900">{gs.name}</h3>
-                                    <p className="mt-1 text-sm text-gray-500">{formatGameLabel(gs.game)} · {node?.ip || 'IP не назначен'}:{gs.port}</p>
-                                  </div>
-                                  <span className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-gray-700">
-                                    {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? gs.slots}
-                                  </span>
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <div className="rounded-xl bg-slate-50 px-3 py-3">
-                                    <div className="text-xs uppercase tracking-wide text-gray-500">Слоты</div>
-                                    <div className="mt-1 text-sm font-semibold text-gray-900">
+                                    <span className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-gray-700">
                                       {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? gs.slots}
-                                    </div>
-                                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-200">
-                                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, (playerCounts[gs.id]?.online ?? 0) / Math.max(1, (playerCounts[gs.id]?.max ?? gs.slots)) * 100)}%` }} />
-                                    </div>
+                                    </span>
                                   </div>
-                                  <div className="rounded-xl bg-slate-50 px-3 py-3">
-                                    <div className="text-xs uppercase tracking-wide text-gray-500">Оплата до</div>
-                                    <div className="mt-1 text-sm font-semibold text-gray-900">{gs.paidUntil ? formatDate(gs.paidUntil) : 'Не указано'}</div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                      <div className="text-xs uppercase tracking-wide text-gray-500">Слоты</div>
+                                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                                        {playerCounts[gs.id]?.online ?? 0} / {playerCounts[gs.id]?.max ?? gs.slots}
+                                      </div>
+                                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-200">
+                                        <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, (playerCounts[gs.id]?.online ?? 0) / Math.max(1, (playerCounts[gs.id]?.max ?? gs.slots)) * 100)}%` }} />
+                                      </div>
+                                    </div>
+                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                      <div className="text-xs uppercase tracking-wide text-gray-500">Оплата до</div>
+                                      <div className="mt-1 text-sm font-semibold text-gray-900">{gs.paidUntil ? formatDate(gs.paidUntil) : 'Не указано'}</div>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+                                {gs.status === 'pending_payment' && (
+                                  <div className="mt-4 rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3.5">
+                                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                                      <div>
+                                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-1">⏳ Ожидает оплаты</div>
+                                        <p className="text-xs text-amber-800">Будет удалён через 3 дня. Оплатите позже с баланса ЛК.</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={payBtn || undefined}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 px-3 py-1.5 text-xs font-bold text-white shadow-md transition hover:shadow-lg"
+                                      >
+                                        <CreditCard className="h-3.5 w-3.5" />
+                                        💳 Оплатить
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 cursor-pointer" onClick={() => openServerPanel(gs)}>
                                   <span className="text-sm font-medium text-indigo-600">Открыть панель</span>
                                   <span className="text-xs text-gray-500">Файлы, консоль, доступ</span>
                                 </div>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -2948,6 +2974,31 @@ const ClientDashboard = () => {
                               </div>
                             </div>
 
+                            {ws.status === 'pending' && (() => {
+                              const pendingInv = invoices.find(i => i.status === 'pending' && (i as any).siteId === ws.id);
+                              const onPay = pendingInv
+                                ? () => handlePayInvoice(pendingInv.id)
+                                : () => { setActiveTab('billing'); alert('Перейдите в раздел «Финансы», чтобы оплатить счёт за этот сайт'); };
+                              return (
+                                <div className="mb-5 rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
+                                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                                    <div>
+                                      <div className="text-xs font-black uppercase tracking-wider text-amber-600 mb-1">⏳ Ожидает оплаты</div>
+                                      <p className="text-sm text-amber-800">Сайт будет автоматически удалён через 3 дня, если счёт не оплачен. Можно оплатить позже с внутреннего баланса личного кабинета.</p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={onPay}
+                                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+                                    >
+                                      <CreditCard className="h-4 w-4" />
+                                      💳 Оплатить с баланса
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                             <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => handleControlWebSite(ws.id, 'start')}
@@ -3121,13 +3172,12 @@ const ClientDashboard = () => {
         {/* File Manager Modal */}
         {isFileManagerOpen && currentFileServer && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex min-h-screen items-center justify-center px-4 py-6">
               <div className="fixed inset-0 transition-opacity" aria-hidden="true" onClick={() => setIsFileManagerOpen(false)}>
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
-              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
               
-              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
+              <div className="relative w-full max-w-4xl transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 h-[600px] flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-medium leading-6 text-gray-900">
@@ -3467,13 +3517,12 @@ const ClientDashboard = () => {
 
         {isServerPanelOpen && currentPanelServer && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex min-h-screen items-center justify-center px-4 py-6">
               <div className="fixed inset-0 transition-opacity" aria-hidden="true" onClick={() => setIsServerPanelOpen(false)}>
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
-              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
 
-              <div className="inline-block transform overflow-hidden rounded-3xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-6xl sm:align-middle">
+              <div className="relative w-full max-w-6xl transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="mb-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-indigo-700 p-6 text-white shadow-lg">
                     <div className="mb-6 flex justify-between items-start gap-4">
@@ -4690,7 +4739,7 @@ const ClientDashboard = () => {
         {/* New Support Ticket Modal */}
         {isNewTicketOpen && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex min-h-screen items-center justify-center px-4 py-6">
               <div
                 className="fixed inset-0 transition-opacity"
                 aria-hidden="true"
@@ -4698,8 +4747,7 @@ const ClientDashboard = () => {
               >
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
-              <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
-              <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+              <div className="relative w-full max-w-lg transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium leading-6 text-gray-900">Новое обращение в поддержку</h3>
@@ -4770,12 +4818,11 @@ const ClientDashboard = () => {
         {/* Web Site Settings Modal */}
         {isWebSettingsOpen && currentWebSite && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 sm:block sm:p-0">
+            <div className="flex min-h-screen items-center justify-center px-4 py-6">
               <div className="fixed inset-0 transition-opacity" onClick={() => setIsWebSettingsOpen(false)}>
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
-              <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
-              <div className="inline-block w-full max-w-7xl max-h-[90vh] transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-6 sm:align-middle overflow-y-auto">
+              <div className="relative w-full max-w-7xl max-h-[90vh] transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all">
                 <div className="flex flex-col h-full max-h-[90vh]">
                 <div className="border-b border-slate-200 bg-slate-50/60 px-6 py-4">
                   <div className="flex items-center justify-between">
