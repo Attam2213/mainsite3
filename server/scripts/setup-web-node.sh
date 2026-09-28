@@ -170,6 +170,7 @@ cat > "$TEMPLATE_DIR/server.js" <<'EOF'
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -177,9 +178,23 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(bodyParser.json({limit:'5mb'}));
 app.use(bodyParser.urlencoded({extended:true, limit:'5mb'}));
-app.use('/assets', express.static(path.join(__dirname,'public/assets')));
-app.get('/', (req, res) => res.render('index', {title: 'Ваш сайт на Wexa.su'}));
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html','htm'] }));
+app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
+app.use(express.static(__dirname, { index: false }));
+app.get('/', (req, res, next) => {
+  const customIndex = path.join(__dirname, 'index.html');
+  if (fs.existsSync(customIndex)) return res.sendFile(customIndex);
+  const publicIndex = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(publicIndex)) return res.sendFile(publicIndex);
+  res.render('index', {title: 'Ваш сайт на Wexa.su'});
+});
 app.get('/health', (req,res) => res.status(200).json({ok:true,site:'wexa-site'}));
+app.use((req, res, next) => {
+  const p = decodeURIComponent(req.path);
+  const candidate = path.join(__dirname, p);
+  if (p !== '/' && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return res.sendFile(candidate);
+  next();
+});
 app.listen(PORT, '127.0.0.1', () => console.log(`[wexa-site] listening 127.0.0.1:${PORT}`));
 EOF
 cat > "$TEMPLATE_DIR/views/index.ejs" <<'EOF'

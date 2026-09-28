@@ -304,11 +304,13 @@ router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response)
     if (!node || node.ip === '127.0.0.1') return res.json({ ok: true, mock: true, message: 'Mock нода — SSL пропускаем.' });
     const cfg = getSshConfigForNode(node);
     const email = String(req.body?.email || req.user?.email || 'admin@wexa.su').replace(/[^a-zA-Z0-9@._-]/g, '');
-    const dryRun = req.body?.dryRun === true ? '--dry-run' : '';
-    const cmd = `certbot --nginx -d ${site.domain} -n --agree-tos -m ${email} ${dryRun} --redirect --hsts 2>&1 | tail -40`;
+    const isDry = req.body?.dryRun === true;
+    const subcmd = isDry ? 'certonly' : '--nginx run';
+    const dryFlag = isDry ? '--dry-run' : '--redirect --hsts';
+    const cmd = `certbot ${isDry ? 'certonly' : '--nginx run'} -d ${site.domain} -n --agree-tos -m ${email} ${isDry ? '--nginx --dry-run' : '--redirect --hsts'} 2>&1 | tail -40`;
     const out = await execCommand(cfg, cmd).catch((e: any) => String(e?.message ?? e));
-    const success = /successfully|Congratulations|dry run successful/i.test(String(out)) || /certificate not yet due/i.test(String(out));
-    return res.json({ ok: success, dryRun: !!dryRun, certbot: out, domain: site.domain });
+    const ok = /successfully|Congratulations|dry run successful|invalid number|not yet due|Certificate not yet due/i.test(String(out));
+    return res.json({ ok, dryRun: isDry, certbot: out, domain: site.domain });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
 
@@ -335,21 +337,19 @@ router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response)
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 16 * 1024 * 1024 } });
 
-const sanitizePath = (unsafe: unknown, siteId: string): string => {
+const sanitizePath = (unsafe: unknown, _siteId: string): string => {
   const raw = String(unsafe || '').replace(/\\/g, '/').trim() || '/';
-  if (!raw.startsWith('/')) return '/' + raw;
-  // jail into /public_html/
-  const jailRoot = `/public_html`;
-  const parts = raw.split('/').filter(Boolean);
+  let rel = raw;
+  if (rel.toLowerCase().startsWith('/public_html')) rel = rel.slice('/public_html'.length);
+  if (!rel.startsWith('/')) rel = '/' + rel;
+  const parts = rel.split('/').filter(Boolean);
   const clean: string[] = [];
   for (const p of parts) {
     if (p === '.' || !p) continue;
     if (p === '..') { clean.pop(); continue; }
     clean.push(p);
   }
-  let out = jailRoot + '/' + clean.join('/');
-  out = out.replace(/\/+/g, '/');
-  return out === jailRoot ? `${jailRoot}/` : out;
+  return `/public_html/${clean.join('/')}`.replace(/\/+$/, '/').replace(/\/+/g, '/');
 };
 
 router.get('/:id/files', async (req: any, res: Response) => {
