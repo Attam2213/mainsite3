@@ -172,16 +172,22 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
   }
 });
 
-router.param('id', authenticateToken, async (req: any, _res: Response, next: any, id: string) => {
+router.param('id', authenticateToken, async (req: any, res: Response, next: any, id: string) => {
   try {
     const isAdmin = getIsAdminFromReq(req);
-    const userId = req.user.id;
-    const site = await WebSite.findOne({
+    const userId = req.user?.id;
+    let site = await WebSite.findOne({
       where: { id, status: { [Op.ne]: 'deleted' as any } } as any,
       include: [{ model: ServerNode as any, as: 'node' }],
     });
     if (!site) return res.status(404).json({ message: 'Сайт не найден' });
-    if (!isAdmin && (site as any).userId !== userId) return res.status(403).json({ message: 'Forbidden' });
+    if (!isAdmin && userId && (site as any).userId !== userId) return res.status(403).json({ message: 'Forbidden' });
+    if (!(site as any).node && (site as any).nodeId) {
+      site = await WebSite.findOne({
+        where: { id: (site as any).id },
+        include: [{ model: ServerNode as any, as: 'node' }],
+      }) as any;
+    }
     req.site = site;
     return next();
   } catch (e) { next(e); }
@@ -295,9 +301,12 @@ router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response)
     const node = site.node;
     if (!node || node.ip === '127.0.0.1') return res.json({ ok: true, mock: true, message: 'Mock нода — SSL пропускаем.' });
     const cfg = getSshConfigForNode(node);
-    const email = String(req.user?.email || 'admin@wexa.su').replace(/[^a-zA-Z0-9@._-]/g, '');
-    const out = await execCommand(cfg, `certbot --nginx -d ${site.domain} -n --agree-tos -m ${email} --redirect --hsts 2>&1 | tail -40`);
-    return res.json({ ok: true, certbot: out });
+    const email = String(req.body?.email || req.user?.email || 'admin@wexa.su').replace(/[^a-zA-Z0-9@._-]/g, '');
+    const dryRun = req.body?.dryRun === true ? '--dry-run' : '';
+    const cmd = `certbot --nginx -d ${site.domain} -n --agree-tos -m ${email} ${dryRun} --redirect --hsts 2>&1 | tail -40`;
+    const out = await execCommand(cfg, cmd).catch((e: any) => String(e?.message ?? e));
+    const success = /successfully|Congratulations|dry run successful/i.test(String(out)) || /certificate not yet due/i.test(String(out));
+    return res.json({ ok: success, dryRun: !!dryRun, certbot: out, domain: site.domain });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
 
@@ -314,6 +323,7 @@ router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response)
     port: site.sftpPort || 22,
     username: site.sftpUsername || '',
     passwordOnce,
+    password: passwordOnce,
     rootPath: '/public_html',
     note: 'SFTP-only, shell отключен. Загружать/редактировать/удалять файлы можно только в /public_html.',
   });
