@@ -215,12 +215,36 @@ router.get('/:id/logs', async (req: any, res: Response) => {
 
 const control = async (req: any, res: Response, action: 'start' | 'stop' | 'restart') => {
   const site = req.site as any;
-  if (!site.pm2ProcessName) return res.json({ ok: true, skipped: true, message: 'Статический сайт — управление не требуется' });
+  if (!site.pm2ProcessName && action !== 'stop') {
+    return res.json({ ok: true, skipped: true, message: 'Статический сайт — управление не требуется' });
+  }
   try {
     const node = site.node;
     if (node && node.ip && node.ip !== '127.0.0.1') {
       const cfg = getSshConfigForNode(node);
-      await execCommand(cfg, `pm2 ${action} ${site.pm2ProcessName} || true`).catch(() => {});
+      const hostPort = Number(site.hostPort) || (3000 + (Math.abs(String(site.id).charCodeAt(0) + String(site.id).charCodeAt(7)) % 1000));
+      const siteDir = `/var/lib/wexa/sites/${site.id}`;
+      const wasSuspended = String(site.status || '').toLowerCase() === 'suspended';
+      if (action === 'start' || action === 'restart') {
+        await execCommand(cfg, `pm2 start ${site.pm2ProcessName} 2>/dev/null || pm2 restart ${site.pm2ProcessName} 2>/dev/null || true`).catch(() => {});
+        if (wasSuspended || action === 'restart') {
+          const domain = site.domain || `${String(site.id || '').slice(0, 8)}.wexa.local`;
+          try {
+            await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort, pm2ProcessName: site.pm2ProcessName }, siteDir, domain);
+            await execCommand(cfg, `nginx -t && systemctl reload nginx || true`).catch(() => {});
+          } catch (_) { /* ignore conf restore */ }
+        }
+      } else {
+        await execCommand(cfg, `pm2 stop ${site.pm2ProcessName} 2>/dev/null || true`).catch(() => {});
+        if (site.domain) {
+          const shortId = String(site.id || '').slice(0, 8);
+          const conf = `/etc/nginx/sites-enabled/wexa-site-${shortId}.conf`;
+          const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Сайт приостановлен — Wexa.su</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f1f5f9,#cbd5e1);padding:2rem"><div style="max-width:620px;width:100%;padding:2.5rem;background:#fff;border-radius:1.25rem;box-shadow:0 10px 30px rgba(2,6,23,.08);border:1px solid rgba(2,6,23,.06)"><div style="display:inline-block;padding:.25rem .7rem;border-radius:999px;background:#fde68a;color:#92400e;font-weight:600;font-size:.8rem;margin-bottom:1.25rem;letter-spacing:.03em">⏸ Приостановлено</div><h1 style="margin:0 0 .75rem;font-size:1.75rem">Сайт остановлен пользователем</h1><p style="color:#475569;line-height:1.6;margin:.25rem 0">Нажмите «Запустить» в ЛК wexa.su — сайт вернётся в работу.</p></div></body></html>`;
+          const maintenance = `server { listen 80; server_name ${site.domain}; access_log /var/log/nginx/wexa-site-${shortId}-access.log; error_log /var/log/nginx/wexa-site-${shortId}-error.log; default_type text/html; return 503 ${JSON.stringify(html)}; }`;
+          const b64 = Buffer.from(maintenance, 'utf8').toString('base64');
+          await execCommand(cfg, `printf '%s' '${b64}' | base64 -d > '${conf}' && nginx -t && systemctl reload nginx || true`).catch(() => {});
+        }
+      }
     }
     if (action === 'stop') {
       if (site.status !== 'suspended') await site.update({ status: 'suspended' });

@@ -56,19 +56,19 @@ export const checkSubscriptions = async () => {
                         password: node.sshPassword ? decrypt(node.sshPassword) : undefined,
                     };
                     const shortId = String(s.id || '').slice(0, 8);
-                    // suspend: pm2 stop + nginx 503 maintenance
                     await execCommand(cfg, `pm2 stop "${(s as any).pm2ProcessName}" 2>/dev/null || true; true`);
                     if ((s as any).domain) {
                         const conf = `/etc/nginx/sites-enabled/wexa-site-${shortId}.conf`;
                         const suspend = `server {
-  listen 80; server_name ${(s as any).domain};
+  listen 80;
+  server_name ${(s as any).domain};
   access_log /var/log/nginx/wexa-site-${shortId}-access.log;
   error_log /var/log/nginx/wexa-site-${shortId}-error.log;
-  return 503;
-  error_page 503 @maintenance;
-  location @maintenance { default_type text/html; return 503 '<!DOCTYPE html><html lang="ru"><head><title>Сайт приостановлен</title></head><body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc"><div style="max-width:560px;padding:2rem 3rem;border-radius:1rem;background:#fff;border:1px solid #e2e8f0"><h1 style="margin:0 0 .5rem">⏸️ Сайт приостановлен</h1><p style="color:#475569;line-height:1.5">Подписка закончилась. Оплатите счёт в ЛК wexa.su — сайт запустится автоматически.</p></div></body></html>'; }
+  default_type text/html;
+  return 503 '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Сайт приостановлен — Wexa.su</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f1f5f9,#cbd5e1);padding:2rem"><div style="max-width:620px;width:100%;padding:2.5rem;background:#fff;border-radius:1.25rem;box-shadow:0 10px 30px rgba(2,6,23,.08);border:1px solid rgba(2,6,23,.06)"><div style="display:inline-block;padding:.25rem .7rem;border-radius:999px;background:#fde68a;color:#92400e;font-weight:600;font-size:.8rem;margin-bottom:1.25rem;letter-spacing:.03em">⏸ Приостановлено</div><h1 style="margin:0 0 .75rem;font-size:1.75rem">Подписка закончилась</h1><p style="color:#475569;line-height:1.6;margin:.25rem 0">Ваш сайт временно отключён за неуплату. Зайдите в Личный кабинет на <a href="https://wexa.su/dashboard" style="color:#4f46e5;text-decoration:underline">wexa.su</a> и оплатите счёт — сайт запустится автоматически в течение 1 минуты.</p><p style="color:#64748b;font-size:.9rem;margin-top:1.25rem">По вопросам: support@wexa.su · Telegram @wexasupport</p></div></body></html>';
 }`;
-                        await execCommand(cfg, `mkdir -p /etc/nginx/sites-enabled && cat > ${conf} <<'NGXEOF'\n${suspend}\nNGXEOF\n; nginx -t && systemctl reload nginx || true`);
+                        const b64 = Buffer.from(suspend, 'utf8').toString('base64');
+                        await execCommand(cfg, `printf '%s' '${b64}' | base64 -d > '${conf}' && nginx -t && systemctl reload nginx || true`);
                     }
                 } catch (e) { console.error('Suspend website error:', s.id, e); }
             }
