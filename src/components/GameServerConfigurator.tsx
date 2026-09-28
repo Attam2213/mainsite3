@@ -185,6 +185,7 @@ interface GameServerConfiguratorProps {
   compact?: boolean;
   initialGame?: string;
   initialLocation?: string;
+  initialConfiguratorTab?: 'game' | 'website';
   nodes?: PublicNode[];
   showNameField?: boolean;
   isAuthenticated?: boolean;
@@ -197,6 +198,7 @@ const GameServerConfigurator = ({
   compact = false,
   initialGame,
   initialLocation,
+  initialConfiguratorTab = 'game',
   nodes: nodesProp,
   showNameField = false,
   isAuthenticated = false,
@@ -216,7 +218,7 @@ const GameServerConfigurator = ({
   const [cs16Build, setCs16Build] = useState('jives_cstrike_latest');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
-  const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>('game');
+  const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>(initialConfiguratorTab);
   const [selectedWebsitePlan, setSelectedWebsitePlan] = useState<'landing' | 'business' | 'premium'>('business');
   const [websitePlans, setWebsitePlans] = useState<WebsitePlan[]>([]);
   const [websiteDomain, setWebsiteDomain] = useState('');

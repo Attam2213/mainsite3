@@ -260,6 +260,7 @@ const ClientDashboard = () => {
   
   // Game Hosting State
   const [isCreateServerModalOpen, setIsCreateServerModalOpen] = useState(false);
+  const [initialConfiguratorTab, setInitialConfiguratorTab] = useState<'game' | 'website'>('game');
   const [isConsoleModalOpen, setIsConsoleModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
@@ -789,9 +790,14 @@ const ClientDashboard = () => {
     const params = new URLSearchParams(location.search);
     const serviceType = params.get('service');
     
-    if (serviceType === 'game' && nodes.length > 0) {
+    if ((serviceType === 'game' || serviceType === 'server') && nodes.length > 0) {
+        setInitialConfiguratorTab('game');
         setIsCreateServerModalOpen(true);
-        // Clear params
+        window.history.replaceState({}, '', '/dashboard');
+    }
+    if (serviceType === 'site' || serviceType === 'website') {
+        setInitialConfiguratorTab('website');
+        setIsCreateServerModalOpen(true);
         window.history.replaceState({}, '', '/dashboard');
     }
   }, [nodes, location]);
@@ -1836,7 +1842,7 @@ const ClientDashboard = () => {
                     <div className="mb-4 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-gray-900">Игровые серверы</h2>
                       <button
-                        onClick={() => setIsCreateServerModalOpen(true)}
+                        onClick={() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); }}
                         className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -2604,7 +2610,7 @@ const ClientDashboard = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => setIsCreateServerModalOpen(true)}
+                        onClick={() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); }}
                         className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
                       >
                         <Plus className="h-4 w-4" />
@@ -2861,13 +2867,14 @@ const ClientDashboard = () => {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <a
-                          href="/#pricing"
+                        <button
+                          type="button"
+                          onClick={() => { setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); }}
                           className="inline-flex items-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-sky-50"
                         >
                           <Plus className="mr-2 h-4 w-4" />
                           Заказать сайт
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -3156,7 +3163,9 @@ const ClientDashboard = () => {
                     </button>
                   </div>
                   <GameServerConfigurator
+                    key={initialConfiguratorTab + '-' + String(isCreateServerModalOpen)}
                     compact={true}
+                    initialConfiguratorTab={initialConfiguratorTab}
                     showNameField={true}
                     nodes={nodes as PublicNode[]}
                     isAuthenticated={true}
