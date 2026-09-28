@@ -1,6 +1,6 @@
 
 import { Request, Response } from 'express';
-import { GameServer, ServerNode, Invoice, User } from '../models';
+import { GameServer, ServerNode, Invoice, User, WalletTransaction } from '../models';
 import { decrypt } from '../utils/crypto';
 import { execCommand, uploadStream } from '../services/sshService';
 import Busboy from 'busboy';
@@ -1752,6 +1752,14 @@ export const deleteGameServer = async (req: Request, res: Response) => {
                 console.error('Error removing docker container / dir (continuing DB destroy):', err);
             }
         }
+
+        // Cleanup foreign key references (preserve invoices/wallet history, just unlink)
+        try {
+            await Invoice.update({ gameServerId: null }, { where: { gameServerId: id } });
+        } catch (e: any) { console.warn('Invoice unlink GS warning:', e?.message || e); }
+        try {
+            await WalletTransaction.update({ gameServerId: null }, { where: { gameServerId: id } });
+        } catch (e: any) { console.warn('WalletTx unlink GS warning:', e?.message || e); }
 
         await server.destroy();
         res.json({ message: 'Server deleted successfully' });

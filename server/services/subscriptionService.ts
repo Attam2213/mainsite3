@@ -1,4 +1,4 @@
-import { GameServer, Project, ServerNode, WebSite } from '../models';
+import { GameServer, Project, ServerNode, WebSite, Invoice, WalletTransaction } from '../models';
 import { execCommand, stopPM2Process } from './sshService';
 import { Op } from 'sequelize';
 import { decrypt } from '../utils/crypto';
@@ -114,6 +114,10 @@ nginx -t && systemctl reload nginx || true
                     await execCommand(config, `sh -lc "rm -rf ${hostDir} >/dev/null 2>&1 || true"`);
                 }
             } catch (e) { console.error('Delete unpaid game server resources error:', server.id, e); }
+            try {
+                await Invoice.update({ gameServerId: null }, { where: { gameServerId: server.id } });
+                await WalletTransaction.update({ gameServerId: null }, { where: { gameServerId: server.id } });
+            } catch (_) {}
             try { await server.destroy(); } catch (_) {}
             console.log(`[GameServer] DELETED (unpaid >3d) id=${server.id}, name=${server.name}.`);
         }
