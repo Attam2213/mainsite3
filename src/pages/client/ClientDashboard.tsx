@@ -4989,59 +4989,78 @@ const ClientDashboard = () => {
                         {webFilesLoading && <Loader className="h-4 w-4 animate-spin text-indigo-600" />}
                       </div>
 
-                      <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white">
-                        <table className="min-w-full divide-y divide-slate-100">
-                          <thead className="bg-slate-50 sticky top-0 z-10">
+                      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full border-collapse text-sm">
+                          <thead className="bg-slate-50/90 backdrop-blur sticky top-0 z-10">
                             <tr>
-                              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Имя</th>
-                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Размер</th>
-                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Действия</th>
+                              <th className="w-[60%] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Имя</th>
+                              <th className="w-[18%] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Размер</th>
+                              <th className="w-[22%] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Действия</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-50">
+                          <tbody>
                             {!webFilesLoading && webFiles.length === 0 && (
                               <tr>
-                                <td colSpan={3} className="px-4 py-12 text-center text-sm text-slate-400">
-                                  {webFilesPath === '/' ? 'Загрузите файлы вашего сайта в /public_html' : 'Папка пуста'}
+                                <td colSpan={3} className="px-4 py-16 text-center text-sm text-slate-400 align-middle">
+                                  <div className="flex flex-col items-center gap-2">
+                                    <Folder className="h-10 w-10 text-slate-300" />
+                                    {webFilesPath === '/' ? 'Загрузите файлы вашего сайта в /public_html' : 'Папка пуста'}
+                                  </div>
                                 </td>
                               </tr>
                             )}
                             {webFiles.map((f: any, idx: number) => (
                               <tr
-                                key={idx}
+                                key={`${String(f.name || 'f')}-${idx}`}
                                 onDoubleClick={() => {
                                   if (f.isDir || f.isDirectory) {
-                                    const np = (webFilesPath === '/' ? '' : webFilesPath) + '/' + f.name;
+                                    const np = (webFilesPath === '/' ? '' : webFilesPath) + '/' + String(f.name || '');
                                     loadWebSiteFiles(currentWebSite.id, np);
                                   }
                                 }}
-                                className="hover:bg-slate-50 cursor-pointer transition"
+                                className="border-b border-slate-100 hover:bg-indigo-50/60 transition"
+                                title={f.isDir || f.isDirectory ? 'Двойной клик — открыть папку' : undefined}
                               >
-                                <td className="px-4 py-2.5">
-                                  <div className="flex items-center gap-2 text-sm">
+                                <td className="px-4 py-2.5 align-middle">
+                                  <div className="flex min-w-0 items-center gap-2.5">
                                     {(f.isDir || f.isDirectory) ? (
-                                      <Folder className="h-4 w-4 text-amber-500" />
+                                      <Folder className="h-4.5 w-4.5 shrink-0 text-amber-500" />
                                     ) : (
-                                      <FileText className="h-4 w-4 text-slate-400" />
+                                      <FileText className="h-4.5 w-4.5 shrink-0 text-slate-400" />
                                     )}
-                                    <span className="font-medium text-slate-800">{f.name}</span>
+                                    <span className="truncate font-medium text-slate-800" title={String(f.name || '')}>{f.name}</span>
                                   </div>
                                 </td>
-                                <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                                <td className="px-4 py-2.5 text-right align-middle font-mono text-xs text-slate-500 whitespace-nowrap">
                                   {(f.isDir || f.isDirectory) ? '—' : `${(Number(f.size || 0) / 1024).toFixed(1)} KB`}
                                 </td>
-                                <td className="px-4 py-2.5 text-right">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const full = (webFilesPath === '/' ? '' : webFilesPath) + '/' + f.name;
-                                      deleteWebFile(currentWebSite.id, full);
-                                    }}
-                                    className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                                    title="Удалить"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
+                                <td className="px-4 py-2.5 text-right align-middle whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1">
+                                    {(f.isDir || f.isDirectory) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const np = (webFilesPath === '/' ? '' : webFilesPath) + '/' + String(f.name || '');
+                                          loadWebSiteFiles(currentWebSite.id, np);
+                                        }}
+                                        className="rounded-md p-1.5 text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition"
+                                        title="Открыть папку"
+                                      >
+                                        <ChevronRight className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const full = (webFilesPath === '/' ? '' : webFilesPath) + '/' + String(f.name || '');
+                                        deleteWebFile(currentWebSite.id, full);
+                                      }}
+                                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                      title="Удалить"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
