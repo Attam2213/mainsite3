@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
@@ -222,6 +222,7 @@ const GameServerConfigurator = ({
   const [websiteDomain, setWebsiteDomain] = useState('');
   const [websiteDomainMode, setWebsiteDomainMode] = useState<'subdomain' | 'custom'>('subdomain');
   const [websiteSubdomainName, setWebsiteSubdomainName] = useState('');
+  const websiteSubdomainRef = useRef<HTMLInputElement>(null);
   const [subdomainCheck, setSubdomainCheck] = useState<{ status: 'idle' | 'loading' | 'ok' | 'error'; message?: string; full?: string }>({ status: 'idle' });
   const [subdomainParent, setSubdomainParent] = useState<string>('wexa.su');
 
@@ -282,38 +283,33 @@ const GameServerConfigurator = ({
     });
   };
 
-  const setWebsiteSubdomainNameStable = (next: string) => {
-    const y = window.scrollY ?? document.documentElement?.scrollTop ?? document.body?.scrollTop ?? 0;
-    setWebsiteSubdomainName(next);
-    queueMicrotask(() => {
-      try { window.scrollTo(0, y); } catch {}
-      try { if (document.documentElement) document.documentElement.scrollTop = y; } catch {}
-      try { if (document.body) document.body.scrollTop = y; } catch {}
-      const activeEl = document.activeElement as HTMLElement | null;
-      const inputEl = (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) ? (activeEl as HTMLInputElement) : null;
-      if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
-        try { inputEl.focus({ preventScroll: true }); } catch {}
-      }
-    });
+  const setWebsiteSubdomainNameStable = (_next: string) => {
+    // УПРАВЛЯЕМЫЙ НА UREF: НИКАКОГО setState при вводе, чтобы не вызывать re-render и scroll jump
+    // Значение хранится в DOM input через ref, читаем только при check/submit
+    if (websiteSubdomainRef.current) {
+      const el = websiteSubdomainRef.current;
+      const sanitized = el.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (sanitized !== el.value) el.value = sanitized;
+    }
   };
 
   let subdomainCheckCancelRef = false;
   const checkSubdomainNow = () => {
     if (websiteDomainMode !== 'subdomain') return;
-    const raw = websiteSubdomainName.trim().toLowerCase();
+    const raw = (websiteSubdomainRef.current?.value ?? websiteSubdomainName).trim().toLowerCase();
     if (!raw) { setSubdomainCheck({ status: 'idle' }); return; }
     if (raw.length < 3) { setSubdomainCheck({ status: 'error', message: 'Минимум 3 символа' }); return; }
     if (raw.length > 42) { setSubdomainCheck({ status: 'error', message: 'Максимум 42 символа' }); return; }
     if (!/^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/.test(raw)) { setSubdomainCheck({ status: 'error', message: 'Только a-z, 0-9 и дефис (не в начале/конце)' }); return; }
     const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setWebsiteSubdomainName(raw);
     setSubdomainCheck({ status: 'loading' });
     subdomainCheckCancelRef = false;
     fetch(`/api/sites/check-subdomain?name=${encodeURIComponent(raw)}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (subdomainCheckCancelRef) return;
-        const y2 = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
-        const keepY = Math.max(y, y2);
+        const keepY = Math.max(y, window.scrollY ?? 0);
         if (!d?.ok) { setSubdomainCheck({ status: 'error', message: 'Ошибка проверки' }); }
         else {
           if (d.parent) setSubdomainParent(d.parent);
@@ -457,8 +453,15 @@ const GameServerConfigurator = ({
 
   const submitWebsiteOrder = async () => {
     if (!onWebsiteOrder) return;
+    const finalSubdomainName = websiteDomainMode === 'subdomain'
+      ? (websiteSubdomainRef.current?.value ?? websiteSubdomainName).trim().toLowerCase()
+      : undefined;
     if (websiteDomainMode === 'subdomain' && subdomainCheck.status !== 'ok') {
-      alert('Пожалуйста, выберите свободное имя для бесплатного поддомена');
+      alert('Пожалуйста, сначала нажмите «Проверить доступность» и выберите свободное имя для поддомена');
+      return;
+    }
+    if (websiteDomainMode === 'subdomain' && (!finalSubdomainName || finalSubdomainName.length < 3)) {
+      alert('Введите имя поддомена (минимум 3 символа) и проверьте его доступность');
       return;
     }
     setInternalLoading(true);
@@ -467,7 +470,7 @@ const GameServerConfigurator = ({
         plan: selectedWebsitePlan,
         periodMonths,
         domainType: websiteDomainMode,
-        subdomainName: websiteDomainMode === 'subdomain' ? websiteSubdomainName.trim().toLowerCase() : undefined,
+        subdomainName: finalSubdomainName,
         domain: websiteDomainMode === 'custom' ? websiteDomain.trim() || undefined : undefined,
       });
     } finally {
@@ -823,9 +826,10 @@ const GameServerConfigurator = ({
         <>
           <div className="flex items-stretch gap-2 rounded-2xl border-2 border-slate-200 focus-within:border-indigo-500 bg-white overflow-hidden">
             <input
+              ref={websiteSubdomainRef}
               type="text"
-              value={websiteSubdomainName}
-              onChange={(e) => setWebsiteSubdomainNameStable(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              defaultValue={websiteSubdomainName}
+              onChange={(e) => setWebsiteSubdomainNameStable(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); checkSubdomainNow(); } }}
               placeholder="например: orlan-taxi, ilves-shop, lk-my-site"
               className="flex-1 px-4 py-3 bg-transparent outline-none text-gray-900 font-medium"
