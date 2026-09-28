@@ -551,6 +551,11 @@ router.get('/admin/all', authenticateToken, isAdmin, async (_req: any, res: Resp
   return res.json({ ok: true, items: rows });
 });
 
+router.post('/admin/create', authenticateToken, isAdmin, async (req: any, res: Response) => {
+  req.body.autoPay = true;
+  req.body.plan = req.body.plan || 'business';
+  return (router.stack.find((l: any) => l.route && l.route.path === '/order') as any)?.handle?.(req, res, (e: any) => res.status(500).json({ message: String(e?.message || e) }));
+});
 router.post('/admin/sites/create', authenticateToken, isAdmin, async (req: any, res: Response) => {
   req.body.autoPay = true;
   req.body.plan = req.body.plan || 'business';
@@ -568,10 +573,27 @@ router.post('/admin/sites/:id/delete', authenticateToken, isAdmin, async (req: a
       if (site.sftpUsername) await execCommand(cfg, `id "${site.sftpUsername}" >/dev/null 2>&1 && ( umount "/srv/sftp/${site.sftpUsername}/public_html" 2>/dev/null; sed -i "\#/var/lib/wexa/sites/${site.id}#d" /etc/fstab 2>/dev/null; userdel -f -r "${site.sftpUsername}" 2>/dev/null; ) || true`);
       if (site.pm2ProcessName) await execCommand(cfg, `pm2 delete "${site.pm2ProcessName}" 2>/dev/null; rm -f "/etc/nginx/sites-enabled/wexa-site-${shortId}.conf"; pm2 save 2>/dev/null || true; nginx -t && systemctl reload nginx || true`);
     }
+    if (node && site.status !== 'deleted') {
+      const used = Number((node as any).usedWebSites || 0);
+      (node as any).usedWebSites = Math.max(0, used - 1);
+      await (node as any).save();
+    }
     await site.update({ status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, nginxConfPath: null });
     return res.json({ ok: true });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
+router.post('/admin/:id/delete', authenticateToken, isAdmin, async (req: any, res: Response) => {
+  req.params.id = req.params.id;
+  const h = (router.stack.find((l: any) => l.route && l.route.path === '/admin/sites/:id/delete') as any);
+  return h?.handle?.(req, res, (e: any) => res.status(500).json({ message: String(e?.message || e) }));
+});
+
+router.post('/admin/sites/:id/start', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'start'));
+router.post('/admin/sites/:id/stop', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'stop'));
+router.post('/admin/sites/:id/restart', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'restart'));
+router.post('/admin/:id/start', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'start'));
+router.post('/admin/:id/stop', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'stop'));
+router.post('/admin/:id/restart', authenticateToken, isAdmin, async (req: any, res: Response) => control(req, res, 'restart'));
 
 router.post('/admin/sites/:id/migrate', authenticateToken, isAdmin, async (req: any, res: Response) => {
   try {
@@ -669,6 +691,10 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
     console.error('Migrate site error:', e);
     return res.status(500).json({ message: String(e?.message ?? e) });
   }
+});
+router.post('/admin/:id/migrate', authenticateToken, isAdmin, async (req: any, res: Response) => {
+  const h = (router.stack.find((l: any) => l.route && l.route.path === '/admin/sites/:id/migrate') as any);
+  return h?.handle?.(req, res, (e: any) => res.status(500).json({ message: String(e?.message || e) }));
 });
 
 // ==================== apply paid invoice ==================

@@ -1106,31 +1106,43 @@ export const getPlayersCount = async (req: Request, res: Response) => {
 
         // @ts-ignore
         const node = server.node;
+        const safeMax = server.slots || 0;
+
+        if (!node || !node.ip || !server.port || server.status === 'suspended' || server.status === 'pending' || server.status === 'pending_payment' || server.status === 'awaiting_payment') {
+            res.json({ online: 0, max: safeMax });
+            return;
+        }
 
         if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
-            res.json({ online: 0, max: server.slots || 0 });
+            res.json({ online: 0, max: safeMax });
             return;
         }
 
         const host = node.ip as string;
-        const port = server.port as number;
-
-        if (server.game === 'minecraft') {
-            const { online, max } = await getMinecraftPlayers(host, port);
-            res.json({ online, max });
+        const port = Number(server.port) || 0;
+        if (!port) {
+            res.json({ online: 0, max: safeMax });
             return;
         }
 
-        if (server.game === 'cs2' || server.game === 'cs16') {
-            const { online, max } = await getSourcePlayers(host, port);
-            res.json({ online, max });
-            return;
+        let online = 0;
+        let max = safeMax;
+        try {
+            if (server.game === 'minecraft') {
+                const r = await getMinecraftPlayers(host, port);
+                online = Number(r?.online ?? 0); max = Number(r?.max ?? safeMax);
+            } else if (server.game === 'cs2' || server.game === 'cs16') {
+                const r = await getSourcePlayers(host, port);
+                online = Number(r?.online ?? 0); max = Number(r?.max ?? safeMax);
+            }
+        } catch (qerr: any) {
+            online = 0;
+            max = safeMax;
         }
-
-        res.json({ online: 0, max: server.slots || 0 });
+        res.json({ online, max: max || safeMax });
     } catch (error) {
         console.error('Players count error:', error);
-        res.status(500).json({ message: 'Error fetching players count' });
+        res.status(200).json({ online: 0, max: 0 });
     }
 };
 
