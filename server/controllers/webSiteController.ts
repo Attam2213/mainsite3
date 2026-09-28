@@ -392,11 +392,15 @@ router.get('/:id/files', async (req: any, res: Response) => {
       const m = line.match(/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+\s+\S+)\s+(.+)$/);
       if (!m) return null;
       const [, perms, links, owner, group, size, date, name] = m;
+      if (name === '.' || name === '..') return null;
       return {
         name, isDir: perms.startsWith('d'), size: Number.isNaN(Number(size)) ? 0 : Number(size),
         modified: date, perms, owner,
       } as any;
-    }).filter(Boolean);
+    }).filter(Boolean).sort((a: any, b: any) => {
+      if (!!a.isDir !== !!b.isDir) return a.isDir ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+    });
     return res.json({ ok: true, path, hostDir, items });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
