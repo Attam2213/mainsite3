@@ -64,6 +64,28 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/client"
+            element={
+              <ProtectedRoute allowedRoles={['client', 'admin']}>
+                <ClientDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 404 Fallback */}
+          <Route path="*" element={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-6">
+              <div className="max-w-md w-full text-center">
+                <div className="text-8xl font-black bg-gradient-to-br from-indigo-600 to-violet-600 bg-clip-text text-transparent mb-4">404</div>
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">Страница не найдена</h1>
+                <p className="text-slate-600 dark:text-slate-300 mb-8">К сожалению, страница, которую вы ищете, не существует или была перемещена.</p>
+                <a href="/" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 px-6 py-3 text-white font-bold shadow-lg hover:shadow-xl transition-shadow">
+                  ← Вернуться на главную
+                </a>
+              </div>
+            </div>
+          } />
         </Routes>
       </Router>
     </AuthProvider>
