@@ -283,11 +283,47 @@ const GameServerConfigurator = ({
   };
 
   const setWebsiteSubdomainNameStable = (next: string) => {
+    const docEl = document.documentElement;
+    const y = Math.max(window.scrollY ?? 0, docEl?.scrollTop ?? 0, document.body?.scrollTop ?? 0);
+    const activeEl = document.activeElement as HTMLElement | null;
+    const inputEl = (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) ? (activeEl as HTMLInputElement) : null;
+    let selStart = -1, selEnd = -1;
+    if (inputEl) { try { selStart = inputEl.selectionStart ?? -1; selEnd = inputEl.selectionEnd ?? -1; } catch {} }
     setWebsiteSubdomainName(next);
+    const restoreScroll = () => {
+      try { window.scrollTo(0, y); } catch {}
+      try { if (docEl) docEl.scrollTop = y; } catch {}
+      try { if (document.body) document.body.scrollTop = y; } catch {}
+      if (inputEl && document.body.contains(inputEl)) {
+        try {
+          const len = next.length;
+          const s = Math.max(0, Math.min(selStart, len));
+          const e = selEnd < 0 ? s : Math.max(0, Math.min(selEnd, len));
+          inputEl.focus({ preventScroll: true });
+          try { inputEl.setSelectionRange(s, e); } catch {}
+        } catch {}
+      }
+    };
+    queueMicrotask(restoreScroll);
+    setTimeout(restoreScroll, 0);
   };
 
   const setSubdomainCheckStable = (next: { status: 'idle' | 'loading' | 'ok' | 'error'; message?: string; full?: string }) => {
+    const docEl = document.documentElement;
+    const y = Math.max(window.scrollY ?? 0, docEl?.scrollTop ?? 0, document.body?.scrollTop ?? 0);
+    const activeEl = document.activeElement as HTMLElement | null;
+    const inputEl = (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) ? (activeEl as HTMLInputElement) : null;
     setSubdomainCheck(next);
+    const restoreScroll = () => {
+      try { window.scrollTo(0, y); } catch {}
+      try { if (docEl) docEl.scrollTop = y; } catch {}
+      try { if (document.body) document.body.scrollTop = y; } catch {}
+      if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
+        try { inputEl.focus({ preventScroll: true }); } catch {}
+      }
+    };
+    queueMicrotask(restoreScroll);
+    setTimeout(restoreScroll, 0);
   };
 
   const setMcVersionStable = (next: string) => { const y = window.scrollY ?? 0; setMcVersion(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
