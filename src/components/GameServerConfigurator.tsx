@@ -283,8 +283,18 @@ const GameServerConfigurator = ({
   };
 
   const setWebsiteSubdomainNameStable = (next: string) => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? document.body?.scrollTop ?? 0;
     setWebsiteSubdomainName(next);
-    if (subdomainCheck.status !== 'idle') setSubdomainCheck({ status: 'idle' });
+    queueMicrotask(() => {
+      try { window.scrollTo(0, y); } catch {}
+      try { if (document.documentElement) document.documentElement.scrollTop = y; } catch {}
+      try { if (document.body) document.body.scrollTop = y; } catch {}
+      const activeEl = document.activeElement as HTMLElement | null;
+      const inputEl = (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) ? (activeEl as HTMLInputElement) : null;
+      if (inputEl && document.body.contains(inputEl) && document.activeElement !== inputEl) {
+        try { inputEl.focus({ preventScroll: true }); } catch {}
+      }
+    });
   };
 
   let subdomainCheckCancelRef = false;
