@@ -221,6 +221,55 @@ const GameServerConfigurator = ({
   const nodes = nodesProp ?? internalNodes;
   const orderLoading = externalLoading ?? internalLoading;
 
+  const setSelectedGameStable = (next: string) => {
+    const x = window.scrollX ?? 0;
+    const y = window.scrollY ?? 0;
+    const doc = (document.scrollingElement || document.documentElement) as HTMLElement;
+    const docX = doc?.scrollLeft ?? 0;
+    const docY = doc?.scrollTop ?? 0;
+    const keepX = Math.max(x, docX);
+    const keepY = Math.max(y, docY);
+    setSelectedGame(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ left: keepX, top: keepY, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ left: keepX, top: keepY, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
+  const setSelectedLocationStable = (next: string) => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setSelectedLocation(next);
+    queueMicrotask(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+  };
+
+  const setPeriodMonthsStable = (next: number) => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setPeriodMonths(next);
+    queueMicrotask(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+  };
+
+  const setConfiguratorTabStable = (next: 'game' | 'website') => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setConfiguratorTab(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
+  const setSelectedWebsitePlanStable = (next: 'landing' | 'business' | 'premium') => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setSelectedWebsitePlan(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
+  const setMcVersionStable = (next: string) => { const y = window.scrollY ?? 0; setMcVersion(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
+  const setMcCoreStable = (next: string) => { const y = window.scrollY ?? 0; setMcCore(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
+  const setCs16BuildStable = (next: string) => { const y = window.scrollY ?? 0; setCs16Build(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
+
   useEffect(() => {
     if (nodesProp !== undefined) return;
     fetch('/api/nodes/public')
@@ -385,7 +434,7 @@ const GameServerConfigurator = ({
             <button
               key={g.id}
               type="button"
-              onClick={() => setSelectedGame(g.id)}
+              onClick={(e) => { e.preventDefault(); setSelectedGameStable(g.id); }}
               className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
                 active
                   ? 'border-indigo-500 bg-indigo-50 shadow-inner'
@@ -411,7 +460,7 @@ const GameServerConfigurator = ({
             <button
               key={loc.id}
               type="button"
-              onClick={() => setSelectedLocation(loc.id)}
+              onClick={(e) => { e.preventDefault(); setSelectedLocationStable(loc.id); }}
               className={`p-3 rounded-xl border-2 text-center transition-all text-sm font-bold ${
                 active
                   ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
@@ -437,7 +486,7 @@ const GameServerConfigurator = ({
             <button
               key={p}
               type="button"
-              onClick={() => setPeriodMonths(p)}
+              onClick={(e) => { e.preventDefault(); setPeriodMonthsStable(p); }}
               className={`flex items-center justify-center py-3 px-3 rounded-xl border-2 font-semibold text-sm transition-all ${
                 active
                   ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner'
@@ -510,7 +559,7 @@ const GameServerConfigurator = ({
               onChange={e => {
                 const v = e.target.value;
                 if (v === '__custom__') return;
-                setMcVersion(v);
+                setMcVersionStable(v);
               }}
               className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
             >
@@ -522,7 +571,7 @@ const GameServerConfigurator = ({
             <input
               type="text"
               value={mcVersion}
-              onChange={e => setMcVersion(e.target.value)}
+              onChange={e => setMcVersionStable(e.target.value)}
               placeholder="например 1.20.1"
               className="w-40 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium font-mono text-indigo-900"
             />
@@ -538,7 +587,7 @@ const GameServerConfigurator = ({
           <label className="block text-sm font-semibold text-gray-700 mb-2">Тип ядра</label>
           <select
             value={mcCore}
-            onChange={e => setMcCore(e.target.value)}
+            onChange={e => setMcCoreStable(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
           >
             {MINECRAFT_CORE_OPTIONS.map(opt => (
@@ -603,7 +652,7 @@ const GameServerConfigurator = ({
           <label className="block text-sm font-semibold text-gray-700 mb-2">Версия HLDS / ReHLDS</label>
           <select
             value={cs16Build}
-            onChange={e => setCs16Build(e.target.value)}
+            onChange={e => setCs16BuildStable(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-0 outline-none text-sm font-medium bg-white"
           >
             {CS16_BUILD_OPTIONS.map(o => (
@@ -645,7 +694,7 @@ const GameServerConfigurator = ({
             <button
               key={p.id}
               type="button"
-              onClick={() => setSelectedWebsitePlan(p.id)}
+              onClick={(e) => { e.preventDefault(); setSelectedWebsitePlanStable(p.id); }}
               className={`text-left p-5 rounded-2xl border-2 transition-all relative bg-white hover:shadow-lg ${
                 active ? `${accent.border} ring-4 ${accent.bg}/60 shadow-inner` : 'border-gray-200 hover:border-gray-300'
               }`}
@@ -967,7 +1016,7 @@ const GameServerConfigurator = ({
               <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setConfiguratorTab('game')}
+                  onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
                     configuratorTab === 'game'
                       ? 'bg-white shadow text-indigo-700 border border-indigo-100'
@@ -979,7 +1028,7 @@ const GameServerConfigurator = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfiguratorTab('website')}
+                  onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
                     configuratorTab === 'website'
                       ? 'bg-white shadow text-indigo-700 border border-indigo-100'
