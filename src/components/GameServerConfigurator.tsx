@@ -273,6 +273,33 @@ const GameServerConfigurator = ({
     });
   };
 
+  const setWebsiteDomainModeStable = (next: 'subdomain' | 'custom') => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setWebsiteDomainMode(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
+  const setWebsiteSubdomainNameStable = (next: string) => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setWebsiteSubdomainName(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
+  const setSubdomainCheckStable = (next: { status: 'idle' | 'loading' | 'ok' | 'error'; message?: string; full?: string }) => {
+    const y = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    setSubdomainCheck(next);
+    queueMicrotask(() => {
+      try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {}
+      requestAnimationFrame(() => { try { window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); } catch {} });
+    });
+  };
+
   const setMcVersionStable = (next: string) => { const y = window.scrollY ?? 0; setMcVersion(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
   const setMcCoreStable = (next: string) => { const y = window.scrollY ?? 0; setMcCore(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
   const setCs16BuildStable = (next: string) => { const y = window.scrollY ?? 0; setCs16Build(next); queueMicrotask(() => { try { window.scrollTo(0, y); } catch {} }); };
@@ -361,24 +388,24 @@ const GameServerConfigurator = ({
   }, []);
 
   useEffect(() => {
-    if (websiteDomainMode !== 'subdomain') { setSubdomainCheck({ status: 'idle' }); return; }
+    if (websiteDomainMode !== 'subdomain') { setSubdomainCheckStable({ status: 'idle' }); return; }
     const raw = websiteSubdomainName.trim().toLowerCase();
-    if (!raw) { setSubdomainCheck({ status: 'idle' }); return; }
-    if (raw.length < 3) { setSubdomainCheck({ status: 'error', message: 'Минимум 3 символа' }); return; }
-    if (raw.length > 42) { setSubdomainCheck({ status: 'error', message: 'Максимум 42 символа' }); return; }
-    if (!/^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/.test(raw)) { setSubdomainCheck({ status: 'error', message: 'Только a-z, 0-9 и дефис (не в начале/конце)' }); return; }
-    setSubdomainCheck({ status: 'loading' });
+    if (!raw) { setSubdomainCheckStable({ status: 'idle' }); return; }
+    if (raw.length < 3) { setSubdomainCheckStable({ status: 'error', message: 'Минимум 3 символа' }); return; }
+    if (raw.length > 42) { setSubdomainCheckStable({ status: 'error', message: 'Максимум 42 символа' }); return; }
+    if (!/^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/.test(raw)) { setSubdomainCheckStable({ status: 'error', message: 'Только a-z, 0-9 и дефис (не в начале/конце)' }); return; }
+    setSubdomainCheckStable({ status: 'loading' });
     let cancel = false;
     fetch(`/api/sites/check-subdomain?name=${encodeURIComponent(raw)}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (cancel) return;
-        if (!d?.ok) { setSubdomainCheck({ status: 'error', message: 'Ошибка проверки' }); return; }
+        if (!d?.ok) { setSubdomainCheckStable({ status: 'error', message: 'Ошибка проверки' }); return; }
         if (d.parent) setSubdomainParent(d.parent);
-        if (d.available) setSubdomainCheck({ status: 'ok', message: `Свободно: ${d.full}`, full: d.full || undefined });
-        else setSubdomainCheck({ status: 'error', message: d.reason || 'Занято' });
+        if (d.available) setSubdomainCheckStable({ status: 'ok', message: `Свободно: ${d.full}`, full: d.full || undefined });
+        else setSubdomainCheckStable({ status: 'error', message: d.reason || 'Занято' });
       })
-      .catch(() => { if (!cancel) setSubdomainCheck({ status: 'error', message: 'Не удалось проверить' }); });
+      .catch(() => { if (!cancel) setSubdomainCheckStable({ status: 'error', message: 'Не удалось проверить' }); });
     const t = setTimeout(() => {}, 50);
     return () => { cancel = true; clearTimeout(t); };
   }, [websiteSubdomainName, websiteDomainMode]);
@@ -776,14 +803,14 @@ const GameServerConfigurator = ({
       <div className="flex items-stretch gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-1 mb-3">
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); setWebsiteDomainMode('subdomain'); }}
+          onClick={(e) => { e.preventDefault(); setWebsiteDomainModeStable('subdomain'); }}
           className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'subdomain' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
         >
           🎁 Бесплатный поддомен
         </button>
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); setWebsiteDomainMode('custom'); }}
+          onClick={(e) => { e.preventDefault(); setWebsiteDomainModeStable('custom'); }}
           className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'custom' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
         >
           🌐 Свой домен
@@ -796,7 +823,7 @@ const GameServerConfigurator = ({
             <input
               type="text"
               value={websiteSubdomainName}
-              onChange={(e) => setWebsiteSubdomainName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              onChange={(e) => setWebsiteSubdomainNameStable(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
               placeholder="например: orlan-taxi, ilves-shop, lk-my-site"
               className="flex-1 px-4 py-3 bg-transparent outline-none text-gray-900 font-medium"
               maxLength={42}
