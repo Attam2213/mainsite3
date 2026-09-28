@@ -116,6 +116,8 @@ interface HostingNode {
 interface WebSiteItem {
   id: string;
   domain: string | null;
+  domainType?: 'subdomain' | 'custom' | null;
+  subdomainName?: string | null;
   plan: 'landing' | 'business' | 'premium';
   price: number;
   status: 'pending' | 'provisioning' | 'active' | 'suspended' | 'deleting' | 'deleted';
@@ -3528,7 +3530,14 @@ const AdminDashboard = () => {
                                   <a href={`http://${ws.domain}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">{ws.domain} ↗</a>
                                 ) : <span className="text-gray-400 italic">домен не указан</span>}
                               </div>
-                              <div className="text-[11px] text-gray-400 font-mono">{ws.id?.slice(0, 10)}…</div>
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                {ws.domainType === 'subdomain' ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">🎁 Wexa Поддомен</span>
+                                ) : ws.domain ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">🌐 Свой домен</span>
+                                ) : null}
+                                <span className="text-[11px] text-gray-400 font-mono">{ws.id?.slice(0, 10)}…</span>
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="text-sm text-gray-900 font-medium">{ws.user?.name || ws.userId?.slice(0, 8)}</div>

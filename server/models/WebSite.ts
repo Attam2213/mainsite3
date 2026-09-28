@@ -4,12 +4,15 @@ import sequelize from '../config/database';
 type WebSitePlan = 'landing' | 'business' | 'premium';
 type WebSiteStatus = 'pending' | 'provisioning' | 'active' | 'suspended' | 'deleting' | 'deleted';
 type WebSiteTemplate = 'static' | 'nodejs' | 'wordpress';
+type WebSiteDomainType = 'subdomain' | 'custom';
 
 class WebSite extends Model {
   declare id: string;
   declare userId: string;
   declare nodeId: string | null;
   declare domain: string | null;
+  declare domainType: WebSiteDomainType | null;
+  declare subdomainName: string | null;
   declare plan: WebSitePlan;
   declare priceMonthly: number;
   declare status: WebSiteStatus;
@@ -41,6 +44,12 @@ WebSite.init(
     userId: { type: DataTypes.UUID, allowNull: false },
     nodeId: { type: DataTypes.UUID, allowNull: true },
     domain: { type: DataTypes.STRING, allowNull: true, unique: true },
+    domainType: {
+      type: DataTypes.ENUM('subdomain', 'custom'),
+      allowNull: true,
+      defaultValue: 'custom',
+    },
+    subdomainName: { type: DataTypes.STRING, allowNull: true, unique: true },
     plan: {
       type: DataTypes.ENUM('landing', 'business', 'premium'),
       allowNull: false,
@@ -77,7 +86,9 @@ WebSite.init(
       { fields: ['userId'] },
       { fields: ['nodeId'] },
       { fields: ['status'] },
-      { fields: ['domain'] },
+      { fields: ['domain'], unique: true },
+      { fields: ['subdomainName'], unique: true },
+      { fields: ['domainType'] },
     ],
   }
 );

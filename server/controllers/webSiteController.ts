@@ -25,6 +25,27 @@ import multer from 'multer';
 
 const router = Router();
 const SALT_ROUNDS = 10;
+const SUBDOMAIN_PARENT = process.env.WEBSITE_SUBDOMAIN_PARENT || 'wexa.su';
+const SUBDOMAIN_REGEX = /^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/;
+const DOMAIN_REGEX = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
+const RESERVED_SUBDOMAINS = new Set([
+  'www', 'mail', 'smtp', 'pop', 'pop3', 'imap', 'ftp', 'sftp', 'ssh',
+  'cpanel', 'whm', 'plesk', 'ispmanager', 'ns1', 'ns2', 'ns3', 'ns',
+  'admin', 'api', 'app', 'blog', 'shop', 'store', 'dev', 'test',
+  'staging', 'stage', 'demo', 'cdn', 'static', 'media', 'img',
+  'minecraft', 'cs', 'csgo', 'cs2', 'valve', 'panel', 'billing',
+  'cabinet', 'account', 'support', 'help', 'docs', 'status',
+]);
+
+const validateSubdomainName = (name: string): { ok: true } | { ok: false; reason: string } => {
+  const raw = String(name || '').trim().toLowerCase();
+  if (!raw) return { ok: false, reason: 'Введите имя поддомена' };
+  if (raw.length < 3) return { ok: false, reason: 'Минимум 3 символа' };
+  if (raw.length > 42) return { ok: false, reason: 'Максимум 42 символа' };
+  if (!SUBDOMAIN_REGEX.test(raw)) return { ok: false, reason: 'Только a-z, 0-9 и дефис (не в начале/конце)' };
+  if (RESERVED_SUBDOMAINS.has(raw)) return { ok: false, reason: 'Это имя зарезервировано' };
+  return { ok: true };
+};
 
 const getIsAdminFromReq = (req: any): boolean => Boolean(req?.user?.role === 'admin');
 
@@ -77,6 +98,15 @@ router.post('/plans/calculate', (req: Request, res: Response) => {
   }
 });
 
+router.get('/check-subdomain', async (req: Request, res: Response) => {
+  const name = String(req.query.name || '').trim().toLowerCase();
+  const v = validateSubdomainName(name);
+  if (!v.ok) return res.json({ ok: true, available: false, reason: v.reason, parent: SUBDOMAIN_PARENT, full: null });
+  const colliding = await WebSite.findOne({ where: { subdomainName: name } as any });
+  if (colliding) return res.json({ ok: true, available: false, reason: 'Имя уже занято', parent: SUBDOMAIN_PARENT, full: null });
+  return res.json({ ok: true, available: true, parent: SUBDOMAIN_PARENT, full: `${name}.${SUBDOMAIN_PARENT}` });
+});
+
 // ============== Auth required user endpoints ==============
 router.get('/mine', authenticateToken, async (req: any, res: Response) => {
   const userId = req.user.id;
@@ -106,10 +136,37 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
     const user = await User.findByPk(userId) as any;
     if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
 
+    const rawDomainType = (body.domainType && ['subdomain', 'custom'].includes(body.domainType)) ? body.domainType : null;
+    let domain: string | null = null;
+    let subdomainName: string | null = null;
+    let domainType: 'subdomain' | 'custom' | null = null;
+
+    if (rawDomainType === 'subdomain') {
+      const name = String(body.subdomainName || '').trim().toLowerCase();
+      const v = validateSubdomainName(name);
+      if (!v.ok) return res.status(400).json({ message: `Имя поддомена: ${v.reason}` });
+      const colliding = await WebSite.findOne({ where: { subdomainName: name } as any });
+      if (colliding) return res.status(409).json({ message: 'Это имя поддомена уже занято' });
+      subdomainName = name;
+      domain = `${name}.${SUBDOMAIN_PARENT}`;
+      domainType = 'subdomain';
+    } else {
+      if (body.domain && String(body.domain).trim()) {
+        const d = String(body.domain).trim().toLowerCase();
+        if (!DOMAIN_REGEX.test(d)) return res.status(400).json({ message: 'Неверный формат домена' });
+        const col = await WebSite.findOne({ where: { domain: d } as any });
+        if (col) return res.status(409).json({ message: 'Этот домен уже используется' });
+        domain = d;
+        domainType = 'custom';
+      }
+    }
+
     const existingSite = await WebSite.create({
       userId,
       nodeId: node?.id ?? null,
-      domain: typeof body.domain === 'string' && body.domain.trim() ? body.domain.trim() : null,
+      domain,
+      domainType,
+      subdomainName,
       plan,
       priceMonthly: breakdown.priceMonthly,
       status: 'pending',
@@ -269,12 +326,24 @@ router.patch('/:id/settings', async (req: any, res: Response) => {
     }
     let needNginxReload = false;
     const node = site.node;
-    if (body.domain !== undefined && String(body.domain).trim()) {
+    if (body.domainType === 'subdomain' && body.subdomainName !== undefined) {
+      const name = String(body.subdomainName || '').trim().toLowerCase();
+      const v = validateSubdomainName(name);
+      if (!v.ok) return res.status(400).json({ message: `Имя поддомена: ${v.reason}` });
+      const col = await WebSite.findOne({ where: { subdomainName: name, id: { [Op.ne]: site.id } } as any });
+      if (col) return res.status(409).json({ message: 'Это имя поддомена уже занято' });
+      patch.subdomainName = name;
+      patch.domain = `${name}.${SUBDOMAIN_PARENT}`;
+      patch.domainType = 'subdomain';
+      needNginxReload = true;
+    } else if (body.domainType === 'custom' && body.domain !== undefined && String(body.domain).trim()) {
       const domain = String(body.domain).trim().toLowerCase();
-      if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return res.status(400).json({ message: 'Неверный формат домена' });
+      if (!DOMAIN_REGEX.test(domain)) return res.status(400).json({ message: 'Неверный формат домена' });
       const colliding = await WebSite.findOne({ where: { domain, id: { [Op.ne]: site.id } } as any });
       if (colliding) return res.status(409).json({ message: 'Этот домен уже используется другим сайтом' });
       patch.domain = domain;
+      patch.domainType = 'custom';
+      patch.subdomainName = null;
       needNginxReload = true;
     }
     if (body.plan !== undefined) {

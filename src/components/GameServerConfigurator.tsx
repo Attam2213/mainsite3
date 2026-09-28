@@ -4,7 +4,8 @@ import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
   Terminal, Upload, Crown, Sparkles, CreditCard, Cpu,
-  Globe, Database, FileText, Headphones, Rocket, Award
+  Globe, Database, FileText, Headphones, Rocket, Award,
+  Loader2, CheckCircle2, XCircle,
 } from 'lucide-react';
 
 export const SUPPORTED_GAMES = [
@@ -175,6 +176,8 @@ export interface WebsitePlan {
 export interface WebsiteOrderPayload {
   plan: 'landing' | 'business' | 'premium';
   periodMonths: number;
+  domainType?: 'subdomain' | 'custom';
+  subdomainName?: string;
   domain?: string;
 }
 
@@ -217,6 +220,10 @@ const GameServerConfigurator = ({
   const [selectedWebsitePlan, setSelectedWebsitePlan] = useState<'landing' | 'business' | 'premium'>('business');
   const [websitePlans, setWebsitePlans] = useState<WebsitePlan[]>([]);
   const [websiteDomain, setWebsiteDomain] = useState('');
+  const [websiteDomainMode, setWebsiteDomainMode] = useState<'subdomain' | 'custom'>('subdomain');
+  const [websiteSubdomainName, setWebsiteSubdomainName] = useState('');
+  const [subdomainCheck, setSubdomainCheck] = useState<{ status: 'idle' | 'loading' | 'ok' | 'error'; message?: string; full?: string }>({ status: 'idle' });
+  const [subdomainParent, setSubdomainParent] = useState<string>('wexa.su');
 
   const nodes = nodesProp ?? internalNodes;
   const orderLoading = externalLoading ?? internalLoading;
@@ -353,6 +360,29 @@ const GameServerConfigurator = ({
       });
   }, []);
 
+  useEffect(() => {
+    if (websiteDomainMode !== 'subdomain') { setSubdomainCheck({ status: 'idle' }); return; }
+    const raw = websiteSubdomainName.trim().toLowerCase();
+    if (!raw) { setSubdomainCheck({ status: 'idle' }); return; }
+    if (raw.length < 3) { setSubdomainCheck({ status: 'error', message: 'Минимум 3 символа' }); return; }
+    if (raw.length > 42) { setSubdomainCheck({ status: 'error', message: 'Максимум 42 символа' }); return; }
+    if (!/^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/.test(raw)) { setSubdomainCheck({ status: 'error', message: 'Только a-z, 0-9 и дефис (не в начале/конце)' }); return; }
+    setSubdomainCheck({ status: 'loading' });
+    let cancel = false;
+    fetch(`/api/sites/check-subdomain?name=${encodeURIComponent(raw)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancel) return;
+        if (!d?.ok) { setSubdomainCheck({ status: 'error', message: 'Ошибка проверки' }); return; }
+        if (d.parent) setSubdomainParent(d.parent);
+        if (d.available) setSubdomainCheck({ status: 'ok', message: `Свободно: ${d.full}`, full: d.full || undefined });
+        else setSubdomainCheck({ status: 'error', message: d.reason || 'Занято' });
+      })
+      .catch(() => { if (!cancel) setSubdomainCheck({ status: 'error', message: 'Не удалось проверить' }); });
+    const t = setTimeout(() => {}, 50);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [websiteSubdomainName, websiteDomainMode]);
+
   const game = SUPPORTED_GAMES.find(g => g.id === selectedGame)!;
   const websitePlan = websitePlans.find(p => p.id === selectedWebsitePlan) ?? websitePlans[1];
 
@@ -398,12 +428,18 @@ const GameServerConfigurator = ({
 
   const submitWebsiteOrder = async () => {
     if (!onWebsiteOrder) return;
+    if (websiteDomainMode === 'subdomain' && subdomainCheck.status !== 'ok') {
+      alert('Пожалуйста, выберите свободное имя для бесплатного поддомена');
+      return;
+    }
     setInternalLoading(true);
     try {
       await onWebsiteOrder({
         plan: selectedWebsitePlan,
         periodMonths,
-        domain: websiteDomain.trim() || undefined,
+        domainType: websiteDomainMode,
+        subdomainName: websiteDomainMode === 'subdomain' ? websiteSubdomainName.trim().toLowerCase() : undefined,
+        domain: websiteDomainMode === 'custom' ? websiteDomain.trim() || undefined : undefined,
       });
     } finally {
       setInternalLoading(false);
@@ -736,19 +772,81 @@ const GameServerConfigurator = ({
 
   const WebsiteDomainField = () => (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-3">
-        Домен (необязательно)
-      </label>
-      <input
-        type="text"
-        value={websiteDomain}
-        onChange={e => setWebsiteDomain(e.target.value)}
-        placeholder="например: orlan-taxi.ru (оставьте пустым — дадим временный)"
-        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
-      />
-      <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
-        Если домен уже есть — привяжите его позже в ЛК (A-запись на IP ноды). Без домена сайт будет доступен по временному URL.
-      </p>
+      <label className="block text-sm font-bold text-gray-700 mb-3">Домен вашего сайта</label>
+      <div className="flex items-stretch gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-1 mb-3">
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); setWebsiteDomainMode('subdomain'); }}
+          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'subdomain' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          🎁 Бесплатный поддомен
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); setWebsiteDomainMode('custom'); }}
+          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'custom' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          🌐 Свой домен
+        </button>
+      </div>
+
+      {websiteDomainMode === 'subdomain' && (
+        <>
+          <div className="flex items-stretch gap-2 rounded-2xl border-2 border-slate-200 focus-within:border-indigo-500 bg-white overflow-hidden">
+            <input
+              type="text"
+              value={websiteSubdomainName}
+              onChange={(e) => setWebsiteSubdomainName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              placeholder="например: orlan-taxi, ilves-shop, lk-my-site"
+              className="flex-1 px-4 py-3 bg-transparent outline-none text-gray-900 font-medium"
+              maxLength={42}
+              autoComplete="off"
+            />
+            <div className="flex items-center shrink-0 px-4 py-3 bg-slate-50 border-l border-slate-200 font-mono text-sm text-slate-600 font-bold select-none">
+              .{subdomainParent}
+            </div>
+            <div className="flex items-center shrink-0 px-3">
+              {subdomainCheck.status === 'loading' && (
+                <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+              )}
+              {subdomainCheck.status === 'ok' && (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              )}
+              {subdomainCheck.status === 'error' && (
+                <XCircle className="h-5 w-5 text-rose-500" />
+              )}
+            </div>
+          </div>
+          <p className={`mt-2 text-[12px] font-semibold leading-snug ${
+            subdomainCheck.status === 'ok' ? 'text-emerald-600' :
+            subdomainCheck.status === 'error' ? 'text-rose-600' :
+            subdomainCheck.status === 'loading' ? 'text-indigo-600' : 'text-slate-500'
+          }`}>
+            {subdomainCheck.status === 'idle' && 'Введите имя — мы проверим свободно ли оно. Минимум 3 символа.'}
+            {subdomainCheck.status === 'loading' && 'Проверяем свободность…'}
+            {subdomainCheck.status === 'ok' && (subdomainCheck.message || `Свободно ✓ ${websiteSubdomainName.toLowerCase()}.${subdomainParent}`)}
+            {subdomainCheck.status === 'error' && (subdomainCheck.message || 'Занято. Попробуйте другое имя.')}
+          </p>
+          <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+            Бесплатно навсегда. SSL-сертификат Let's Encrypt выдаётся автоматически. Ничего регистрировать не нужно.
+          </p>
+        </>
+      )}
+
+      {websiteDomainMode === 'custom' && (
+        <>
+          <input
+            type="text"
+            value={websiteDomain}
+            onChange={e => setWebsiteDomain(e.target.value)}
+            placeholder="например: orlan-taxi.ru или ilves.com"
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
+          />
+          <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+            Купите домен у любого регистратора (reg.ru / webnames.ru / nic.ru). Затем в DNS добавьте A-запись <code className="rounded bg-slate-100 px-1.5 py-0.5">@ → 82.146.47.246</code> и подождите 5–60 минут. Привязать домен можно позже в ЛК.
+          </p>
+        </>
+      )}
     </div>
   );
 

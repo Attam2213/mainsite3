@@ -221,6 +221,8 @@ const startServer = async () => {
           "userId" UUID NOT NULL,
           "nodeId" UUID,
           domain VARCHAR(255) UNIQUE,
+          "domainType" VARCHAR(16) DEFAULT 'custom',
+          "subdomainName" VARCHAR(64) UNIQUE,
           plan VARCHAR(16) NOT NULL DEFAULT 'landing',
           "priceMonthly" INTEGER NOT NULL DEFAULT 149,
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
@@ -254,13 +256,18 @@ const startServer = async () => {
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_user ON web_sites("userId");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_node ON web_sites("nodeId");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_domain_type ON web_sites("domainType");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "domainType" VARCHAR(16) DEFAULT 'custom';`); } catch (_) {}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "subdomainName" VARCHAR(64) UNIQUE;`); } catch (_) {}
       } else if (dialect === 'sqlite') {
         await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
           id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
           "userId" TEXT NOT NULL,
           "nodeId" TEXT,
           domain TEXT UNIQUE,
+          "domainType" TEXT DEFAULT 'custom',
+          "subdomainName" TEXT UNIQUE,
           plan TEXT NOT NULL DEFAULT 'landing',
           "priceMonthly" INTEGER NOT NULL DEFAULT 149,
           status TEXT NOT NULL DEFAULT 'pending',
@@ -294,13 +301,18 @@ const startServer = async () => {
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_user ON web_sites("userId");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_node ON web_sites("nodeId");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_domain_type ON web_sites("domainType");`);
         await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
+        try { await ensureSqliteColumn('web_sites','domainType','TEXT DEFAULT \'custom\''); } catch(_){}
+        try { await ensureSqliteColumn('web_sites','subdomainName','TEXT UNIQUE'); } catch(_){}
       } else {
         await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
           id VARCHAR(36) PRIMARY KEY,
           userId VARCHAR(36) NOT NULL,
           nodeId VARCHAR(36),
           domain VARCHAR(255) UNIQUE,
+          domainType VARCHAR(16) DEFAULT 'custom',
+          subdomainName VARCHAR(64) UNIQUE,
           plan VARCHAR(16) NOT NULL DEFAULT 'landing',
           priceMonthly INTEGER NOT NULL DEFAULT 149,
           status VARCHAR(16) NOT NULL DEFAULT 'pending',

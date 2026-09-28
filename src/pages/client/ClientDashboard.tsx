@@ -2881,7 +2881,7 @@ const ClientDashboard = () => {
                           <div key={ws.id} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md hover:border-slate-300">
                             <div className="flex items-start justify-between mb-4 gap-3">
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1.5">
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                   <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${meta.color}`}>
                                     <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
                                     {meta.label}
@@ -2889,6 +2889,15 @@ const ClientDashboard = () => {
                                   <span className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-50 to-violet-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-100">
                                     {getWebPlanLabel(ws.plan)}
                                   </span>
+                                  {ws.domainType === 'subdomain' ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-100">
+                                      🎁 Бесплатный поддомен
+                                    </span>
+                                  ) : ws.domain ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-slate-600 border border-slate-200">
+                                      🌐 Свой домен
+                                    </span>
+                                  ) : null}
                                 </div>
                                 {fullUrl ? (
                                   <a
