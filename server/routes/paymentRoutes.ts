@@ -5,10 +5,37 @@ import { plategaService } from '../services/PlategaService';
 import { execCommand, startPM2Process } from '../services/sshService';
 import { decrypt } from '../utils/crypto';
 import { applyGameServerPaidInvoice } from '../controllers/gameServerController';
-import { adjustBalance } from '../services/balanceService';
+import { applyWebSitePaidInvoice } from '../controllers/webSiteController';
+import { adjustBalance, getBalance, round2 } from '../services/balanceService';
 import { Request, Response } from 'express';
 
 const router = express.Router();
+
+async function applyPostPaidInvoice(invoice: any) {
+  if (!invoice) return;
+  if (invoice.type === 'monthly' && invoice.projectId) {
+    try {
+      const project = await Project.findByPk(invoice.projectId);
+      if (project) {
+        let startDate = new Date();
+        const cur = (project as any).paidUntil ? new Date((project as any).paidUntil) : null;
+        if (cur && cur > startDate) startDate = cur;
+        const months = Number(invoice.periodMonths) || 1;
+        const newPaidUntil = new Date(startDate);
+        newPaidUntil.setMonth(newPaidUntil.getMonth() + months);
+        (project as any).paidUntil = newPaidUntil;
+        await project.save();
+        await startPM2Process(project);
+      }
+    } catch (e) { console.error('postpaid apply project error', e); }
+  }
+  if (invoice.type === 'monthly' && invoice.gameServerId) {
+    try { await applyGameServerPaidInvoice(invoice); } catch (e) { console.error('postpaid apply gs error', e); }
+  }
+  if (invoice.siteId) {
+    try { await applyWebSitePaidInvoice(invoice); } catch (e) { console.error('postpaid apply site error', e); }
+  }
+}
 
 // Create payment for invoice
 router.post('/create', authenticateToken, async (req: Request, res: Response) => {
@@ -20,6 +47,11 @@ router.post('/create', authenticateToken, async (req: Request, res: Response) =>
       (typeof origin === 'string' && origin.startsWith('http') ? origin.replace(/\/+$/, '') : '') ||
       'http://localhost:5173';
 
+    // @ts-ignore
+    const userId = req.user.id;
+    // @ts-ignore
+    const isAdmin: boolean = req.user.role === 'admin';
+
     const invoice = await Invoice.findByPk(invoiceId, {
       include: [{ model: User, as: 'user' }]
     });
@@ -28,14 +60,55 @@ router.post('/create', authenticateToken, async (req: Request, res: Response) =>
       return res.status(404).json({ message: 'Invoice not found' });
     }
 
+    if (invoice.userId !== userId && !isAdmin) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
     if (invoice.status === 'paid') {
       return res.status(400).json({ message: 'Invoice already paid' });
     }
 
+    const amount = round2(Number(invoice.amount) || 0);
+
+    // 1) BALANCE FIRST: try to charge from internal balance if sufficient
+    if (!isAdmin) {
+      const balUser = await User.findByPk(invoice.userId, { attributes: ['id', 'balance'] });
+      const userBal = round2(balUser?.balance ?? 0);
+      if (userBal >= amount - 0.001) {
+        try {
+          const { newBalance } = await adjustBalance({
+            userId: invoice.userId,
+            amount: -amount,
+            type: 'withdraw',
+            description: invoice.title || `Оплата счета #${invoice.id}`,
+            invoiceId: invoice.id,
+            gameServerId: invoice.gameServerId || undefined,
+            projectId: invoice.projectId || undefined,
+            metadata: { source: 'balance_pay_now' },
+          });
+          invoice.status = 'paid';
+          await invoice.save();
+          await applyPostPaidInvoice(invoice);
+          return res.json({ paid: true, balanceAfter: Number(newBalance.toFixed(2)), paidWithBalance: true });
+        } catch (wb: any) {
+          console.error('Balance-first charge failed:', wb?.message || wb);
+        }
+      } else {
+        // Insufficient balance: return 402 with details (frontend shows banner)
+        return res.status(402).json({
+          message: 'Недостаточно средств на балансе',
+          needed: round2(amount - userBal),
+          balance: userBal,
+          totalAmount: amount,
+        });
+      }
+    }
+
+    // 2) FALLBACK: Platega redirect if balance charge didn't happen (or admin)
     const result = await plategaService.createPayment({
       paymentMethod,
       paymentDetails: {
-        amount: invoice.amount,
+        amount,
         currency: 'RUB'
       },
       description: `Invoice #${invoice.id} payment`,
