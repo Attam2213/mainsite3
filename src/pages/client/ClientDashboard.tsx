@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import GameServerConfigurator, {
   type GameServerOrderPayload,
+  type WebsiteOrderPayload,
   type PublicNode,
   MINECRAFT_CORE_OPTIONS,
   POPULAR_MINECRAFT_VERSIONS,
@@ -40,6 +41,15 @@ import {
   Wallet,
   ChevronLeft,
   ChevronRight,
+  Globe,
+  Play,
+  Square,
+  RotateCcw,
+  FileArchive,
+  ShieldCheck,
+  KeyRound,
+  HardDrive,
+  Terminal as TerminalIcon,
 } from 'lucide-react';
 
 interface WalletTransactionItem {
@@ -233,7 +243,7 @@ const ClientDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers' | 'balance'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers' | 'websites' | 'balance'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
 
@@ -306,6 +316,23 @@ const ClientDashboard = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
+
+  // Web Hosting State
+  const [webSites, setWebSites] = useState<any[]>([]);
+  const [isWebSettingsOpen, setIsWebSettingsOpen] = useState(false);
+  const [currentWebSite, setCurrentWebSite] = useState<any>(null);
+  const [webSettingsTab, setWebSettingsTab] = useState<'overview' | 'files' | 'logs' | 'backups'>('overview');
+  const [webFiles, setWebFiles] = useState<any[]>([]);
+  const [webFilesPath, setWebFilesPath] = useState('/');
+  const [webFilesLoading, setWebFilesLoading] = useState(false);
+  const [webLogs, setWebLogs] = useState({ pm2: '', nginx: '' });
+  const [webLogsLoading, setWebLogsLoading] = useState(false);
+  const [webBackups, setWebBackups] = useState<any[]>([]);
+  const [webBackupsLoading, setWebBackupsLoading] = useState(false);
+  const [webSftpCreds, setWebSftpCreds] = useState<any>(null);
+  const [webLoadingAction, setWebLoadingAction] = useState<string | null>(null);
+  const [webDomainInput, setWebDomainInput] = useState('');
+  const [webFileUploadFile, setWebFileUploadFile] = useState<File | null>(null);
 
   const getServerNode = (server?: GameServer | null) =>
     server ? nodes.find(n => n.id === server.node?.id || (server.node as any)?.id === n.id) : undefined;
@@ -512,7 +539,6 @@ const ClientDashboard = () => {
         const data = await res.json().catch(() => ({}));
         setIsCreateServerModalOpen(false);
         await fetchData();
-        // Balance paid: invoice status=paid OR game server already created
         if (data?.invoice?.status === 'paid' || data?.gameServer?.id) {
           try { await refreshBalance(); } catch (e) {}
           await fetchData();
@@ -533,6 +559,45 @@ const ClientDashboard = () => {
     } catch (e) {
       console.error('Order network error:', e);
       alert('Ошибка сети или сервера');
+    }
+  };
+
+  const handleWebsiteOrderFromDashboard = async (payload: WebsiteOrderPayload) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/sites/order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setIsCreateServerModalOpen(false);
+        if (data?.invoice?.status === 'paid' || data?.webSite?.id) {
+          try { await refreshBalance(); } catch (e) {}
+        }
+        await fetchData();
+        setActiveTab('websites');
+        if (data?.invoice?.id && data?.invoice?.status !== 'paid') {
+          handlePayInvoice(data.invoice.id);
+        }
+      } else if (res.status === 401) {
+        localStorage.setItem('wexa_order_intent', JSON.stringify({ type: 'website', payload }));
+        navigate('/login');
+      } else if (res.status === 402) {
+        const errorData = await res.json().catch(() => ({}));
+        showInsufficientFundsAlert(errorData, 'Недостаточно средств для создания сайта');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Не удалось создать сайт');
+      }
+    } catch (e) {
+      console.error('Website order error:', e);
+      alert('Ошибка сети');
     }
   };
 
@@ -783,7 +848,8 @@ const ClientDashboard = () => {
           fetch('/api/orders', { headers }),
           fetch('/api/nodes/public', { headers }),
           fetch('/api/game-servers', { headers }),
-          fetch('/api/leads', { headers })
+          fetch('/api/leads', { headers }),
+          fetch('/api/sites/mine', { headers })
         ]);
 
         const invoicesRes = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -792,6 +858,7 @@ const ClientDashboard = () => {
         const nodesRes = results[3].status === 'fulfilled' ? results[3].value : null;
         const gsRes = results[4].status === 'fulfilled' ? results[4].value : null;
         const leadsRes = results[5].status === 'fulfilled' ? results[5].value : null;
+        const sitesRes = results[6].status === 'fulfilled' ? results[6].value : null;
 
         if (invoicesRes?.ok) {
           const data = await invoicesRes.json();
@@ -821,6 +888,13 @@ const ClientDashboard = () => {
         if (leadsRes?.ok) {
           const data = await leadsRes.json();
           if (Array.isArray(data)) setLeads(data);
+        }
+
+        if (sitesRes?.ok) {
+          const data = await sitesRes.json();
+          if (data?.ok && Array.isArray(data.items)) setWebSites(data.items);
+          else if (Array.isArray(data)) setWebSites(data);
+          else setWebSites([]);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -1139,6 +1213,201 @@ const ClientDashboard = () => {
     }
   };
 
+  // ==================== Web sites helpers ====================
+  const getWebSiteStatusMeta = (status?: string) => {
+    switch (status) {
+      case 'active': return { label: 'Работает', color: 'bg-emerald-100 text-emerald-700 border border-emerald-200', dot: 'bg-emerald-500' };
+      case 'pending': return { label: 'Ожидает оплаты', color: 'bg-amber-100 text-amber-700 border border-amber-200', dot: 'bg-amber-500' };
+      case 'provisioning': return { label: 'Разворачивается...', color: 'bg-indigo-100 text-indigo-700 border border-indigo-200', dot: 'bg-indigo-500 animate-pulse' };
+      case 'suspended': return { label: 'Приостановлен', color: 'bg-rose-100 text-rose-700 border border-rose-200', dot: 'bg-rose-500' };
+      case 'deleting': return { label: 'Удаляется...', color: 'bg-gray-200 text-gray-700 border border-gray-300', dot: 'bg-gray-500 animate-pulse' };
+      case 'deleted': return { label: 'Удалён', color: 'bg-gray-100 text-gray-500 border border-gray-200', dot: 'bg-gray-400' };
+      default: return { label: status || 'Неизвестно', color: 'bg-gray-100 text-gray-600 border border-gray-200', dot: 'bg-gray-400' };
+    }
+  };
+
+  const getWebPlanLabel = (planId?: string): string => {
+    const map: Record<string, string> = { landing: 'Landing', business: 'Business', premium: 'Premium' };
+    return map[String(planId || 'landing')] ?? String(planId ?? 'Landing');
+  };
+
+  const handleControlWebSite = async (id: string, action: 'start' | 'stop' | 'restart') => {
+    try {
+      setWebLoadingAction(`${id}-${action}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Ошибка выполнения команды');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data?.message) console.log(data.message);
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Control website error', error);
+      alert('Ошибка соединения');
+    } finally {
+      setWebLoadingAction(null);
+    }
+  };
+
+  const openWebSettings = (site: any) => {
+    setCurrentWebSite(site);
+    setWebSettingsTab('overview');
+    setWebFiles([]); setWebFilesPath('/');
+    setWebLogs({ pm2: '', nginx: '' });
+    setWebBackups([]);
+    setWebSftpCreds(null);
+    setWebDomainInput(site?.domain || '');
+    setWebFileUploadFile(null);
+    setIsWebSettingsOpen(true);
+  };
+
+  const loadWebSiteLogs = async (siteId: string) => {
+    try {
+      setWebLogsLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/logs`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setWebLogs({ pm2: String(data?.pm2 ?? ''), nginx: String(data?.nginx ?? '') });
+      }
+    } catch (e) { console.error(e); }
+    finally { setWebLogsLoading(false); }
+  };
+
+  const loadWebSiteFiles = async (siteId: string, path: string = '/') => {
+    try {
+      setWebFilesLoading(true);
+      const token = localStorage.getItem('token');
+      const q = new URLSearchParams({ path });
+      const res = await fetch(`/api/sites/${siteId}/files?${q}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.ok) {
+          setWebFilesPath(data.path || path);
+          setWebFiles(Array.isArray(data.items) ? data.items : []);
+        }
+      }
+    } catch (e) { console.error(e); }
+    finally { setWebFilesLoading(false); }
+  };
+
+  const loadWebSiteBackups = async (siteId: string) => {
+    try {
+      setWebBackupsLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/backups`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.ok) setWebBackups(Array.isArray(data.items) ? data.items : []);
+      }
+    } catch (e) { console.error(e); }
+    finally { setWebBackupsLoading(false); }
+  };
+
+  const loadWebSftpCreds = async (siteId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/sftp-creds`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.ok) setWebSftpCreds(data);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const triggerWebBackup = async (siteId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/backups/trigger`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) { alert('Бэкап создан'); loadWebSiteBackups(siteId); }
+      else { const e = await res.json().catch(() => ({})); alert(e.message || 'Ошибка создания бэкапа'); }
+    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+  };
+
+  const attachWebDomain = async (siteId: string, domain: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/domain/attach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ domain }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(`Домен ${domain} привязан!\n\n${data.instructions || ''}\nIP ноды: ${data.nodeIp || ''}`);
+        fetchData();
+        setCurrentWebSite((s: any) => s && res.ok ? { ...s, domain } : s);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка привязки домена');
+      }
+    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+  };
+
+  const issueWebSsl = async (siteId: string) => {
+    if (!confirm('Запустить выпуск SSL-сертификата Let\'s Encrypt? (домен должен уже указывать A-записью на IP ноды)')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/ssl/issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      const text = await res.text();
+      alert(res.ok ? `SSL сертификат выпущен!\n\n${text.slice(0, 500)}` : `Ошибка выпуска SSL:\n${text.slice(0, 800)}`);
+    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+  };
+
+  const uploadWebFile = async (siteId: string, toPath: string, file: File) => {
+    try {
+      setWebFilesLoading(true);
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+      form.append('file', file);
+      form.append('path', toPath);
+      const res = await fetch(`/api/sites/${siteId}/files/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: form,
+      });
+      if (res.ok) {
+        setWebFileUploadFile(null);
+        loadWebSiteFiles(siteId, toPath);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка загрузки файла');
+      }
+    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+    finally { setWebFilesLoading(false); }
+  };
+
+  const deleteWebFile = async (siteId: string, path: string) => {
+    if (!confirm(`Удалить ${path}? Это действие нельзя отменить.`)) return;
+    try {
+      setWebFilesLoading(true);
+      const token = localStorage.getItem('token');
+      const q = new URLSearchParams({ path });
+      const res = await fetch(`/api/sites/${siteId}/files?${q}`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка удаления');
+      } else {
+        const parent = path.split('/').slice(0, -1).join('/') || '/';
+        loadWebSiteFiles(siteId, parent === '' ? '/' : parent);
+      }
+    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+    finally { setWebFilesLoading(false); }
+  };
+
   const fetchConsoleLogs = async (id: string) => {
     try {
         const token = localStorage.getItem('token');
@@ -1198,6 +1467,23 @@ const ClientDashboard = () => {
       fetchPlayersList(currentPanelServer.id);
     }
   }, [isServerPanelOpen, currentPanelServer?.id, serverPanelTab]);
+
+  useEffect(() => {
+    if (!isWebSettingsOpen || !currentWebSite) return;
+    const id = currentWebSite.id;
+    if (webSettingsTab === 'overview') {
+      if (!webSftpCreds) loadWebSftpCreds(id);
+    }
+    if (webSettingsTab === 'logs') {
+      if (!webLogs.pm2 && !webLogs.nginx) loadWebSiteLogs(id);
+    }
+    if (webSettingsTab === 'files') {
+      if (webFiles.length === 0) loadWebSiteFiles(id, webFilesPath);
+    }
+    if (webSettingsTab === 'backups') {
+      if (webBackups.length === 0) loadWebSiteBackups(id);
+    }
+  }, [isWebSettingsOpen, currentWebSite?.id, webSettingsTab]);
 
   useEffect(() => {
     const shouldPoll = isServerPanelOpen && serverPanelTab === 'players' && currentPanelServer;
@@ -2534,6 +2820,166 @@ const ClientDashboard = () => {
                 </div>
               )}
 
+              {activeTab === 'websites' && (
+                <div className="space-y-6">
+                  <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="mb-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-sky-100">
+                          <Globe className="mr-2 h-4 w-4" />
+                          Хостинг сайтов
+                        </div>
+                        <h2 className="text-2xl font-bold sm:text-3xl">Мои сайты</h2>
+                        <p className="mt-1 text-sm text-sky-100 sm:text-base">
+                          Всего сайтов: {webSites.length} · Активных: {webSites.filter(w => w.status === 'active').length}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href="/#pricing"
+                          className="inline-flex items-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-sky-50"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Заказать сайт
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {webSites.length === 0 ? (
+                    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-gradient-to-br from-slate-50 to-white p-12 text-center shadow-sm">
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg">
+                        <Globe size={32} />
+                      </div>
+                      <h3 className="mb-2 text-lg font-bold text-gray-900">Пока нет сайтов</h3>
+                      <p className="mb-5 mx-auto max-w-md text-sm text-gray-500 leading-relaxed">
+                        Закажите хостинг сайта — статический Landing или Node.js Business/Premium с админ-панелью. Шаблон Ordlan Такси разворачивается автоматически.
+                      </p>
+                      <a
+                        href="/#pricing"
+                        className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Перейти к конфигуратору
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid gap-5 md:grid-cols-2">
+                      {webSites.map((ws: any) => {
+                        const meta = getWebSiteStatusMeta(ws.status);
+                        const node = ws.node || null;
+                        const daysLeft = (() => {
+                          try {
+                            if (!ws.paidUntil) return null;
+                            const d = Math.ceil((new Date(String(ws.paidUntil) + 'T00:00:00').getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+                            return d;
+                          } catch { return null; }
+                        })();
+                        const fullUrl = ws.domain ? `https://${ws.domain}` : node?.ip ? `http://${node.ip}` : null;
+                        const loading = webLoadingAction?.startsWith(`${ws.id}-`);
+                        return (
+                          <div key={ws.id} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md hover:border-slate-300">
+                            <div className="flex items-start justify-between mb-4 gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${meta.color}`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                                    {meta.label}
+                                  </span>
+                                  <span className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-50 to-violet-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-100">
+                                    {getWebPlanLabel(ws.plan)}
+                                  </span>
+                                </div>
+                                {fullUrl ? (
+                                  <a
+                                    href={fullUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="group/link"
+                                  >
+                                    <h3 className="text-lg font-extrabold text-gray-900 truncate group-hover/link:text-indigo-600 transition">
+                                      {ws.domain || `${String(ws.id || '').slice(0, 8)}.sites.wexa.su`}
+                                    </h3>
+                                    <p className="text-xs text-sky-600 mt-0.5 font-medium truncate">
+                                      {fullUrl} ↗
+                                    </p>
+                                  </a>
+                                ) : (
+                                  <h3 className="text-lg font-extrabold text-gray-900 truncate">
+                                    Сайт #{String(ws.id || '').slice(0, 8)}
+                                  </h3>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-5 text-xs">
+                              {node && (
+                                <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Нода</div>
+                                  <div className="font-semibold text-slate-700 truncate">{node.name || node.ip} <span className="text-slate-400">· {node.ip}</span></div>
+                                </div>
+                              )}
+                              <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Тип</div>
+                                <div className="font-semibold text-slate-700">
+                                  {ws.coreTemplate === 'nodejs' ? 'Node.js + Express' : 'Static HTML'}
+                                </div>
+                              </div>
+                              {daysLeft !== null && (
+                                <div className={`rounded-lg px-3 py-2 border ${daysLeft < 3 ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-100'}`}>
+                                  <div className={`text-[10px] uppercase tracking-wider font-bold mb-0.5 ${daysLeft < 3 ? 'text-rose-400' : 'text-slate-400'}`}>Оплачено до</div>
+                                  <div className={`font-semibold truncate ${daysLeft < 3 ? 'text-rose-700' : 'text-slate-700'}`}>
+                                    {ws.paidUntil} · {daysLeft >= 0 ? `${daysLeft} дн.` : `просрочено ${-daysLeft} дн.`}
+                                  </div>
+                                </div>
+                              )}
+                              <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Цена</div>
+                                <div className="font-semibold text-slate-700">{ws.priceMonthly || '?'} ₽/мес</div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleControlWebSite(ws.id, 'start')}
+                                disabled={loading || ws.status === 'active' || ws.status === 'provisioning' || ws.status === 'deleted'}
+                                className="inline-flex items-center rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                              >
+                                {loading ? <Loader className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-4 w-4" />}
+                                Старт
+                              </button>
+                              <button
+                                onClick={() => handleControlWebSite(ws.id, 'stop')}
+                                disabled={loading || ws.status === 'suspended' || ws.status === 'pending' || ws.status === 'deleted'}
+                                className="inline-flex items-center rounded-xl bg-rose-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                              >
+                                {loading ? <Loader className="mr-1.5 h-4 w-4 animate-spin" /> : <Square className="mr-1.5 h-4 w-4" />}
+                                Стоп
+                              </button>
+                              <button
+                                onClick={() => handleControlWebSite(ws.id, 'restart')}
+                                disabled={loading || ws.status === 'deleted'}
+                                className="inline-flex items-center rounded-xl bg-sky-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                              >
+                                {loading ? <Loader className="mr-1.5 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-1.5 h-4 w-4" />}
+                                Рестарт
+                              </button>
+                              <button
+                                onClick={() => openWebSettings(ws)}
+                                className="ml-auto inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300 group-hover:bg-indigo-50 group-hover:border-indigo-200 group-hover:text-indigo-700"
+                              >
+                                <Settings className="mr-1.5 h-4 w-4" />
+                                Настройки
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* Sidebar - Navigation */}
@@ -2561,6 +3007,17 @@ const ClientDashboard = () => {
                   >
                     <Server className="mr-3 h-5 w-5" />
                     Игровые серверы
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('websites')}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'websites' 
+                        ? 'bg-indigo-50 text-indigo-700' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Globe className="mr-3 h-5 w-5" />
+                    Сайты
                   </button>
                   <button
                     onClick={() => setActiveTab('billing')}
@@ -2633,7 +3090,7 @@ const ClientDashboard = () => {
               <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-5xl sm:align-middle">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium leading-6 text-gray-900">Заказать игровой сервер</h3>
+                    <h3 className="text-lg font-medium leading-6 text-gray-900">Заказать сервис</h3>
                     <button onClick={() => setIsCreateServerModalOpen(false)} className="text-gray-500 hover:text-gray-700">
                       <X className="w-5 h-5" />
                     </button>
@@ -2644,6 +3101,7 @@ const ClientDashboard = () => {
                     nodes={nodes as PublicNode[]}
                     isAuthenticated={true}
                     onOrder={submitOrderFromConfiguratorModal}
+                    onWebsiteOrder={handleWebsiteOrderFromDashboard}
                   />
                 </div>
               </div>
@@ -4293,6 +4751,434 @@ const ClientDashboard = () => {
                     className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Web Site Settings Modal */}
+        {isWebSettingsOpen && currentWebSite && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" onClick={() => setIsWebSettingsOpen(false)}>
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
+              <div className="inline-block w-full max-w-5xl transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-8 sm:align-middle">
+                <div className="border-b border-slate-200 bg-slate-50/60 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                        <Globe className="h-5 w-5 text-sky-600" />
+                        Настройки сайта
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${getWebSiteStatusMeta(currentWebSite.status).color}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${getWebSiteStatusMeta(currentWebSite.status).dot}`} />
+                          {getWebSiteStatusMeta(currentWebSite.status).label}
+                        </span>
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {currentWebSite.domain ? (
+                          <a href={`http://${currentWebSite.domain}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-600 hover:underline">
+                            {currentWebSite.domain} ↗
+                          </a>
+                        ) : (
+                          <span className="font-mono text-slate-400">Домен не привязан</span>
+                        )}
+                        <span className="mx-2 text-slate-300">·</span>
+                        Тариф <span className="font-medium text-slate-700">{getWebPlanLabel(currentWebSite.plan)}</span>
+                      </p>
+                    </div>
+                    <button onClick={() => setIsWebSettingsOpen(false)} className="rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-slate-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex gap-1 rounded-xl bg-white p-1 shadow-sm">
+                    {([
+                      { id: 'overview', label: 'Общие', icon: ShieldCheck },
+                      { id: 'files', label: 'Файлы', icon: HardDrive },
+                      { id: 'logs', label: 'Логи', icon: TerminalIcon },
+                      { id: 'backups', label: 'Бэкапы', icon: FileArchive },
+                    ] as const).map((t) => {
+                      const Icon = t.icon;
+                      const active = webSettingsTab === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => setWebSettingsTab(t.id)}
+                          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                            active
+                              ? 'bg-indigo-600 text-white shadow'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-white px-6 py-5 min-h-[520px]">
+                  {webSettingsTab === 'overview' && (
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-5">
+                        <div>
+                          <h4 className="mb-2 text-sm font-semibold text-slate-900">Домен</h4>
+                          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                            <label className="block text-xs font-medium text-slate-600">Ваш домен (например, orlan-taxi.ru)</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={webDomainInput}
+                                onChange={(e) => setWebDomainInput(e.target.value)}
+                                placeholder="example.ru"
+                                className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <button
+                                onClick={() => attachWebDomain(currentWebSite.id, webDomainInput.trim())}
+                                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition"
+                              >
+                                Прикрепить
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => issueWebSsl(currentWebSite.id)}
+                              className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                              Выпустить SSL-сертификат (Let's Encrypt)
+                            </button>
+                            {currentWebSite.node?.ip && (
+                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                <b>DNS настройка:</b> добавьте A-запись домена на IP <span className="font-mono font-semibold">{currentWebSite.node.ip}</span> перед выпуском SSL.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="mb-2 text-sm font-semibold text-slate-900">Информация о тарифе</h4>
+                          <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                            {[
+                              ['Тариф', getWebPlanLabel(currentWebSite.plan)],
+                              ['Нода', currentWebSite.node?.name || currentWebSite.node?.ip || '—'],
+                              ['IP ноды', currentWebSite.node?.ip || '—'],
+                              ['Оплачено до', currentWebSite.paidUntil ? new Date(currentWebSite.paidUntil).toLocaleString('ru-RU') : '—'],
+                              ['Стоимость', `${currentWebSite.price || 0} ₽/мес`],
+                            ].map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                                <span className="text-slate-500">{k}</span>
+                                <span className="font-medium text-slate-900">{String(v)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="mb-2 text-sm font-semibold text-slate-900">Доступ SFTP</h4>
+                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-indigo-50/40 p-4 space-y-3">
+                          <div className="flex items-start gap-2 rounded-lg bg-white p-3 border border-slate-200">
+                            <KeyRound className="mt-0.5 h-4 w-4 text-indigo-600" />
+                            <p className="text-xs text-slate-600">
+                              Подключитесь через <b>WinSCP</b> / FileZilla / Cyberduck по протоколу SFTP.
+                              Вы попадёте в изолированную папку <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">/public_html</code>.
+                            </p>
+                          </div>
+
+                          {webSftpCreds?.ok || webSftpCreds?.host ? (
+                            <div className="space-y-2">
+                              {([
+                                ['Host', webSftpCreds.host || currentWebSite.node?.ip, 'SFTP Host'],
+                                ['Port', webSftpCreds.port, 'Порт'],
+                                ['User', webSftpCreds.user, 'Пользователь'],
+                              ] as const).map(([k, v, label]) => (
+                                <div key={k} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
+                                    <div className="font-mono text-sm text-slate-900 break-all">{String(v ?? '—')}</div>
+                                  </div>
+                                  {v && (
+                                    <button
+                                      onClick={() => copyToClipboard(String(v), label)}
+                                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition"
+                                    >
+                                      {copiedValue === label ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+
+                              {webSftpCreds.passwordOnce && (
+                                <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[10px] uppercase tracking-wider text-amber-600">Пароль (показывается один раз — сохраните)</div>
+                                    <div className="font-mono text-sm text-amber-900 break-all">{webSftpCreds.passwordOnce}</div>
+                                  </div>
+                                  <button
+                                    onClick={() => copyToClipboard(webSftpCreds.passwordOnce, 'SFTP Пароль')}
+                                    className="shrink-0 rounded-md p-1.5 text-amber-600 hover:bg-amber-100 transition"
+                                  >
+                                    {copiedValue === 'SFTP Пароль' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              )}
+
+                              <div className="rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100 space-y-1 overflow-x-auto">
+                                <div className="text-slate-400"># Пример подключения WinSCP/CLI:</div>
+                                <div>$ sftp -P {webSftpCreds.port} {webSftpCreds.user}@{webSftpCreds.host || currentWebSite.node?.ip}</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => loadWebSftpCreds(currentWebSite.id)}
+                              className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                            >
+                              Загрузить учетные данные SFTP
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {webSettingsTab === 'files' && (
+                    <div className="flex h-[520px] flex-col gap-3">
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <button
+                          onClick={() => {
+                            const parts = webFilesPath.split('/').filter(Boolean);
+                            parts.pop();
+                            loadWebSiteFiles(currentWebSite.id, parts.length ? '/' + parts.join('/') : '/');
+                          }}
+                          disabled={webFilesPath === '/' || webFilesLoading}
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-indigo-600 disabled:opacity-40 transition"
+                          title="Наверх"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <Home className="h-4 w-4 text-slate-400" />
+                        <span className="text-slate-300">/</span>
+                        <div className="font-mono text-sm text-slate-700 truncate flex-1">
+                          /public_html{webFilesPath === '/' ? '' : webFilesPath}
+                        </div>
+
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
+                          <Upload className="h-3.5 w-3.5" />
+                          Загрузить файл
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => setWebFileUploadFile(e.target.files?.[0] || null)}
+                          />
+                        </label>
+                        {webFileUploadFile && (
+                          <button
+                            onClick={() => uploadWebFile(currentWebSite.id, webFilesPath, webFileUploadFile)}
+                            disabled={webFilesLoading}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                          >
+                            → {webFileUploadFile.name} ({(webFileUploadFile.size / 1024).toFixed(1)} KB)
+                          </button>
+                        )}
+                        {webFilesLoading && <Loader className="h-4 w-4 animate-spin text-indigo-600" />}
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="min-w-full divide-y divide-slate-100">
+                          <thead className="bg-slate-50 sticky top-0 z-10">
+                            <tr>
+                              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Имя</th>
+                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Размер</th>
+                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Действия</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {!webFilesLoading && webFiles.length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="px-4 py-12 text-center text-sm text-slate-400">
+                                  {webFilesPath === '/' ? 'Загрузите файлы вашего сайта в /public_html' : 'Папка пуста'}
+                                </td>
+                              </tr>
+                            )}
+                            {webFiles.map((f: any, idx: number) => (
+                              <tr
+                                key={idx}
+                                onDoubleClick={() => {
+                                  if (f.isDir || f.isDirectory) {
+                                    const np = (webFilesPath === '/' ? '' : webFilesPath) + '/' + f.name;
+                                    loadWebSiteFiles(currentWebSite.id, np);
+                                  }
+                                }}
+                                className="hover:bg-slate-50 cursor-pointer transition"
+                              >
+                                <td className="px-4 py-2.5">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    {(f.isDir || f.isDirectory) ? (
+                                      <Folder className="h-4 w-4 text-amber-500" />
+                                    ) : (
+                                      <FileText className="h-4 w-4 text-slate-400" />
+                                    )}
+                                    <span className="font-medium text-slate-800">{f.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                                  {(f.isDir || f.isDirectory) ? '—' : `${(Number(f.size || 0) / 1024).toFixed(1)} KB`}
+                                </td>
+                                <td className="px-4 py-2.5 text-right">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const full = (webFilesPath === '/' ? '' : webFilesPath) + '/' + f.name;
+                                      deleteWebFile(currentWebSite.id, full);
+                                    }}
+                                    className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                    title="Удалить"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {webSettingsTab === 'logs' && (
+                    <div className="flex h-[520px] flex-col gap-3">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          {webLogsLoading ? (
+                            <><Loader className="h-4 w-4 animate-spin text-indigo-600" /> Загрузка логов...</>
+                          ) : (
+                            <><TerminalIcon className="h-4 w-4 text-slate-400" /> Логи сервера</>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => loadWebSiteLogs(currentWebSite.id)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                        >
+                          Обновить
+                        </button>
+                      </div>
+                      <div className="grid flex-1 gap-3 md:grid-cols-1 md:grid-rows-2">
+                        <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200">
+                          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2">
+                            <span className="text-xs font-semibold text-slate-700">PM2 / App stdout-stderr</span>
+                            <span className="text-[10px] text-slate-400">{(webLogs.pm2 || '').split('\n').length} строк</span>
+                          </div>
+                          <textarea
+                            readOnly
+                            value={webLogs.pm2 || '(логи пусты, приложение не запущено)'}
+                            className="flex-1 min-h-[200px] w-full resize-none bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-emerald-200 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200">
+                          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2">
+                            <span className="text-xs font-semibold text-slate-700">Nginx (access + error)</span>
+                            <span className="text-[10px] text-slate-400">{(webLogs.nginx || '').split('\n').length} строк</span>
+                          </div>
+                          <textarea
+                            readOnly
+                            value={webLogs.nginx || '(логи Nginx пусты)'}
+                            className="flex-1 min-h-[200px] w-full resize-none bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-amber-100 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {webSettingsTab === 'backups' && (
+                    <div className="flex h-[520px] flex-col gap-3">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+                        <div className="text-sm text-slate-600">
+                          <FileArchive className="inline mr-1.5 h-4 w-4 text-slate-400" />
+                          Бэкапы создаются ежедневно в 04:05 MSK, хранятся 7 дней.
+                        </div>
+                        <button
+                          onClick={() => triggerWebBackup(currentWebSite.id)}
+                          disabled={webBackupsLoading}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Создать бэкап сейчас
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="min-w-full divide-y divide-slate-100">
+                          <thead className="bg-slate-50 sticky top-0">
+                            <tr>
+                              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Дата</th>
+                              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Тип</th>
+                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Размер</th>
+                              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Скачать</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {!webBackupsLoading && webBackups.length === 0 && (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-12 text-center text-sm text-slate-400">
+                                  Бэкапы пока отсутствуют. Нажмите «Создать бэкап сейчас».
+                                </td>
+                              </tr>
+                            )}
+                            {webBackups.map((b: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50 transition">
+                                <td className="px-4 py-2.5 text-sm text-slate-800 font-medium">
+                                  {b.createdAt ? new Date(b.createdAt).toLocaleString('ru-RU') : b.date || '—'}
+                                </td>
+                                <td className="px-4 py-2.5">
+                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                    {b.kind === 'manual' ? 'Ручной' : 'Ежедневный'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600">
+                                  {typeof b.size === 'number' ? `${(b.size / 1024 / 1024).toFixed(2)} MB` : b.size || '—'}
+                                </td>
+                                <td className="px-4 py-2.5 text-right">
+                                  {b.url || b.downloadUrl || b.fileName ? (
+                                    <a
+                                      href={b.url || b.downloadUrl || (b.fileName ? `/api/sites/${currentWebSite.id}/backups/download?file=${encodeURIComponent(b.fileName)}` : '#')}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      Скачать
+                                    </a>
+                                  ) : (
+                                    <button
+                                      disabled
+                                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 disabled:cursor-not-allowed"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      Скоро
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5">
+                  <div className="mr-auto text-xs text-slate-500">
+                    ID: <code className="rounded bg-white px-1.5 py-0.5 font-mono">{currentWebSite.id?.slice(0, 8)}</code>
+                  </div>
+                  <button
+                    onClick={() => setIsWebSettingsOpen(false)}
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                  >
+                    Закрыть
                   </button>
                 </div>
               </div>

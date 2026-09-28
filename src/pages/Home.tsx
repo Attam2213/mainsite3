@@ -4,6 +4,7 @@ import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
   type GameServerOrderPayload,
+  type WebsiteOrderPayload,
 } from '../components/GameServerConfigurator';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,28 @@ const Home = () => {
       }
     }
     localStorage.setItem('wexa_order_intent', JSON.stringify(payload));
+    navigate('/login');
+  };
+
+  const handleWebsiteOrder = async (payload: WebsiteOrderPayload) => {
+    const intent = { type: 'website', ...payload };
+    if (isAuthenticated) {
+      try {
+        const res = await fetch('/api/sites/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          navigate('/dashboard?tab=websites');
+          return;
+        }
+      } catch {
+          // fallthrough
+        }
+    }
+    localStorage.setItem('wexa_order_intent', JSON.stringify(intent));
     navigate('/login');
   };
 
@@ -128,6 +151,7 @@ const Home = () => {
           compact={false}
           isAuthenticated={isAuthenticated}
           onOrder={handleOrder}
+          onWebsiteOrder={handleWebsiteOrder}
         />
 
         {/* FEATURES */}

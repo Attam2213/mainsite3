@@ -90,7 +90,8 @@ const installDocker = async (node: any) => {
 
 export const createNode = async (req: Request, res: Response) => {
     try {
-        const { name, ip, sshPort, sshUser, sshPassword, totalRam, supportedGames, slotPrice, slotPrices } = req.body;
+        const { name, ip, sshPort, sshUser, sshPassword, totalRam, supportedGames, slotPrice, slotPrices, type, capacityWebSites, usedWebSites, webSftpPortStart, webSftpPortEnd } = req.body;
+        const validType = (type === 'game' || type === 'web' || type === 'both') ? type : 'game';
         
         const node = await ServerNode.create({
             name,
@@ -101,8 +102,13 @@ export const createNode = async (req: Request, res: Response) => {
             totalRam: totalRam || 0,
             supportedGames: Array.isArray(supportedGames) ? supportedGames : undefined,
             slotPrice: Number.isFinite(Number(slotPrice)) ? Number(slotPrice) : undefined,
-            slotPrices: normalizeSlotPrices(slotPrices) || undefined
-        });
+            slotPrices: normalizeSlotPrices(slotPrices) || undefined,
+            type: validType,
+            capacityWebSites: Number.isFinite(Number(capacityWebSites)) ? Number(capacityWebSites) : 50,
+            usedWebSites: Number.isFinite(Number(usedWebSites)) ? Number(usedWebSites) : 0,
+            webSftpPortStart: Number.isFinite(Number(webSftpPortStart)) ? Number(webSftpPortStart) : 2222,
+            webSftpPortEnd: Number.isFinite(Number(webSftpPortEnd)) ? Number(webSftpPortEnd) : 2299,
+        } as any);
 
         // Try to install Docker (async)
         installDocker(node).catch(err => console.error('Docker install failed background:', err));
@@ -174,8 +180,9 @@ export const updateNode = async (req: Request, res: Response) => {
             return;
         }
 
-        const { name, ip, sshPort, sshUser, sshPassword, totalRam, status, supportedGames, slotPrice, slotPrices } = req.body;
+        const { name, ip, sshPort, sshUser, sshPassword, totalRam, status, supportedGames, slotPrice, slotPrices, type, capacityWebSites, usedWebSites, webSftpPortStart, webSftpPortEnd } = req.body;
         const normalizedSlotPrices = normalizeSlotPrices(slotPrices);
+        const validType = (type === 'game' || type === 'web' || type === 'both') ? type : (node as any).type || 'game';
 
         await node.update({
             name: name ?? node.name,
@@ -187,8 +194,13 @@ export const updateNode = async (req: Request, res: Response) => {
             status: status ?? node.status,
             supportedGames: Array.isArray(supportedGames) ? supportedGames : node.supportedGames,
             slotPrice: Number.isFinite(Number(slotPrice)) ? Number(slotPrice) : node.slotPrice,
-            slotPrices: normalizedSlotPrices ? normalizedSlotPrices : node.slotPrices
-        });
+            slotPrices: normalizedSlotPrices ? normalizedSlotPrices : node.slotPrices,
+            type: validType,
+            capacityWebSites: Number.isFinite(Number(capacityWebSites)) ? Number(capacityWebSites) : (node as any).capacityWebSites,
+            usedWebSites: Number.isFinite(Number(usedWebSites)) ? Number(usedWebSites) : (node as any).usedWebSites,
+            webSftpPortStart: Number.isFinite(Number(webSftpPortStart)) ? Number(webSftpPortStart) : (node as any).webSftpPortStart,
+            webSftpPortEnd: Number.isFinite(Number(webSftpPortEnd)) ? Number(webSftpPortEnd) : (node as any).webSftpPortEnd,
+        } as any);
 
         res.json(node);
     } catch (error) {

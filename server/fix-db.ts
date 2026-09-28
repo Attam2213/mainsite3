@@ -6,10 +6,18 @@ const run = async () => {
     
     const queries = [
         "ALTER TABLE users ADD COLUMN balance DECIMAL(12,2) DEFAULT 0.0;",
+        "ALTER TABLE server_nodes ADD COLUMN type VARCHAR(16) DEFAULT 'game';",
+        "ALTER TABLE server_nodes ADD COLUMN capacityWebSites INTEGER DEFAULT 50;",
+        "ALTER TABLE server_nodes ADD COLUMN usedWebSites INTEGER DEFAULT 0;",
+        "ALTER TABLE server_nodes ADD COLUMN webSftpPortStart INTEGER DEFAULT 2222;",
+        "ALTER TABLE server_nodes ADD COLUMN webSftpPortEnd INTEGER DEFAULT 2299;",
+        "ALTER TABLE invoices ADD COLUMN siteId UUID;",
         "ALTER TABLE game_servers ADD COLUMN mcVersion VARCHAR(64) DEFAULT 'LATEST';",
         "ALTER TABLE game_servers ADD COLUMN mcCustomJarUrl TEXT;",
         "ALTER TABLE game_servers ADD COLUMN mcCustomJarName VARCHAR(255);",
         "ALTER TABLE game_servers ADD COLUMN cs16Build VARCHAR(64) DEFAULT 'jives_cstrike_latest';",
+        "CREATE TABLE IF NOT EXISTS web_sites (id TEXT PRIMARY KEY, userId TEXT NOT NULL, nodeId TEXT, domain TEXT UNIQUE, plan TEXT NOT NULL DEFAULT 'landing', priceMonthly INTEGER NOT NULL DEFAULT 149, status TEXT NOT NULL DEFAULT 'pending', paidUntil TEXT, pm2ProcessName TEXT, sftpUsername TEXT UNIQUE, sftpPasswordHash TEXT, sftpPasswordPlainOnce TEXT, sftpPort INTEGER DEFAULT 22, sftpChroot TEXT, nginxConfPath TEXT, sslCertPath TEXT, sslExpiresAt TEXT, settings TEXT DEFAULT '{}', gitRepoUrl TEXT, backupEnabled INTEGER NOT NULL DEFAULT 1, coreTemplate TEXT NOT NULL DEFAULT 'static', createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);",
+        "CREATE TABLE IF NOT EXISTS web_site_backups (id TEXT PRIMARY KEY, webSiteId TEXT NOT NULL, fileName TEXT NOT NULL, filePath TEXT NOT NULL, sizeBytes INTEGER NOT NULL DEFAULT 0, note TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);",
         "ALTER TABLE projects ADD COLUMN paidUntil DATE;",
         "ALTER TABLE projects ADD COLUMN siteStatus TEXT DEFAULT 'unknown';",
         "ALTER TABLE invoices ADD COLUMN periodMonths INTEGER DEFAULT 1;",

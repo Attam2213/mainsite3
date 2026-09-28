@@ -31,6 +31,7 @@ import { startMonitoring } from './services/monitorService';
 import { startSubscriptionService } from './services/subscriptionService';
 import nodeRoutes from './routes/nodeRoutes';
 import gameServerRoutes from './routes/gameServerRoutes';
+import webSiteRoutes from './routes/webSiteRoutes';
 import walletRoutes from './routes/walletRoutes';
 
 // Prevent unused variable errors for now (will use them in routes later)
@@ -75,6 +76,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/game-servers', gameServerRoutes);
+app.use('/api/sites', webSiteRoutes);
 app.use('/api/wallet', walletRoutes);
 
 // Basic health check
@@ -183,6 +185,156 @@ const startServer = async () => {
       }
     } catch (e) {
       console.error('[DB] ensure users.balance column failed:', e);
+    }
+
+    try {
+      if (dialect === 'postgres') {
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS type VARCHAR(16) NOT NULL DEFAULT 'game';");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS capacityWebSites INTEGER NOT NULL DEFAULT 50;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS usedWebSites INTEGER NOT NULL DEFAULT 0;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS webSftpPortStart INTEGER NOT NULL DEFAULT 2222;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN IF NOT EXISTS webSftpPortEnd INTEGER NOT NULL DEFAULT 2299;");
+        await sequelize.query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS siteId UUID;");
+      } else if (dialect === 'sqlite') {
+        await ensureSqliteColumn('server_nodes', 'type', 'VARCHAR(16) DEFAULT \'game\'');
+        await ensureSqliteColumn('server_nodes', 'capacityWebSites', 'INTEGER DEFAULT 50');
+        await ensureSqliteColumn('server_nodes', 'usedWebSites', 'INTEGER DEFAULT 0');
+        await ensureSqliteColumn('server_nodes', 'webSftpPortStart', 'INTEGER DEFAULT 2222');
+        await ensureSqliteColumn('server_nodes', 'webSftpPortEnd', 'INTEGER DEFAULT 2299');
+        await ensureSqliteColumn('invoices', 'siteId', 'UUID');
+      } else {
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN type VARCHAR(16) DEFAULT 'game';");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN capacityWebSites INTEGER DEFAULT 50;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN usedWebSites INTEGER DEFAULT 0;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN webSftpPortStart INTEGER DEFAULT 2222;");
+        await sequelize.query("ALTER TABLE server_nodes ADD COLUMN webSftpPortEnd INTEGER DEFAULT 2299;");
+        await sequelize.query("ALTER TABLE invoices ADD COLUMN siteId UUID;");
+      }
+    } catch (e) {
+      console.error('[DB] ensure server_nodes.type/capacityWeb + invoices.siteId columns failed:', e);
+    }
+
+    try {
+      if (dialect === 'postgres') {
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          "userId" UUID NOT NULL,
+          "nodeId" UUID,
+          domain VARCHAR(255) UNIQUE,
+          plan VARCHAR(16) NOT NULL DEFAULT 'landing',
+          "priceMonthly" INTEGER NOT NULL DEFAULT 149,
+          status VARCHAR(16) NOT NULL DEFAULT 'pending',
+          "paidUntil" DATE,
+          "pm2ProcessName" VARCHAR(128),
+          "sftpUsername" VARCHAR(64) UNIQUE,
+          "sftpPasswordHash" VARCHAR(255),
+          "sftpPasswordPlainOnce" VARCHAR(128),
+          "sftpPort" INTEGER DEFAULT 22,
+          "sftpChroot" VARCHAR(255),
+          "nginxConfPath" VARCHAR(255),
+          "sslCertPath" VARCHAR(255),
+          "sslExpiresAt" DATE,
+          settings JSONB DEFAULT '{}'::jsonb,
+          "gitRepoUrl" VARCHAR(512),
+          "backupEnabled" BOOLEAN NOT NULL DEFAULT true,
+          "coreTemplate" VARCHAR(16) NOT NULL DEFAULT 'static',
+          "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );`);
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_site_backups (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          "webSiteId" UUID NOT NULL REFERENCES web_sites(id) ON DELETE CASCADE,
+          "fileName" VARCHAR(255) NOT NULL,
+          "filePath" VARCHAR(512) NOT NULL,
+          "sizeBytes" BIGINT NOT NULL DEFAULT 0,
+          note VARCHAR(255),
+          "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_user ON web_sites("userId");`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_node ON web_sites("nodeId");`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
+      } else if (dialect === 'sqlite') {
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+          "userId" TEXT NOT NULL,
+          "nodeId" TEXT,
+          domain TEXT UNIQUE,
+          plan TEXT NOT NULL DEFAULT 'landing',
+          "priceMonthly" INTEGER NOT NULL DEFAULT 149,
+          status TEXT NOT NULL DEFAULT 'pending',
+          "paidUntil" TEXT,
+          "pm2ProcessName" TEXT,
+          "sftpUsername" TEXT UNIQUE,
+          "sftpPasswordHash" TEXT,
+          "sftpPasswordPlainOnce" TEXT,
+          "sftpPort" INTEGER DEFAULT 22,
+          "sftpChroot" TEXT,
+          "nginxConfPath" TEXT,
+          "sslCertPath" TEXT,
+          "sslExpiresAt" TEXT,
+          settings TEXT DEFAULT '{}',
+          "gitRepoUrl" TEXT,
+          "backupEnabled" INTEGER NOT NULL DEFAULT 1,
+          "coreTemplate" TEXT NOT NULL DEFAULT 'static',
+          "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+          "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+        );`);
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_site_backups (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+          "webSiteId" TEXT NOT NULL REFERENCES web_sites(id) ON DELETE CASCADE,
+          "fileName" TEXT NOT NULL,
+          "filePath" TEXT NOT NULL,
+          "sizeBytes" INTEGER NOT NULL DEFAULT 0,
+          note TEXT,
+          "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+          "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+        );`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_user ON web_sites("userId");`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_node ON web_sites("nodeId");`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_sites_status ON web_sites(status);`);
+        await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_web_site_backups_site ON web_site_backups("webSiteId");`);
+      } else {
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_sites (
+          id VARCHAR(36) PRIMARY KEY,
+          userId VARCHAR(36) NOT NULL,
+          nodeId VARCHAR(36),
+          domain VARCHAR(255) UNIQUE,
+          plan VARCHAR(16) NOT NULL DEFAULT 'landing',
+          priceMonthly INTEGER NOT NULL DEFAULT 149,
+          status VARCHAR(16) NOT NULL DEFAULT 'pending',
+          paidUntil DATE,
+          pm2ProcessName VARCHAR(128),
+          sftpUsername VARCHAR(64) UNIQUE,
+          sftpPasswordHash VARCHAR(255),
+          sftpPasswordPlainOnce VARCHAR(128),
+          sftpPort INTEGER DEFAULT 22,
+          sftpChroot VARCHAR(255),
+          nginxConfPath VARCHAR(255),
+          sslCertPath VARCHAR(255),
+          sslExpiresAt DATE,
+          settings JSON DEFAULT '{}',
+          gitRepoUrl VARCHAR(512),
+          backupEnabled BOOLEAN NOT NULL DEFAULT true,
+          coreTemplate VARCHAR(16) NOT NULL DEFAULT 'static',
+          createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
+        await sequelize.query(`CREATE TABLE IF NOT EXISTS web_site_backups (
+          id VARCHAR(36) PRIMARY KEY,
+          webSiteId VARCHAR(36) NOT NULL REFERENCES web_sites(id) ON DELETE CASCADE,
+          fileName VARCHAR(255) NOT NULL,
+          filePath VARCHAR(512) NOT NULL,
+          sizeBytes BIGINT NOT NULL DEFAULT 0,
+          note VARCHAR(255),
+          createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_web_site_backups_site (webSiteId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
+      }
+    } catch (e) {
+      console.error('[DB] ensure web_sites + web_site_backups tables failed:', e);
     }
 
     await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });

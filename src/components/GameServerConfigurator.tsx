@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
-  Terminal, Upload, Crown, Sparkles, CreditCard, Cpu
+  Terminal, Upload, Crown, Sparkles, CreditCard, Cpu,
+  Globe, Database, FileText, Headphones, Rocket, Award
 } from 'lucide-react';
 
 export const SUPPORTED_GAMES = [
@@ -160,6 +161,23 @@ export interface GameServerOrderPayload {
   cs16Build?: string;
 }
 
+export interface WebsitePlan {
+  id: 'landing' | 'business' | 'premium';
+  label: string;
+  priceMonthly: number;
+  description: string;
+  features: string[];
+  coreTemplate: 'static' | 'nodejs';
+  backupEnabled: boolean;
+  included?: string[];
+}
+
+export interface WebsiteOrderPayload {
+  plan: 'landing' | 'business' | 'premium';
+  periodMonths: number;
+  domain?: string;
+}
+
 interface GameServerConfiguratorProps {
   compact?: boolean;
   initialGame?: string;
@@ -169,6 +187,7 @@ interface GameServerConfiguratorProps {
   isAuthenticated?: boolean;
   orderLoading?: boolean;
   onOrder: (payload: GameServerOrderPayload) => void | Promise<void>;
+  onWebsiteOrder?: (payload: WebsiteOrderPayload) => void | Promise<void>;
 }
 
 const GameServerConfigurator = ({
@@ -180,6 +199,7 @@ const GameServerConfigurator = ({
   isAuthenticated = false,
   orderLoading: externalLoading,
   onOrder,
+  onWebsiteOrder,
 }: GameServerConfiguratorProps) => {
   const [selectedGame, setSelectedGame] = useState(initialGame ?? SUPPORTED_GAMES[0].id);
   const [selectedLocation, setSelectedLocation] = useState(initialLocation ?? LOCATIONS[0].id);
@@ -193,6 +213,10 @@ const GameServerConfigurator = ({
   const [cs16Build, setCs16Build] = useState('jives_cstrike_latest');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
+  const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>('game');
+  const [selectedWebsitePlan, setSelectedWebsitePlan] = useState<'landing' | 'business' | 'premium'>('business');
+  const [websitePlans, setWebsitePlans] = useState<WebsitePlan[]>([]);
+  const [websiteDomain, setWebsiteDomain] = useState('');
 
   const nodes = nodesProp ?? internalNodes;
   const orderLoading = externalLoading ?? internalLoading;
@@ -257,7 +281,31 @@ const GameServerConfigurator = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGame]);
 
+  useEffect(() => {
+    fetch('/api/sites/plans')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.plans && Array.isArray(data.plans)) {
+          setWebsitePlans(data.plans);
+        } else {
+          setWebsitePlans([
+            { id: 'landing', label: 'Landing', priceMonthly: 149, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
+            { id: 'business', label: 'Business', priceMonthly: 299, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
+            { id: 'premium', label: 'Premium', priceMonthly: 599, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
+          ] as WebsitePlan[]);
+        }
+      })
+      .catch(() => {
+        setWebsitePlans([
+          { id: 'landing', label: 'Landing', priceMonthly: 149, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
+          { id: 'business', label: 'Business', priceMonthly: 299, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
+          { id: 'premium', label: 'Premium', priceMonthly: 599, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
+        ] as WebsitePlan[]);
+      });
+  }, []);
+
   const game = SUPPORTED_GAMES.find(g => g.id === selectedGame)!;
+  const websitePlan = websitePlans.find(p => p.id === selectedWebsitePlan) ?? websitePlans[1];
 
   const slotPrice =
     nodes.find(n => n.supportedGames?.includes(selectedGame) && n.location === selectedLocation)
@@ -273,6 +321,9 @@ const GameServerConfigurator = ({
   const monthlyPrice = Math.ceil(slots * slotPrice);
   const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
   const totalPrice = Math.ceil(monthlyPrice * periodMonths * (1 - discount));
+
+  const websiteMonthlyPrice = websitePlan?.priceMonthly ?? 299;
+  const websiteTotalPrice = Math.ceil(websiteMonthlyPrice * periodMonths * (1 - discount));
 
   const submitOrder = async () => {
     setInternalLoading(true);
@@ -290,6 +341,20 @@ const GameServerConfigurator = ({
         mcCustomJarUrl: selectedGame === 'minecraft' ? mcCustomJarUrl.trim() || undefined : undefined,
         mcCustomJarName: selectedGame === 'minecraft' ? mcCustomJarName.trim() || undefined : undefined,
         cs16Build: selectedGame === 'cs16' ? cs16Build : undefined,
+      });
+    } finally {
+      setInternalLoading(false);
+    }
+  };
+
+  const submitWebsiteOrder = async () => {
+    if (!onWebsiteOrder) return;
+    setInternalLoading(true);
+    try {
+      await onWebsiteOrder({
+        plan: selectedWebsitePlan,
+        periodMonths,
+        domain: websiteDomain.trim() || undefined,
       });
     } finally {
       setInternalLoading(false);
@@ -564,6 +629,80 @@ const GameServerConfigurator = ({
     );
   };
 
+  const WebsitePlanCards = () => (
+    <div>
+      <label className="block text-sm font-bold text-gray-700 mb-4">Тариф хостинга сайтов</label>
+      <div className="grid md:grid-cols-3 gap-4">
+        {websitePlans.map(p => {
+          const active = selectedWebsitePlan === p.id;
+          const accent = p.id === 'landing'
+            ? { border: 'border-sky-500', bg: 'bg-sky-50', text: 'text-sky-700', grad: 'from-sky-500 to-cyan-500' }
+            : p.id === 'business'
+            ? { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700', grad: 'from-indigo-500 to-purple-500' }
+            : { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', grad: 'from-amber-500 to-orange-500' };
+          const Icon = p.id === 'landing' ? FileText : p.id === 'business' ? Rocket : Award;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setSelectedWebsitePlan(p.id)}
+              className={`text-left p-5 rounded-2xl border-2 transition-all relative bg-white hover:shadow-lg ${
+                active ? `${accent.border} ring-4 ${accent.bg}/60 shadow-inner` : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${accent.grad} text-white flex items-center justify-center mb-4 shadow-md`}>
+                <Icon size={22} />
+              </div>
+              <div className="flex items-baseline justify-between mb-2">
+                <h5 className="text-xl font-extrabold text-gray-900">{p.label}</h5>
+                {p.id === 'business' && (
+                  <span className="text-[10px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full">
+                    ПОПУЛЯРНЫЙ
+                  </span>
+                )}
+              </div>
+              <div className={`text-3xl font-black ${accent.text} mb-2`}>
+                {p.priceMonthly} <span className="text-sm font-semibold text-gray-500">₽/мес</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed mb-3">{p.description}</p>
+              <ul className="space-y-1.5 mb-1">
+                {p.features.slice(0, 4).map((f, i) => (
+                  <li key={i} className="text-[11px] text-gray-600 flex items-start gap-1.5">
+                    <CheckCircle size={12} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              {active && (
+                <div className={`absolute top-3 right-3 w-7 h-7 rounded-full ${accent.border.replace('border-', 'bg-')} text-white flex items-center justify-center shadow`}>
+                  <CheckCircle size={16} />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const WebsiteDomainField = () => (
+    <div>
+      <label className="block text-sm font-bold text-gray-700 mb-3">
+        Домен (необязательно)
+      </label>
+      <input
+        type="text"
+        value={websiteDomain}
+        onChange={e => setWebsiteDomain(e.target.value)}
+        placeholder="например: orlan-taxi.ru (оставьте пустым — дадим временный)"
+        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
+      />
+      <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+        Если домен уже есть — привяжите его позже в ЛК (A-запись на IP ноды). Без домена сайт будет доступен по временному URL.
+      </p>
+    </div>
+  );
+
 
   const PricePanel = () => {
     const IconGame = game.icon;
@@ -639,6 +778,85 @@ const GameServerConfigurator = ({
           </button>
           <p className="text-xs text-gray-400 text-center mt-4 leading-relaxed">
             Оплата картами / СБП через Platega • Счёт создаётся автоматически
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const WebsitePricePanel = () => {
+    const p = websitePlan;
+    const accent = p?.id === 'landing'
+      ? { from: 'from-sky-500', to: 'to-cyan-500', shadow: 'rgba(14,165,233,0.5)', shadowHover: 'rgba(6,182,212,0.7)' }
+      : p?.id === 'business'
+      ? { from: 'from-indigo-500', to: 'to-purple-500', shadow: 'rgba(99,102,241,0.5)', shadowHover: 'rgba(168,85,247,0.7)' }
+      : { from: 'from-amber-500', to: 'to-orange-500', shadow: 'rgba(245,158,11,0.5)', shadowHover: 'rgba(249,115,22,0.7)' };
+    return (
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white p-6 md:p-8 flex flex-col justify-center rounded-3xl lg:rounded-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.15),transparent_60%)]" />
+        <div className="relative z-10 w-full">
+          {periodMonths > 1 && discount > 0 ? (
+            <>
+              <div className="text-sm text-gray-400 uppercase tracking-wider mb-1">Итого за {periodMonths} мес</div>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-5xl md:text-6xl font-black text-white">{websiteTotalPrice}</span>
+                <span className="text-xl font-bold text-gray-300">₽</span>
+              </div>
+              <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-gray-400">{websiteMonthlyPrice} ₽ × {periodMonths} мес</span>
+                <span className="text-emerald-400 font-bold">× {Math.round((1 - discount) * 100)}%</span>
+                <span className="text-emerald-400/80 text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  экономия {websiteMonthlyPrice * periodMonths - websiteTotalPrice} ₽
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm text-gray-400 uppercase tracking-wider mb-2">Итого в месяц</div>
+              <div className="flex items-baseline gap-2 mb-8">
+                <span className="text-6xl md:text-7xl font-black text-white">{websiteMonthlyPrice}</span>
+                <span className="text-2xl font-bold text-gray-300">₽ / мес</span>
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2.5 mb-8 text-sm">
+            {[
+              { k: 'Тариф', v: p?.label ?? 'Business', I: Globe },
+              { k: 'Движок', v: p?.coreTemplate === 'nodejs' ? 'Node.js + Express' : 'Static HTML', I: Database },
+              { k: 'Бэкапы', v: p?.backupEnabled ? '7 дней ротация' : 'Раз в неделю', I: Lock },
+              { k: 'Период', v: periodLabel(periodMonths), I: Clock },
+              { k: 'Поддержка', v: p?.id === 'premium' ? '24/7 приоритет' : 'в рабочее время', I: Headphones },
+            ].map((row, i) => {
+              const Ic = row.I as any;
+              return (
+                <div key={i} className="flex items-center justify-between py-1.5 border-b border-white/10">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Ic size={14} />
+                    {row.k}
+                  </div>
+                  <div className="font-semibold text-white">{row.v}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={submitWebsiteOrder}
+            disabled={orderLoading || !onWebsiteOrder}
+            className={`w-full py-5 rounded-2xl bg-gradient-to-r ${accent.from} ${accent.to} hover:brightness-110 font-bold text-lg shadow-[0_0_30px_${accent.shadow}] hover:shadow-[0_0_50px_${accent.shadowHover}] transition-all transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed`}
+          >
+            {orderLoading ? (
+              'Создаю сайт...'
+            ) : isAuthenticated ? (
+              <>Заказать сайт <ArrowRight size={18} className="inline ml-2" /></>
+            ) : (
+              <>Войти и заказать <ArrowRight size={18} className="inline ml-2" /></>
+            )}
+          </button>
+          <p className="text-xs text-gray-400 text-center mt-4 leading-relaxed">
+            Оплата с внутреннего баланса • Пополнение — карты / СБП через Platega
           </p>
         </div>
       </div>
@@ -739,25 +957,72 @@ const GameServerConfigurator = ({
         {!compact && (
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Конфигуратор</h2>
-            <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl">Соберите свой сервер</p>
-            <p className="mt-4 text-xl text-gray-500">Выберите параметры — цена рассчитается автоматически.</p>
+            <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl">Соберите сервер или сайт</p>
+            <p className="mt-4 text-xl text-gray-500">Выберите услугу и параметры — цена рассчитается автоматически.</p>
           </div>
         )}
         <div className={`max-w-5xl mx-auto ${compact ? '' : 'bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100'}`}>
           <div className="grid lg:grid-cols-5 rounded-3xl overflow-hidden bg-white shadow-2xl border border-gray-100">
             <div className="lg:col-span-3 p-6 md:p-10 space-y-6">
-              <CompactGameSelector />
-              <CompactLocationSelector />
-              <PeriodSelector />
-              {showNameField && <NameField />}
-              <div className="space-y-6 pt-2">
-                <Sliders />
-                <McVersionSelector />
-                <Cs16BuildSelector />
+              <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setConfiguratorTab('game')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                    configuratorTab === 'game'
+                      ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Gamepad2 size={18} />
+                  Игровые серверы
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfiguratorTab('website')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                    configuratorTab === 'website'
+                      ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Globe size={18} />
+                  Сайты под заказ
+                </button>
               </div>
+
+              {configuratorTab === 'game' ? (
+                <>
+                  <CompactGameSelector />
+                  <CompactLocationSelector />
+                  <PeriodSelector />
+                  {showNameField && <NameField />}
+                  <div className="space-y-6 pt-2">
+                    <Sliders />
+                    <McVersionSelector />
+                    <Cs16BuildSelector />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <WebsitePlanCards />
+                  <PeriodSelector />
+                  <WebsiteDomainField />
+                  <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl">
+                    <Rocket size={20} className="text-sky-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-bold text-sky-800 mb-1">Быстрый старт</div>
+                      <p className="text-xs text-sky-700/90 leading-relaxed">
+                        После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — шаблон как Ordlan Такси (Express + EJS + админка), <b>Landing</b> — чистый HTML.
+                        Загружайте свои файлы через SFTP или файловый менеджер в ЛК.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
             <div className="lg:col-span-2">
-              <PricePanel />
+              {configuratorTab === 'game' ? <PricePanel /> : <WebsitePricePanel />}
             </div>
           </div>
         </div>

@@ -106,6 +106,26 @@ interface HostingNode {
   slotPrice?: number;
   slotPrices?: Record<string, number>;
   status: string;
+  type?: 'game' | 'web' | 'both';
+  capacityWebSites?: number;
+  usedWebSites?: number;
+  webSftpPortStart?: number;
+  webSftpPortEnd?: number;
+}
+
+interface WebSiteItem {
+  id: string;
+  domain: string | null;
+  plan: 'landing' | 'business' | 'premium';
+  price: number;
+  status: 'pending' | 'provisioning' | 'active' | 'suspended' | 'deleting' | 'deleted';
+  paidUntil: string | null;
+  userId: string;
+  nodeId: string;
+  coreTemplate?: string | null;
+  user?: User;
+  node?: HostingNode;
+  createdAt?: string;
 }
 
 interface GameServerItem {
@@ -203,13 +223,14 @@ const formatDate = (date: string | Date) => {
 
 const AdminDashboard = () => {
   const { refreshBalance } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers' | 'finances'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers' | 'web_sites' | 'finances'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [hostingNodes, setHostingNodes] = useState<HostingNode[]>([]);
   const [gameServers, setGameServers] = useState<GameServerItem[]>([]);
+  const [webSites, setWebSites] = useState<WebSiteItem[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -416,6 +437,21 @@ const AdminDashboard = () => {
   const [isGameServerModalOpen, setIsGameServerModalOpen] = useState(false);
   const [currentNode, setCurrentNode] = useState<Partial<HostingNode>>({});
   const [currentGameServer, setCurrentGameServer] = useState<Partial<GameServerItem>>({});
+
+  // Web Sites admin
+  const [selectedWebSiteIds, setSelectedWebSiteIds] = useState<Set<string>>(new Set());
+  const [wsStatusFilter, setWsStatusFilter] = useState<string>('all');
+  const [wsPlanFilter, setWsPlanFilter] = useState<string>('all');
+  const [wsNodeFilter, setWsNodeFilter] = useState<string>('all');
+  const [wsSearch, setWsSearch] = useState('');
+  const [wsMassActionLoading, setWsMassActionLoading] = useState(false);
+  const [isWebSiteModalOpen, setIsWebSiteModalOpen] = useState(false);
+  const [currentWebSite, setCurrentWebSite] = useState<Partial<WebSiteItem> & { userId?: string; periodMonths?: number }>({
+    plan: 'business',
+    periodMonths: 1,
+  });
+  const [isWebSiteMigrateOpen, setIsWebSiteMigrateOpen] = useState(false);
+  const [webSiteMigrate, setWebSiteMigrate] = useState<{ siteId: string; newNodeId: string }>({ siteId: '', newNodeId: '' });
   
   // User Profile Modal State
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -460,7 +496,7 @@ const AdminDashboard = () => {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       };
 
-      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes, nodesRes, gameServersRes] = await Promise.all([
+      const [servicesRes, portfolioRes, usersRes, invoicesRes, projectsRes, ordersRes, serversRes, feedbacksRes, nodesRes, gameServersRes, webSitesRes] = await Promise.all([
         fetch('/api/services/admin', { headers }),
         fetch('/api/portfolio'),
         fetch('/api/users', { headers }),
@@ -470,7 +506,8 @@ const AdminDashboard = () => {
         fetch('/api/servers', { headers }),
         fetch('/api/feedback', { headers }),
         fetch('/api/nodes', { headers }),
-        fetch('/api/game-servers', { headers })
+        fetch('/api/game-servers', { headers }),
+        fetch('/api/sites/admin/all', { headers }).catch(() => ({ ok: false, json: async () => [] })),
       ]);
       
       const servicesData = servicesRes.ok ? await servicesRes.json() : [];
@@ -518,6 +555,14 @@ const AdminDashboard = () => {
           const gsData = await gameServersRes.json();
           if (Array.isArray(gsData)) setGameServers(gsData);
       }
+
+      try {
+        if (webSitesRes && typeof webSitesRes.ok !== 'undefined' && webSitesRes.ok) {
+          const wsData = await (webSitesRes as any).json();
+          const items: WebSiteItem[] = Array.isArray(wsData) ? wsData : Array.isArray(wsData?.items) ? wsData.items : [];
+          setWebSites(items);
+        }
+      } catch (e) { console.warn('web sites fetch skipped', e); }
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -879,7 +924,12 @@ const AdminDashboard = () => {
         body: JSON.stringify({
           supportedGames: currentNode.supportedGames || [],
           slotPrices: currentNode.slotPrices || {},
-          slotPrice: Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10
+          slotPrice: Number.isFinite(Number(currentNode.slotPrice)) ? Number(currentNode.slotPrice) : 10,
+          type: currentNode.type || 'game',
+          capacityWebSites: Number.isFinite(Number(currentNode.capacityWebSites)) ? Number(currentNode.capacityWebSites) : 50,
+          usedWebSites: Number.isFinite(Number(currentNode.usedWebSites)) ? Number(currentNode.usedWebSites) : 0,
+          webSftpPortStart: currentNode.webSftpPortStart,
+          webSftpPortEnd: currentNode.webSftpPortEnd,
         })
       });
       if (res.ok) {
@@ -932,6 +982,117 @@ const AdminDashboard = () => {
       } catch (error) {
           console.error(error);
       }
+  };
+
+  // =============== WEB SITES HELPERS ===============
+  const handleControlWebSite = async (id: string, action: 'start' | 'stop' | 'restart' | 'delete') => {
+    if (action === 'delete' && !confirm('Удалить сайт? Данные SFTP/PM2/Nginx будут удалены безвозвратно.')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/admin/${id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка');
+      }
+      fetchData();
+    } catch (error) { console.error(error); alert('Ошибка соединения'); }
+  };
+
+  const handleMigrateWebSite = async () => {
+    if (!webSiteMigrate.siteId || !webSiteMigrate.newNodeId) { alert('Выберите сайт и ноду'); return; }
+    if (!confirm(`Перенести сайт на новую ноду? (будет выполнен rsync, старая нода очищена)`)) return;
+    try {
+      setWsMassActionLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/admin/${webSiteMigrate.siteId}/migrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ nodeId: webSiteMigrate.newNodeId }),
+      });
+      if (res.ok) {
+        alert('Миграция запущена, результат в логах нод');
+        setIsWebSiteMigrateOpen(false);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка миграции');
+      }
+    } catch (e) { console.error(e); alert('Ошибка соединения'); }
+    finally { setWsMassActionLoading(false); fetchData(); }
+  };
+
+  const handleCreateWebSite = async () => {
+    if (!currentWebSite.userId) { alert('Выберите пользователя'); return; }
+    if (!currentWebSite.plan) { alert('Выберите тариф'); return; }
+    try {
+      setWsMassActionLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/sites/admin/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: currentWebSite.userId,
+          domain: currentWebSite.domain || null,
+          plan: currentWebSite.plan || 'business',
+          price: Number.isFinite(Number(currentWebSite.price)) ? Number(currentWebSite.price) : undefined,
+          periodMonths: Number(currentWebSite.periodMonths || 1),
+          nodeId: currentWebSite.nodeId || undefined,
+          coreTemplate: currentWebSite.coreTemplate || undefined,
+          autoPay: true,
+        }),
+      });
+      if (res.ok) {
+        alert('Сайт создан / счет выставлен');
+        setIsWebSiteModalOpen(false);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        alert(e.message || 'Ошибка создания');
+      }
+    } catch (e) { console.error(e); alert('Ошибка соединения'); }
+    finally { setWsMassActionLoading(false); fetchData(); }
+  };
+
+  const filteredWebSites = webSites.filter(ws => {
+    if (wsSearch.trim()) {
+      const q = wsSearch.toLowerCase();
+      const hay = `${ws.id} ${ws.domain || ''} ${ws.user?.name || ''} ${ws.user?.email || ''} ${ws.node?.name || ''} ${ws.node?.ip || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (wsStatusFilter !== 'all' && ws.status !== wsStatusFilter) return false;
+    if (wsPlanFilter !== 'all' && ws.plan !== wsPlanFilter) return false;
+    if (wsNodeFilter !== 'all' && ws.nodeId !== wsNodeFilter) return false;
+    return true;
+  });
+
+  const toggleWebSiteSelection = (id: string) => {
+    setSelectedWebSiteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearWebSiteSelection = () => setSelectedWebSiteIds(new Set());
+
+  const handleBulkWebSiteAction = async (action: 'start' | 'stop' | 'restart' | 'delete') => {
+    const ids = Array.from(selectedWebSiteIds);
+    if (ids.length === 0) return alert('Не выбрано ни одного сайта');
+    if (!confirm(`Применить «${action}» к ${ids.length} сайтам?`)) return;
+    try {
+      setWsMassActionLoading(true);
+      const token = localStorage.getItem('token');
+      const CHUNK = 10;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        await Promise.allSettled(chunk.map(id => fetch(`/api/sites/admin/${id}/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        }).catch(() => null)));
+      }
+      clearWebSiteSelection();
+    } catch (e) { console.error(e); }
+    finally { setWsMassActionLoading(false); fetchData(); }
   };
 
   // =============== GAME SERVERS FILTERS & SELECTION ===============
@@ -1165,6 +1326,7 @@ const AdminDashboard = () => {
                 { id: 'invoices', label: 'Счета' },
                 { id: 'hosting_nodes', label: 'Ноды (локации)' },
                 { id: 'game_servers', label: 'Игровые серверы' },
+                { id: 'web_sites', label: 'Сайты' },
                 { id: 'orders', label: 'Заказы (услуги)' },
                 { id: 'discussions', label: 'Обсуждения' },
                 { id: 'feedback', label: 'Обратная связь' },
@@ -2773,23 +2935,60 @@ const AdminDashboard = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Тип</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSH Port</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RAM</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сайты</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Цена/слот</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {hostingNodes.map((node) => (
+                    {hostingNodes.map((node) => {
+                      const type = node.type || 'game';
+                      const typeMeta: Record<string, { label: string; cls: string }> = {
+                        game: { label: 'Игровая', cls: 'bg-indigo-100 text-indigo-700' },
+                        web: { label: 'Веб-нода', cls: 'bg-sky-100 text-sky-700' },
+                        both: { label: 'Универсальная', cls: 'bg-violet-100 text-violet-700' },
+                      };
+                      const usedSites = Number(node.usedWebSites || 0);
+                      const capSites = Number(node.capacityWebSites || 0);
+                      return (
                       <tr key={node.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{node.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${typeMeta[type]?.cls || 'bg-gray-100 text-gray-700'}`}>
+                            {typeMeta[type]?.label || type}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.ip}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.sshPort}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.totalRam} MB</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {`MC:${Number.isFinite(Number(node.slotPrices?.minecraft)) ? Number(node.slotPrices?.minecraft) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS2:${Number.isFinite(Number(node.slotPrices?.cs2)) ? Number(node.slotPrices?.cs2) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS16:${Number.isFinite(Number(node.slotPrices?.cs16)) ? Number(node.slotPrices?.cs16) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽`}
+                          {(type === 'web' || type === 'both') ? (
+                            <>
+                              <span className="font-semibold text-slate-700">{usedSites}</span>
+                              <span className="mx-1 text-slate-400">/</span>
+                              <span className="text-slate-500">{capSites || 50}</span>
+                              <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full bg-sky-500"
+                                  style={{ width: `${capSites ? Math.min(100, (usedSites / capSites) * 100) : 0}%` }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {(type === 'game' || type === 'both') ? (
+                            `MC:${Number.isFinite(Number(node.slotPrices?.minecraft)) ? Number(node.slotPrices?.minecraft) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS2:${Number.isFinite(Number(node.slotPrices?.cs2)) ? Number(node.slotPrices?.cs2) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽ | CS16:${Number.isFinite(Number(node.slotPrices?.cs16)) ? Number(node.slotPrices?.cs16) : (Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10)} ₽`
+                          ) : (
+                            <span className="text-slate-400 text-xs">не для игр</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -2804,12 +3003,15 @@ const AdminDashboard = () => {
                                   ...node,
                                   supportedGames: Array.isArray(node.supportedGames) ? node.supportedGames : ['minecraft', 'cs2', 'cs16'],
                                   slotPrice: Number.isFinite(Number(node.slotPrice)) ? Number(node.slotPrice) : 10,
-                                  slotPrices: (node.slotPrices && typeof node.slotPrices === 'object') ? node.slotPrices : undefined
+                                  slotPrices: (node.slotPrices && typeof node.slotPrices === 'object') ? node.slotPrices : undefined,
+                                  type: node.type || 'game',
+                                  capacityWebSites: Number.isFinite(Number(node.capacityWebSites)) ? Number(node.capacityWebSites) : 50,
+                                  usedWebSites: Number(node.usedWebSites || 0),
                                 });
                                 setIsNodeGamesModalOpen(true);
                               }}
                               className="text-gray-600 hover:text-gray-900"
-                              title="Доступные игры"
+                              title="Доступные игры / тип ноды"
                             >
                               <Settings className="h-4 w-4" />
                             </button>
@@ -2825,7 +3027,7 @@ const AdminDashboard = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -2834,16 +3036,60 @@ const AdminDashboard = () => {
 
           {isNodeModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-              <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Добавить Ноду</h2>
                 <div className="space-y-4">
                     <input type="text" placeholder="Название (MSK-1)" className="w-full p-2 border rounded" value={currentNode.name || ''} onChange={e => setCurrentNode({...currentNode, name: e.target.value})} />
                     <input type="text" placeholder="IP" className="w-full p-2 border rounded" value={currentNode.ip || ''} onChange={e => setCurrentNode({...currentNode, ip: e.target.value})} />
-                    <input type="number" placeholder="SSH Port (22)" className="w-full p-2 border rounded" value={currentNode.sshPort || 22} onChange={e => setCurrentNode({...currentNode, sshPort: parseInt(e.target.value)})} />
-                    <input type="text" placeholder="SSH User (root)" className="w-full p-2 border rounded" value={currentNode.sshUser || 'root'} onChange={e => setCurrentNode({...currentNode, sshUser: e.target.value})} />
-                    <input type="password" placeholder="SSH Password" className="w-full p-2 border rounded" value={currentNode.sshPassword || ''} onChange={e => setCurrentNode({...currentNode, sshPassword: e.target.value})} />
-                    <input type="number" placeholder="Total RAM (MB)" className="w-full p-2 border rounded" value={currentNode.totalRam || 0} onChange={e => setCurrentNode({...currentNode, totalRam: parseInt(e.target.value)})} />
-                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="number" placeholder="SSH Port (22)" className="w-full p-2 border rounded" value={currentNode.sshPort || 22} onChange={e => setCurrentNode({...currentNode, sshPort: parseInt(e.target.value) || 22})} />
+                      <input type="number" placeholder="Total RAM (MB)" className="w-full p-2 border rounded" value={currentNode.totalRam || 0} onChange={e => setCurrentNode({...currentNode, totalRam: parseInt(e.target.value) || 0})} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="text" placeholder="SSH User (root)" className="w-full p-2 border rounded" value={currentNode.sshUser || 'root'} onChange={e => setCurrentNode({...currentNode, sshUser: e.target.value})} />
+                      <input type="password" placeholder="SSH Password" className="w-full p-2 border rounded" value={currentNode.sshPassword || ''} onChange={e => setCurrentNode({...currentNode, sshPassword: e.target.value})} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Тип ноды</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { id: 'game', label: 'Игровая', desc: 'Только сервера' },
+                          { id: 'web', label: 'Веб', desc: 'Только сайты' },
+                          { id: 'both', label: 'Универсал', desc: 'Сервера + сайты' },
+                        ] as const).map(t => {
+                          const active = (currentNode.type || 'game') === t.id;
+                          return (
+                            <label key={t.id} className={`cursor-pointer rounded-lg border-2 p-2.5 transition ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                              <input
+                                type="radio"
+                                className="sr-only"
+                                name="node-type"
+                                checked={active}
+                                onChange={() => setCurrentNode({ ...currentNode, type: t.id })}
+                              />
+                              <div className="text-sm font-semibold text-gray-900">{t.label}</div>
+                              <div className="text-[11px] text-gray-500">{t.desc}</div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {((currentNode.type || 'game') !== 'game') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Макс. количество сайтов</label>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="50"
+                          className="w-full p-2 border rounded"
+                          value={Number.isFinite(Number(currentNode.capacityWebSites)) ? Number(currentNode.capacityWebSites) : 50}
+                          onChange={e => setCurrentNode({ ...currentNode, capacityWebSites: Math.max(1, parseInt(e.target.value) || 50), usedWebSites: 0 })}
+                        />
+                      </div>
+                    )}
+
                     <div className="flex justify-end gap-2 pt-4">
                         <button onClick={() => setIsNodeModalOpen(false)} className="px-4 py-2 border rounded">Отмена</button>
                         <button onClick={handleSaveNode} className="px-4 py-2 bg-indigo-600 text-white rounded">Сохранить</button>
@@ -2855,14 +3101,53 @@ const AdminDashboard = () => {
 
           {isNodeGamesModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-              <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+              <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Доступные игры</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Параметры ноды</h2>
                   <button onClick={() => setIsNodeGamesModalOpen(false)} className="text-gray-400 hover:text-gray-500">
                     <X className="h-6 w-6" />
                   </button>
                 </div>
+
+                <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Тип ноды</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { id: 'game', label: 'Игровая' },
+                        { id: 'web', label: 'Веб' },
+                        { id: 'both', label: 'Универсал' },
+                      ] as const).map(t => {
+                        const active = (currentNode.type || 'game') === t.id;
+                        return (
+                          <label key={t.id} className={`cursor-pointer rounded-lg border-2 p-2 text-center transition ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                            <input type="radio" className="sr-only" name="node-type-edit" checked={active} onChange={() => setCurrentNode({ ...currentNode, type: t.id })} />
+                            <div className="text-sm font-semibold">{t.label}</div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {((currentNode.type || 'game') !== 'game') && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Макс. сайтов</label>
+                        <input type="number" min="1" className="w-full p-2 border rounded text-sm"
+                          value={Number.isFinite(Number(currentNode.capacityWebSites)) ? Number(currentNode.capacityWebSites) : 50}
+                          onChange={e => setCurrentNode({ ...currentNode, capacityWebSites: Math.max(1, parseInt(e.target.value) || 50) })} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Размещено (вручную)</label>
+                        <input type="number" min="0" className="w-full p-2 border rounded text-sm"
+                          value={Number.isFinite(Number(currentNode.usedWebSites)) ? Number(currentNode.usedWebSites) : 0}
+                          onChange={e => setCurrentNode({ ...currentNode, usedWebSites: Math.max(0, parseInt(e.target.value) || 0) })} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Доступные игры</div>
                   {[
                     { id: 'minecraft', label: 'Minecraft (Java)' },
                     { id: 'cs2', label: 'CS 2' },
@@ -2884,8 +3169,9 @@ const AdminDashboard = () => {
                   ))}
                 </div>
                 <div className="pt-5 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Цены за слот</div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: Minecraft (₽)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Minecraft (₽)</label>
                     <input
                       type="number"
                       min="0"
@@ -2895,7 +3181,7 @@ const AdminDashboard = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: CS 2 (₽)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">CS 2 (₽)</label>
                     <input
                       type="number"
                       min="0"
@@ -2905,7 +3191,7 @@ const AdminDashboard = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Цена за слот: CS 1.6 (₽)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">CS 1.6 (₽)</label>
                     <input
                       type="number"
                       min="0"
@@ -3116,6 +3402,173 @@ const AdminDashboard = () => {
                         <tr>
                           <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                             Нет игровых серверов
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'web_sites' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div className="flex flex-wrap items-center gap-3 justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input type="text" placeholder="Поиск (домен, пользователь, ID)..." value={wsSearch} onChange={e => setWsSearch(e.target.value)}
+                        className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-72" />
+                    </div>
+                    <select value={wsStatusFilter} onChange={e => setWsStatusFilter(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300">
+                      <option value="all">Все статусы</option>
+                      <option value="pending">Ожидает</option>
+                      <option value="provisioning">Разворачивается</option>
+                      <option value="active">Работает</option>
+                      <option value="suspended">Приостановлен</option>
+                      <option value="deleted">Удалён</option>
+                    </select>
+                    <select value={wsPlanFilter} onChange={e => setWsPlanFilter(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300">
+                      <option value="all">Все тарифы</option>
+                      <option value="landing">Landing (149₽)</option>
+                      <option value="business">Business (299₽)</option>
+                      <option value="premium">Premium (599₽)</option>
+                    </select>
+                    <select value={wsNodeFilter} onChange={e => setWsNodeFilter(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-300">
+                      <option value="all">Все ноды</option>
+                      {hostingNodes.filter(n => !n.type || n.type === 'web' || n.type === 'both').map(n => (
+                        <option key={n.id} value={n.id}>{n.name} ({n.ip})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <button disabled={selectedWebSiteIds.size === 0 || wsMassActionLoading}
+                        onClick={() => document.getElementById('ws-bulk-menu')?.classList.toggle('hidden')}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50">
+                        {wsMassActionLoading ? <Loader className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
+                        Массовые ({selectedWebSiteIds.size})
+                      </button>
+                      <div id="ws-bulk-menu" className="hidden absolute right-0 mt-2 z-20 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+                        {(['start', 'restart', 'stop', 'delete'] as const).map(a => (
+                          <button key={a} onClick={() => { document.getElementById('ws-bulk-menu')?.classList.add('hidden'); handleBulkWebSiteAction(a); }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${a === 'delete' ? 'text-red-700' : 'text-gray-700'}`}>
+                            {a === 'start' ? 'Запустить' : a === 'stop' ? 'Остановить' : a === 'restart' ? 'Рестарт' : 'Удалить'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsWebSiteMigrateOpen(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                    >
+                      <ChevronRight className="h-4 w-4" /> Мигрировать
+                    </button>
+                    <button onClick={() => {
+                      setCurrentWebSite({ plan: 'business', periodMonths: 1, price: 299 });
+                      setIsWebSiteModalOpen(true);
+                    }} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                      <Plus className="h-5 w-5 mr-2" /> Создать сайт
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left">
+                          <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                            checked={filteredWebSites.length > 0 && filteredWebSites.every(ws => selectedWebSiteIds.has(ws.id))}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedWebSiteIds(new Set(filteredWebSites.map(ws => ws.id)));
+                              else clearWebSiteSelection();
+                            }} />
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Домен</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Клиент</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Тариф</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Нода</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Оплачено до</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Управление</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredWebSites.map(ws => {
+                        const statusMap: Record<string, { label: string; cls: string }> = {
+                          pending: { label: 'Ожидает', cls: 'bg-amber-100 text-amber-800' },
+                          provisioning: { label: 'Разворачивается', cls: 'bg-indigo-100 text-indigo-800' },
+                          active: { label: 'Работает', cls: 'bg-green-100 text-green-800' },
+                          suspended: { label: 'Приостановлен', cls: 'bg-rose-100 text-rose-800' },
+                          deleting: { label: 'Удаляется', cls: 'bg-gray-100 text-gray-800' },
+                          deleted: { label: 'Удалён', cls: 'bg-gray-100 text-gray-500' },
+                        };
+                        const planMap: Record<string, { label: string; cls: string }> = {
+                          landing: { label: 'Landing 149₽', cls: 'bg-sky-100 text-sky-700' },
+                          business: { label: 'Business 299₽', cls: 'bg-violet-100 text-violet-700' },
+                          premium: { label: 'Premium 599₽', cls: 'bg-amber-100 text-amber-800' },
+                        };
+                        const s = statusMap[ws.status] || { label: ws.status, cls: 'bg-gray-100 text-gray-700' };
+                        const p = planMap[ws.plan] || { label: ws.plan, cls: 'bg-gray-100 text-gray-700' };
+                        return (
+                          <tr key={ws.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                                checked={selectedWebSiteIds.has(ws.id)}
+                                onChange={() => toggleWebSiteSelection(ws.id)} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-mono text-sm font-semibold text-gray-900">
+                                {ws.domain ? (
+                                  <a href={`http://${ws.domain}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">{ws.domain} ↗</a>
+                                ) : <span className="text-gray-400 italic">домен не указан</span>}
+                              </div>
+                              <div className="text-[11px] text-gray-400 font-mono">{ws.id?.slice(0, 10)}…</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="text-sm text-gray-900 font-medium">{ws.user?.name || ws.userId?.slice(0, 8)}</div>
+                              <div className="text-xs text-gray-500">{ws.user?.email || ''}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${p.cls}`}>{p.label}</span>
+                              {Number.isFinite(Number(ws.price)) && <div className="text-[11px] text-gray-500 mt-0.5">факт {Number(ws.price)} ₽/мес</div>}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              <div className="font-medium">{ws.node?.name || '-'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono">{ws.node?.ip || ''}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>{s.label}</span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                              {ws.paidUntil ? new Date(ws.paidUntil).toLocaleDateString('ru-RU') : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <button onClick={() => handleControlWebSite(ws.id, 'start')} className="text-green-700 hover:text-green-900 px-1.5 text-xs">Start</button>
+                              <button onClick={() => handleControlWebSite(ws.id, 'restart')} className="text-blue-700 hover:text-blue-900 px-1.5 text-xs">Restart</button>
+                              <button onClick={() => handleControlWebSite(ws.id, 'stop')} className="text-amber-700 hover:text-amber-900 px-1.5 text-xs">Stop</button>
+                              <button onClick={() => handleControlWebSite(ws.id, 'delete')} className="text-red-700 hover:text-red-900 px-1.5 text-xs">Del</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredWebSites.length === 0 && !loading && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-16 text-center">
+                            <Globe className="mx-auto mb-2 h-10 w-10 text-slate-300" />
+                            <div className="text-sm text-slate-500">Сайтов пока нет. Нажмите «Создать сайт» или включите тариф через Configurator.</div>
+                          </td>
+                        </tr>
+                      )}
+                      {loading && webSites.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-12 text-center text-gray-400 text-sm">
+                            <Loader className="inline-block h-4 w-4 animate-spin mr-2" /> Загрузка...
                           </td>
                         </tr>
                       )}
@@ -3874,6 +4327,175 @@ const AdminDashboard = () => {
           </motion.div>
         </div>
       )}
+
+        {/* Web Site Custom Create Modal */}
+        {isWebSiteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-xl font-bold text-gray-900">Создать сайт (админский)</h2>
+                <button onClick={() => setIsWebSiteModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Пользователь-владелец *</label>
+                  <select className="w-full p-2.5 border rounded-lg"
+                    value={currentWebSite.userId || ''}
+                    onChange={e => setCurrentWebSite({ ...currentWebSite, userId: e.target.value })}>
+                    <option value="">Выберите пользователя…</option>
+                    {users.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email}) · баланс {Number(u.balance || 0).toFixed(0)} ₽
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Домен</label>
+                    <input type="text" placeholder="orlan-taxi.ru" className="w-full p-2.5 border rounded-lg font-mono"
+                      value={currentWebSite.domain || ''}
+                      onChange={e => setCurrentWebSite({ ...currentWebSite, domain: e.target.value.trim() })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Тариф *</label>
+                    <select className="w-full p-2.5 border rounded-lg"
+                      value={currentWebSite.plan || 'business'}
+                      onChange={e => setCurrentWebSite({ ...currentWebSite, plan: e.target.value as any })}>
+                      <option value="landing">Landing (статика) · 149 ₽/мес</option>
+                      <option value="business">Business (Node.js EJS · Ordlan template) · 299 ₽/мес</option>
+                      <option value="premium">Premium (24/7 priority) · 599 ₽/мес</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Период (месяцев)</label>
+                    <select className="w-full p-2.5 border rounded-lg"
+                      value={Number(currentWebSite.periodMonths || 1)}
+                      onChange={e => setCurrentWebSite({ ...currentWebSite, periodMonths: Number(e.target.value) })}>
+                      {[1, 3, 6, 12].map(m => (
+                        <option key={m} value={m}>{m} мес {m === 3 ? '(-5%)' : m === 6 ? '(-10%)' : m === 12 ? '(-15%)' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Цена (кастом, ₽/мес)</label>
+                    <input type="number" min="0" placeholder="по тарифу" className="w-full p-2.5 border rounded-lg"
+                      value={Number.isFinite(Number(currentWebSite.price)) ? Number(currentWebSite.price) : ''}
+                      onChange={e => setCurrentWebSite({ ...currentWebSite, price: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Нода</label>
+                    <select className="w-full p-2.5 border rounded-lg"
+                      value={currentWebSite.nodeId || ''}
+                      onChange={e => setCurrentWebSite({ ...currentWebSite, nodeId: e.target.value })}>
+                      <option value="">Авто (любая web/both с местом)</option>
+                      {hostingNodes.filter(n => !n.type || n.type === 'web' || n.type === 'both').map(n => {
+                        const used = Number(n.usedWebSites || 0); const cap = Number(n.capacityWebSites || 50);
+                        return <option key={n.id} value={n.id}>{n.name} ({n.ip}) · {used}/{cap}</option>;
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Шаблон / Core</label>
+                  <select className="w-full p-2.5 border rounded-lg"
+                    value={currentWebSite.coreTemplate || ''}
+                    onChange={e => setCurrentWebSite({ ...currentWebSite, coreTemplate: e.target.value || undefined })}>
+                    <option value="">По умолчанию (Landing → static, Business/Premium → orlan-taxi)</option>
+                    <option value="orlan-taxi-business">Ordlan Taxi Business (Express/EJS)</option>
+                    <option value="static-blank">Static blank (empty public_html)</option>
+                    <option value="node-blank">Node.js blank (package.json + server.js)</option>
+                  </select>
+                </div>
+
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  <b>Списание:</b> при сохранении сумма (price × период со скидкой) будет списана с баланса пользователя автоматически (autoPay=true).
+                  Если средств не хватит — сайт создастся в статусе pending, будет выставлен счёт.
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-6 mt-4 border-t">
+                <button onClick={() => setIsWebSiteModalOpen(false)} className="px-4 py-2 border rounded-lg">Отмена</button>
+                <button onClick={handleCreateWebSite} disabled={wsMassActionLoading}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                  {wsMassActionLoading && <Loader className="h-4 w-4 animate-spin" />}
+                  Создать сайт
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Web Site Migrate Modal */}
+        {isWebSiteMigrateOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Миграция сайта на другую ноду</h2>
+                <button onClick={() => setIsWebSiteMigrateOpen(false)} className="text-gray-400 hover:text-gray-500">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Сайт для миграции</label>
+                  <select className="w-full p-2.5 border rounded-lg"
+                    value={webSiteMigrate.siteId}
+                    onChange={e => setWebSiteMigrate({ ...webSiteMigrate, siteId: e.target.value })}>
+                    <option value="">Выберите сайт…</option>
+                    {webSites.filter(ws => ws.status === 'active' || ws.status === 'suspended').map(ws => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.domain || ws.id?.slice(0, 10)} · {ws.user?.name || ws.userId?.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Целевая нода (web/both)</label>
+                  <select className="w-full p-2.5 border rounded-lg"
+                    value={webSiteMigrate.newNodeId}
+                    onChange={e => setWebSiteMigrate({ ...webSiteMigrate, newNodeId: e.target.value })}>
+                    <option value="">Выберите ноду…</option>
+                    {hostingNodes
+                      .filter(n => n.type === 'web' || n.type === 'both')
+                      .filter(n => {
+                        const used = Number(n.usedWebSites || 0);
+                        const cap = Number(n.capacityWebSites || 50);
+                        return cap - used > 0;
+                      })
+                      .map(n => (
+                        <option key={n.id} value={n.id}>
+                          {n.name} ({n.ip}) · {Number(n.usedWebSites || 0)}/{Number(n.capacityWebSites || 50)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-1">
+                  <p>Будет выполнено: <code className="bg-white px-1.5 rounded">rsync</code> файлов сайта + бэкапов между нодами,</p>
+                  <p>на старой ноде: umount bind, userdel, pm2 delete, nginx conf rm.</p>
+                  <p>на новой ноде: useradd / SFTP / pm2 ecosystem / nginx virtual host (вся провиженинг).</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-5 mt-4 border-t">
+                <button onClick={() => setIsWebSiteMigrateOpen(false)} className="px-4 py-2 border rounded-lg">Отмена</button>
+                <button onClick={handleMigrateWebSite} disabled={wsMassActionLoading}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                  {wsMassActionLoading && <Loader className="h-4 w-4 animate-spin" />}
+                  Запустить миграцию
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
     </Layout>
   );
 };

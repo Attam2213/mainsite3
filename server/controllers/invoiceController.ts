@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Invoice, User, Service, Project, GameServer } from '../models';
 import { applyGameServerPaidInvoice } from './gameServerController';
+import { applyWebSitePaidInvoice } from './webSiteController';
 import { adjustBalance, round2 } from '../services/balanceService';
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<void> => {
@@ -175,11 +176,12 @@ export const patchInvoiceStatus = async (req: Request, res: Response): Promise<v
     invoice.status = status as any;
     await invoice.save();
 
-    if (status === 'paid' && oldStatus !== 'paid' && invoice.type === 'monthly' && invoice.gameServerId) {
-      try {
-        await applyGameServerPaidInvoice(invoice);
-      } catch (err) {
-        console.error('Admin patch provision error:', err);
+    if (status === 'paid' && oldStatus !== 'paid') {
+      if (invoice.gameServerId) {
+        try { await applyGameServerPaidInvoice(invoice); } catch (err) { console.error('Admin patch game provision error:', err); }
+      }
+      if ((invoice as any).siteId) {
+        try { await applyWebSitePaidInvoice(invoice); } catch (err) { console.error('Admin patch website provision error:', err); }
       }
     }
     res.json(invoice);

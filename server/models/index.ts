@@ -11,6 +11,8 @@ import Lead from './Lead';
 import Feedback from './Feedback';
 import ServerNode from './ServerNode';
 import GameServer from './GameServer';
+import WebSite from './WebSite';
+import WebSiteBackup from './WebSiteBackup';
 import WalletTransaction from './WalletTransaction';
 
 // Associations
@@ -40,7 +42,7 @@ Message.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 User.hasMany(Message, { foreignKey: 'senderId', as: 'sentMessages' });
 Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
 
-// Site Associations
+// Site Associations (old Studio — hidden, preserved)
 User.hasMany(Site, { foreignKey: 'userId', as: 'sites' });
 Site.belongsTo(User, { foreignKey: 'userId', as: 'owner' });
 
@@ -50,11 +52,25 @@ Site.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
 Site.hasMany(Lead, { foreignKey: 'siteId', as: 'leads' });
 Lead.belongsTo(Site, { foreignKey: 'siteId', as: 'site' });
 
+// GameServers Associations
 GameServer.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 GameServer.belongsTo(ServerNode, { foreignKey: 'nodeId', as: 'node' });
 
 GameServer.hasMany(Invoice, { foreignKey: 'gameServerId', as: 'invoices' });
 Invoice.belongsTo(GameServer, { foreignKey: 'gameServerId', as: 'gameServer' });
+
+// WebSite (new Hosting feature) Associations
+User.hasMany(WebSite, { foreignKey: 'userId', as: 'webSites' });
+WebSite.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+ServerNode.hasMany(WebSite, { foreignKey: 'nodeId', as: 'webSites' });
+WebSite.belongsTo(ServerNode, { foreignKey: 'nodeId', as: 'node' });
+
+WebSite.hasMany(Invoice, { foreignKey: 'siteId', as: 'invoices' });
+Invoice.belongsTo(WebSite, { foreignKey: 'siteId', as: 'webSite' });
+
+WebSite.hasMany(WebSiteBackup, { foreignKey: 'webSiteId', as: 'backups', onDelete: 'CASCADE' });
+WebSiteBackup.belongsTo(WebSite, { foreignKey: 'webSiteId', as: 'webSite' });
 
 User.hasMany(WalletTransaction, { foreignKey: 'userId', as: 'walletTransactions' });
 WalletTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -73,5 +89,7 @@ export {
   Feedback,
   ServerNode,
   GameServer,
+  WebSite,
+  WebSiteBackup,
   WalletTransaction
 };

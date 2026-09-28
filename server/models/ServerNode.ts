@@ -14,6 +14,11 @@ class ServerNode extends Model {
   declare supportedGames: string[];
   declare slotPrice: number;
   declare slotPrices: Record<string, number>;
+  declare type: 'game' | 'web' | 'both';
+  declare capacityWebSites: number;
+  declare usedWebSites: number;
+  declare webSftpPortStart: number;
+  declare webSftpPortEnd: number;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -47,6 +52,26 @@ ServerNode.init(
       type: DataTypes.JSON,
       allowNull: false,
       defaultValue: { minecraft: 10, cs2: 10, cs16: 10 },
+    },
+    type: {
+      type: DataTypes.ENUM('game', 'web', 'both'),
+      defaultValue: 'game',
+    },
+    capacityWebSites: {
+      type: DataTypes.INTEGER,
+      defaultValue: 50,
+    },
+    usedWebSites: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    webSftpPortStart: {
+      type: DataTypes.INTEGER,
+      defaultValue: 2222,
+    },
+    webSftpPortEnd: {
+      type: DataTypes.INTEGER,
+      defaultValue: 2299,
     },
   },
   {
