@@ -605,7 +605,7 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
     const shortId = site.id.slice(0, 8);
     const sftpUser = `wexa_site_${shortId}`;
     const sftpPass = genRandomPassword(18);
-    const sftpPassHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
+    const sftpPasswordHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
     const pm2Name = `wexa-site-${shortId}`;
     const siteDir = `/var/lib/wexa/sites/${site.id}`;
     const sftpChroot = `/srv/sftp/${sftpUser}`;
