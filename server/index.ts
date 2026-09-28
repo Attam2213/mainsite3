@@ -69,6 +69,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/orders/:orderId/messages', messageRoutes);
 app.use('/api/servers', serverRoutes);
+app.use('/api/sites', webSiteRoutes);
 app.use('/api/sites', siteRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -76,7 +77,6 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/game-servers', gameServerRoutes);
-app.use('/api/sites', webSiteRoutes);
 app.use('/api/wallet', walletRoutes);
 
 // Basic health check
