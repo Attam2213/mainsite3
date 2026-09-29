@@ -2023,7 +2023,7 @@ const ClientDashboard = () => {
                       </div>
                     )}
                   </div>
-
+                  <div>
                   {/* Websites Summary (Overview only — combined view) */}
                   <div
                     className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
@@ -2165,6 +2165,7 @@ const ClientDashboard = () => {
                         </div>
                       </div>
                     )}
+                  </div>
                   </div>
               </div>
 
