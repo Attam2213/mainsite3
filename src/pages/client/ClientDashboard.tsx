@@ -271,6 +271,7 @@ const ClientDashboard = () => {
   // Game Hosting State
   const [isCreateServerModalOpen, setIsCreateServerModalOpen] = useState(false);
   const [initialConfiguratorTab, setInitialConfiguratorTab] = useState<'game' | 'website'>('game');
+  const [configuratorMode, setConfiguratorMode] = useState<'both' | 'game-only' | 'website-only'>('both');
   const [isConsoleModalOpen, setIsConsoleModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
@@ -1787,9 +1788,13 @@ const ClientDashboard = () => {
 
               {/* Overview Tab Content */}
               <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-8 flex flex-col gap-8">
-                  {warningGameServers.length > 0 && (
+                  {(() => {
+                    const overdueWS = webSites.filter(ws => isOverdue(ws.paidUntil, ws.status));
+                    const paidSoonWS = webSites.filter(ws => isPaidSoon(ws.paidUntil) && !isOverdue(ws.paidUntil, ws.status));
+                    const warningExists = warningGameServers.length > 0 || overdueWS.length > 0 || paidSoonWS.length > 0 || pendingInvoices.length > 0;
+                    if (!warningExists) return null;
+                    return (
                     <div
-                     
                       className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 flex flex-col gap-3"
                     >
                       {overdueGameServers.length > 0 && (
@@ -1797,7 +1802,7 @@ const ClientDashboard = () => {
                           <div className="flex items-start gap-3">
                             <div className="rounded-xl bg-rose-500 p-2 text-white"><AlertCircle className="h-5 w-5" /></div>
                             <div className="flex-1">
-                              <div className="text-sm font-bold text-rose-900">Требуется оплата ({overdueGameServers.length})</div>
+                              <div className="text-sm font-bold text-rose-900">Требуется оплата серверов ({overdueGameServers.length})</div>
                               <div className="mt-1 text-xs text-rose-700">
                                 У вас {overdueGameServers.length} серверов с просроченной оплатой или приостановлено.
                               </div>
@@ -1808,17 +1813,49 @@ const ClientDashboard = () => {
                           </div>
                         </div>
                       )}
+                      {overdueWS.length > 0 && (
+                        <div className="rounded-2xl border-2 border-rose-200 bg-rose-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-rose-500 p-2 text-white"><Globe className="h-5 w-5" /></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold text-rose-900">Требуется оплата сайтов ({overdueWS.length})</div>
+                              <div className="mt-1 text-xs text-rose-700">
+                                У вас {overdueWS.length} сайтов с просроченной оплатой. Они будут удалены через 3 дня.
+                              </div>
+                              <button onClick={withScrollSave(() => setActiveTab('websites'))} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
+                                К сайтам →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {gameServers.filter(gs => isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status)).length > 0 && (
                         <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
                           <div className="flex items-start gap-3">
                             <div className="rounded-xl bg-amber-500 p-2 text-white"><Clock className="h-5 w-5" /></div>
                             <div className="flex-1">
-                              <div className="text-sm font-bold text-amber-900">Скоро окончание оплаты ({gameServers.filter(gs => isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status)).length})</div>
+                              <div className="text-sm font-bold text-amber-900">Скоро окончание оплаты серверов ({gameServers.filter(gs => isPaidSoon(gs.paidUntil) && !isOverdue(gs.paidUntil, gs.status)).length})</div>
                               <div className="mt-1 text-xs text-amber-700">
                                 Срок оплаты истекает менее чем через 5 дней. Рекомендуем продлить заранее.
                               </div>
                               <button onClick={withScrollSave(() => setActiveTab('game_servers'))} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
                                 Продлить серверы →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {paidSoonWS.length > 0 && (
+                        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-amber-500 p-2 text-white"><Globe className="h-5 w-5" /></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold text-amber-900">Скоро окончание оплаты сайтов ({paidSoonWS.length})</div>
+                              <div className="mt-1 text-xs text-amber-700">
+                                Срок оплаты сайтов истекает менее чем через 5 дней. Рекомендуем продлить заранее.
+                              </div>
+                              <button onClick={withScrollSave(() => setActiveTab('websites'))} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                                Продлить сайты →
                               </button>
                             </div>
                           </div>
@@ -1830,7 +1867,7 @@ const ClientDashboard = () => {
                             <div className="rounded-xl bg-indigo-500 p-2 text-white"><CreditCard className="h-5 w-5" /></div>
                             <div className="flex-1">
                               <div className="text-sm font-bold text-indigo-900">Непогашенные счета ({pendingInvoices.length}) на сумму {pendingSum} ₽</div>
-                              <div className="mt-1 text-xs text-indigo-700">Оплатите счета, чтобы серверы не были приостановлены.</div>
+                              <div className="mt-1 text-xs text-indigo-700">Оплатите счета, чтобы серверы и сайты не были приостановлены.</div>
                               <button onClick={() => setActiveTab('billing')} className="mt-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
                                 Оплатить →
                               </button>
@@ -1839,7 +1876,8 @@ const ClientDashboard = () => {
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Game Servers Summary */}
                   <div 
@@ -1849,7 +1887,7 @@ const ClientDashboard = () => {
                     <div className="mb-4 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-gray-900">Игровые серверы</h2>
                       <button
-                        onClick={withScrollSave(() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
+                        onClick={withScrollSave(() => { setConfiguratorMode('both'); setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
                         className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -1977,6 +2015,149 @@ const ClientDashboard = () => {
                                 <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 cursor-pointer" onClick={() => openServerPanel(gs)}>
                                   <span className="text-sm font-medium text-indigo-600">Открыть панель</span>
                                   <span className="text-xs text-gray-500">Файлы, консоль, доступ</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Websites Summary (Overview only — combined view) */}
+                  <div
+                    className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
+                  >
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-xl font-semibold text-gray-900">Сайты</h2>
+                      <button
+                        onClick={withScrollSave(() => { setConfiguratorMode('both'); setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); })}
+                        className="flex items-center gap-2 text-sm bg-sky-600 text-white px-3 py-1.5 rounded-lg hover:bg-sky-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Заказать сайт
+                      </button>
+                    </div>
+
+                    {webSites.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-gray-500">
+                        <Globe className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                        <p>У вас пока нет сайтов</p>
+                        <button
+                          onClick={withScrollSave(() => setActiveTab('websites'))}
+                          className="mt-4 text-sm font-semibold text-sky-600 hover:text-sky-700"
+                        >
+                          Перейти к управлению →
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Всего сайтов</div>
+                            <div className="mt-1 text-2xl font-semibold text-gray-900">{webSites.length}</div>
+                          </div>
+                          <div className="rounded-2xl bg-emerald-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-emerald-700">Активны</div>
+                            <div className="mt-1 text-2xl font-semibold text-emerald-900">{webSites.filter(w => w.status === 'active').length}</div>
+                          </div>
+                          <div className="rounded-2xl bg-rose-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-rose-700">Приостановлено</div>
+                            <div className="mt-1 text-2xl font-semibold text-rose-900">{webSites.filter(w => ['suspended','pending_payment'].includes(String(w.status || ''))).length}</div>
+                          </div>
+                          <div className="rounded-2xl bg-sky-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-sky-700">🎁 Поддомены wexa.su</div>
+                            <div className="mt-1 text-2xl font-semibold text-sky-900">{webSites.filter(w => w.domainType === 'subdomain').length}</div>
+                          </div>
+                          <div className="rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white p-4 cursor-pointer hover:shadow-md transition" onClick={withScrollSave(() => setActiveTab('balance'))}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-xs uppercase tracking-wide text-sky-700">Баланс</div>
+                                <div className="mt-1 text-2xl font-bold text-gray-900">{Number(user?.balance ?? 0).toFixed(2)} <span className="text-sm font-semibold text-sky-700">₽</span></div>
+                              </div>
+                              <div className="rounded-xl bg-sky-500 p-2 text-white shadow"><Wallet className="h-5 w-5" /></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {webSites.slice(0, 4).map((ws: any) => {
+                            const meta = getWebSiteStatusMeta(ws.status);
+                            const fullUrl = ws.domain ? `https://${ws.domain}` : (ws.node?.ip ? `http://${ws.node.ip}` : null);
+                            const wsPendingInv = ws.status === 'pending_payment'
+                              ? invoices.find(i => i.status === 'pending' && ((i as any).webSiteId === ws.id || (i as any).siteId === ws.id))
+                              : null;
+                            const wsPayBtn = wsPendingInv
+                              ? (e: any) => { e.stopPropagation(); handlePayInvoice(wsPendingInv.id); }
+                              : null;
+                            return (
+                              <div
+                                key={ws.id}
+                                className="rounded-2xl border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+                              >
+                                <div className="cursor-pointer" onClick={() => openWebSettings(ws)}>
+                                  <div className="mb-4 flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="mb-2 flex items-center gap-2 flex-wrap">
+                                        <div className="rounded-xl bg-sky-50 p-2 text-sky-600">
+                                          <Globe className="h-4 w-4" />
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${meta.color}`}>
+                                          {meta.label}
+                                        </span>
+                                        {isPaidSoon(ws.paidUntil) && !isOverdue(ws.paidUntil, ws.status) && (
+                                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Скоро окончание</span>
+                                        )}
+                                        {isOverdue(ws.paidUntil, ws.status) && (
+                                          <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">Требуется оплата</span>
+                                        )}
+                                        <span className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-50 to-violet-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-100">
+                                          {getWebPlanLabel(ws.plan)}
+                                        </span>
+                                      </div>
+                                      <h3 className="truncate text-base font-semibold text-gray-900">{fullUrl ? (ws.domain || String(ws.id).slice(0, 8)) : `Сайт #${String(ws.id || '').slice(0, 8)}`}</h3>
+                                      <p className="mt-1 text-sm text-gray-500">
+                                        {fullUrl ? fullUrl : (ws.node?.name ? `Нода: ${ws.node.name}` : 'Разворачивается...')}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                      <div className="text-xs uppercase tracking-wide text-gray-500">Оплачено до</div>
+                                      <div className="mt-1 text-sm font-semibold text-gray-900">{ws.paidUntil ? formatDate(ws.paidUntil) : 'Не указано'}</div>
+                                    </div>
+                                    {ws.domainType && (
+                                      <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                        <div className="text-xs uppercase tracking-wide text-gray-500">Домен</div>
+                                        <div className="mt-1 text-sm font-semibold text-gray-900">
+                                          {ws.domainType === 'subdomain' ? '🎁 Бесплатный' : '🌐 Свой'}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {ws.status === 'pending_payment' && (
+                                  <div className="mt-4 rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3.5">
+                                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                                      <div>
+                                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 mb-1">⏳ Ожидает оплаты</div>
+                                        <p className="text-xs text-amber-800">Будет удалён через 3 дня. Оплатите позже с баланса ЛК.</p>
+                                      </div>
+                                      {wsPayBtn && (
+                                        <button
+                                          type="button"
+                                          onClick={wsPayBtn}
+                                          className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 px-3 py-1.5 text-xs font-bold text-white shadow-md transition hover:shadow-lg"
+                                        >
+                                          <CreditCard className="h-3.5 w-3.5" />
+                                          💳 Оплатить
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 cursor-pointer" onClick={() => openWebSettings(ws)}>
+                                  <span className="text-sm font-medium text-sky-600">Открыть панель</span>
+                                  <span className="text-xs text-gray-500">Файлы, домен, логи</span>
                                 </div>
                               </div>
                             );
@@ -2605,7 +2786,7 @@ const ClientDashboard = () => {
                         </p>
                       </div>
                       <button
-                        onClick={withScrollSave(() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
+                        onClick={withScrollSave(() => { setConfiguratorMode('game-only'); setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
                         className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
                       >
                         <Plus className="h-4 w-4" />
@@ -2862,7 +3043,7 @@ const ClientDashboard = () => {
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={withScrollSave(() => { setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); })}
+                          onClick={withScrollSave(() => { setConfiguratorMode('website-only'); setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); })}
                           className="inline-flex items-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-sky-50"
                         >
                           <Plus className="mr-2 h-4 w-4" />
@@ -3153,9 +3334,10 @@ const ClientDashboard = () => {
                     </button>
                   </div>
                   <GameServerConfigurator
-                    key={initialConfiguratorTab + '-' + String(isCreateServerModalOpen)}
+                    key={configuratorMode + '-' + initialConfiguratorTab + '-' + String(isCreateServerModalOpen)}
                     compact={true}
                     initialConfiguratorTab={initialConfiguratorTab}
+                    configuratorMode={configuratorMode}
                     showNameField={true}
                     nodes={nodes as PublicNode[]}
                     isAuthenticated={true}

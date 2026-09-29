@@ -185,6 +185,7 @@ interface GameServerConfiguratorProps {
   initialGame?: string;
   initialLocation?: string;
   initialConfiguratorTab?: 'game' | 'website';
+  configuratorMode?: 'both' | 'game-only' | 'website-only';
   nodes?: PublicNode[];
   showNameField?: boolean;
   isAuthenticated?: boolean;
@@ -198,6 +199,7 @@ const GameServerConfigurator = ({
   initialGame,
   initialLocation,
   initialConfiguratorTab = 'game',
+  configuratorMode = 'both',
   nodes: nodesProp,
   showNameField = false,
   isAuthenticated = false,
@@ -205,6 +207,7 @@ const GameServerConfigurator = ({
   onOrder,
   onWebsiteOrder,
 }: GameServerConfiguratorProps) => {
+  const forceTab = configuratorMode === 'game-only' ? 'game' : configuratorMode === 'website-only' ? 'website' : null;
   const [selectedGame, setSelectedGame] = useState(initialGame ?? SUPPORTED_GAMES[0].id);
   const [selectedLocation, setSelectedLocation] = useState(initialLocation ?? LOCATIONS[0].id);
   const [slots, setSlots] = useState(SUPPORTED_GAMES.find(g => g.id === (initialGame ?? SUPPORTED_GAMES[0].id))!.defaultSlots);
@@ -217,7 +220,8 @@ const GameServerConfigurator = ({
   const [cs16Build, setCs16Build] = useState('jives_cstrike_latest');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
-  const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>(initialConfiguratorTab);
+  const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>(forceTab ?? initialConfiguratorTab);
+  const actualTab = forceTab ?? configuratorTab;
   const [selectedWebsitePlan, setSelectedWebsitePlan] = useState<'landing' | 'business' | 'premium'>('business');
   const [websitePlans, setWebsitePlans] = useState<WebsitePlan[]>([]);
   const [websiteDomain, setWebsiteDomain] = useState('');
@@ -1158,36 +1162,38 @@ const GameServerConfigurator = ({
         <div className={`max-w-5xl mx-auto ${compact ? '' : 'bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100'}`}>
           <div className="grid lg:grid-cols-5 rounded-3xl overflow-hidden bg-white shadow-2xl border border-gray-100">
             <div className="lg:col-span-3 p-6 md:p-10 space-y-6">
-              <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
-                    configuratorTab === 'game'
-                      ? 'bg-white shadow text-indigo-700 border border-indigo-100'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  <Gamepad2 size={18} />
-                  Игровые серверы
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
-                    configuratorTab === 'website'
-                      ? 'bg-white shadow text-indigo-700 border border-indigo-100'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  <Globe size={18} />
-                  Сайты под заказ
-                </button>
-              </div>
+              {configuratorMode === 'both' && (
+                <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                      actualTab === 'game'
+                        ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Gamepad2 size={18} />
+                    Игровые серверы
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                      actualTab === 'website'
+                        ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Globe size={18} />
+                    Сайты под заказ
+                  </button>
+                </div>
+              )}
 
               <div
-                aria-hidden={configuratorTab !== 'game'}
-                style={{display: configuratorTab === 'game' ? undefined : 'none'}}
+                aria-hidden={actualTab !== 'game'}
+                style={{display: actualTab === 'game' ? undefined : 'none'}}
                 className="flex flex-col gap-6"
               >
                 <CompactGameSelector />
@@ -1201,8 +1207,8 @@ const GameServerConfigurator = ({
                 </div>
               </div>
               <div
-                aria-hidden={configuratorTab !== 'website'}
-                style={{display: configuratorTab === 'website' ? undefined : 'none'}}
+                aria-hidden={actualTab !== 'website'}
+                style={{display: actualTab === 'website' ? undefined : 'none'}}
                 className="flex flex-col gap-6"
               >
                 <WebsitePlanCards />
@@ -1222,14 +1228,14 @@ const GameServerConfigurator = ({
             </div>
             <div className="lg:col-span-2">
               <div
-                aria-hidden={configuratorTab !== 'game'}
-                style={{display: configuratorTab === 'game' ? undefined : 'none'}}
+                aria-hidden={actualTab !== 'game'}
+                style={{display: actualTab === 'game' ? undefined : 'none'}}
               >
                 <PricePanel />
               </div>
               <div
-                aria-hidden={configuratorTab !== 'website'}
-                style={{display: configuratorTab === 'website' ? undefined : 'none'}}
+                aria-hidden={actualTab !== 'website'}
+                style={{display: actualTab === 'website' ? undefined : 'none'}}
               >
                 <WebsitePricePanel />
               </div>
