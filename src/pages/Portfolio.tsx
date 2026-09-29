@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
-import { motion } from 'framer-motion';
 import { ExternalLink, Github, Loader } from 'lucide-react';
 
 interface PortfolioItem {
@@ -82,21 +81,21 @@ const Portfolio = () => {
       <div className="bg-gray-50 min-h-screen py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <h1 
+             
+             
               className="text-4xl font-bold text-gray-900 mb-4"
             >
               Портфолио
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+            </h1>
+            <p 
+             
+             
+             
               className="text-xl text-gray-600"
             >
               Наши лучшие работы. Мы гордимся каждым проектом и всегда нацелены на результат.
-            </motion.p>
+            </p>
           </div>
 
           <div className="flex justify-center mb-12 flex-wrap gap-4">
@@ -117,13 +116,12 @@ const Portfolio = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredProjects.map((project) => (
-              <motion.div
-                layout
+              <div
                 key={project.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
+               
+               
+               
+               
                 className="bg-white rounded-xl shadow-lg overflow-hidden group"
               >
                 <div className="relative overflow-hidden h-64">
@@ -179,7 +177,7 @@ const Portfolio = () => {
                     ))}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -1067,18 +1066,18 @@ const GameServerConfigurator = ({
           <p className="mt-4 text-xl text-gray-500">Выберите игру и соберите сервер под ваши задачи.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {SUPPORTED_GAMES.map((g, idx) => {
+          {SUPPORTED_GAMES.map((g) => {
             const Icon = g.icon;
             const selected = selectedGame === g.id;
             return (
-              <motion.button
+              <button
                 key={g.id}
                 type="button"
                 onClick={() => setSelectedGame(g.id)}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
+               
+               
+               
+               
                 className={`group text-left p-8 rounded-3xl transition-all border-2 relative bg-white shadow-lg hover:shadow-2xl ${
                   selected ? 'border-indigo-500 ring-4 ring-indigo-100' : 'border-transparent hover:border-gray-200'
                 }`}
@@ -1094,7 +1093,7 @@ const GameServerConfigurator = ({
                     <CheckCircle size={20} />
                   </div>
                 )}
-              </motion.button>
+              </button>
             );
           })}
         </div>
@@ -1113,17 +1112,17 @@ const GameServerConfigurator = ({
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {LOCATIONS.map((loc, idx) => {
+          {LOCATIONS.map((loc) => {
             const selected = selectedLocation === loc.id;
             return (
-              <motion.button
+              <button
                 key={loc.id}
                 type="button"
                 onClick={() => setSelectedLocation(loc.id)}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.05 }}
+               
+               
+               
+               
                 className={`p-6 rounded-2xl text-center transition-all border-2 ${
                   selected
                     ? 'border-indigo-500 bg-indigo-50 shadow-lg'
@@ -1136,7 +1135,7 @@ const GameServerConfigurator = ({
                 <div className="text-xs font-semibold text-green-600 bg-green-50 rounded-full px-2 py-1 inline-block">
                   {loc.ping}
                 </div>
-              </motion.button>
+              </button>
             );
           })}
         </div>

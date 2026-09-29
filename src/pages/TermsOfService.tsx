@@ -1,6 +1,5 @@
-import Layout from '../components/Layout';
+﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
-import { motion } from 'framer-motion';
 
 const TermsOfService = () => {
   return (
@@ -11,15 +10,15 @@ const TermsOfService = () => {
         keywords="пользовательское соглашение, условия использования, правила сервиса"
       />
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div 
+         
+         
           className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden"
         >
           <div className="p-8 sm:p-12">
             <h1 className="text-3xl font-bold text-gray-900 mb-8">Пользовательское соглашение</h1>
             
-            <div className="prose prose-indigo max-w-none text-gray-600 space-y-6">
+            <div className="prose prose-indigo max-w-none text-gray-600 flex flex-col gap-6">
               <section>
                 <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Общие положения</h2>
                 <p>1.1. Настоящее Пользовательское соглашение (далее — «Соглашение») регулирует порядок использования онлайн-сервиса (далее — «Сервис»), предоставляемого Администрацией.</p>
@@ -58,7 +57,7 @@ const TermsOfService = () => {
               </section>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </Layout>
   );

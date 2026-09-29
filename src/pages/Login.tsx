@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
-import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, ArrowRight, User } from 'lucide-react';
 
@@ -64,21 +63,21 @@ const Login = () => {
         description="Wexa.su — вход в личный кабинет для управления игровыми серверами, финансами и поддержкой." 
       />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md space-y-8 bg-white p-10 shadow-2xl rounded-2xl border border-gray-100"
+        <div 
+         
+         
+         
+          className="w-full max-w-md flex flex-col gap-8 bg-white p-10 shadow-2xl rounded-2xl border border-gray-100"
         >
           <div className="text-center">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            <div
+             
+             
+             
               className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100"
             >
               <User className="h-8 w-8 text-indigo-600" />
-            </motion.div>
+            </div>
             <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
               Вход в систему
             </h2>
@@ -87,7 +86,7 @@ const Login = () => {
             </p>
           </div>
 
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <form className="mt-8 flex flex-col gap-6" onSubmit={handleSubmit}>
             {error && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="flex">
@@ -97,7 +96,7 @@ const Login = () => {
                 </div>
               </div>
             )}
-            <div className="space-y-4 rounded-md shadow-sm">
+            <div className="flex flex-col gap-4 rounded-md shadow-sm">
               <div>
                 <label htmlFor="email" className="sr-only">Email</label>
                 <div className="relative">
@@ -139,9 +138,9 @@ const Login = () => {
             </div>
 
             <div>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <button
+               
+               
                 type="submit"
                 disabled={loading}
                 className="group relative flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
@@ -150,7 +149,7 @@ const Login = () => {
                   <ArrowRight className="h-5 w-5 text-indigo-300 group-hover:text-indigo-100" aria-hidden="true" />
                 </span>
                 {loading ? 'Вход...' : 'Войти'}
-              </motion.button>
+              </button>
             </div>
             
             <div className="text-center text-sm">
@@ -160,7 +159,7 @@ const Login = () => {
               </Link>
             </div>
           </form>
-        </motion.div>
+        </div>
       </div>
     </Layout>
   );

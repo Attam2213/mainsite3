@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
-import { motion } from 'framer-motion';
 import { Code2, Monitor, Database, Shield, Check, Loader, Activity, Gamepad2, Box, Crosshair, Server as ServerIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -119,24 +118,24 @@ const Services = () => {
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <h1 
+             
+             
               className="text-4xl font-bold text-gray-900 mb-4"
             >
               Услуги и цены
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+            </h1>
+            <p 
+             
+             
+             
               className="text-xl text-gray-600"
             >
               Прозрачное ценообразование и четкие сроки. Выберите подходящий пакет для вашего бизнеса.
-            </motion.p>
+            </p>
           </div>
 
-          <div className="space-y-20">
+          <div className="flex flex-col gap-20">
             {[
               { 
                 title: 'Разработка и Хостинг',
@@ -152,10 +151,10 @@ const Services = () => {
               }
             ].filter(section => section.items.length > 0).map((section) => (
               <div key={section.title}>
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
+                <div 
+                 
+                 
+                 
                   className="flex flex-col items-center justify-center mb-10"
                 >
                   <div className="flex items-center gap-4 mb-4">
@@ -167,19 +166,19 @@ const Services = () => {
                     </h2>
                   </div>
                   <div className={`h-1.5 w-24 rounded-full bg-gradient-to-r ${section.gradient} opacity-80`} />
-                </motion.div>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {section.items.map((service, index) => {
+                  {section.items.map((service) => {
                     const IconComponent = iconMap[service.icon] || Code2;
                     
                     return (
-                      <motion.div
+                      <div
                         key={service.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.1 }}
+                       
+                       
+                       
+                       
                         className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 flex flex-col hover:shadow-xl transition-shadow duration-300"
                       >
                         <div className={`p-6 ${service.color} ${
@@ -197,7 +196,7 @@ const Services = () => {
                         </div>
                         <div className="p-6 flex-1 flex flex-col">
                           <div className="text-3xl font-bold text-gray-900 mb-6">{service.price}</div>
-                          <ul className="space-y-3 mb-8 flex-1">
+                          <ul className="flex flex-col gap-3 mb-8 flex-1">
                             {service.features.map((feature, idx) => (
                               <li key={idx} className="flex items-center text-gray-600">
                                 <Check size={18} className="text-green-500 mr-2 flex-shrink-0" />
@@ -230,7 +229,7 @@ const Services = () => {
                             {orderLoading === service.id ? 'Обработка...' : 'Заказать'}
                           </button>
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })}
                 </div>

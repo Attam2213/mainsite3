@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 const ContactForm = () => {
@@ -50,7 +50,7 @@ const ContactForm = () => {
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input

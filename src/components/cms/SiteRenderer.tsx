@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { 
   Phone,
   Mail,
@@ -943,7 +943,7 @@ const ContactSplit = ({ section, settings, isSelected, onUpdateSection }: Sectio
             <p className="mt-2 text-sm text-gray-500">Мы свяжемся с вами в ближайшее время.</p>
           </div>
         ) : (
-          <form className="mb-0 space-y-6" onSubmit={handleSubmit}>
+          <form className="mb-0 flex flex-col gap-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">Имя</label>
               <div className="mt-1">
@@ -1158,7 +1158,7 @@ const GalleryMasonry = ({ section, settings, isSelected, onUpdateSection }: Sect
            </h2>
          </DraggableElement>
        )}
-       <div className="columns-1 md:columns-3 gap-4 space-y-4">
+       <div className="columns-1 md:columns-3 gap-4 flex flex-col gap-4">
          {(section.items || [1, 2, 3, 4, 5, 6]).map((item, i) => (
            <DraggableElement
              key={item?.id || i}
@@ -1193,7 +1193,7 @@ const NewsList = ({ section, settings, isSelected, onUpdateSection }: SectionPro
            </h2>
          </DraggableElement>
        )}
-       <div className="space-y-8">
+       <div className="flex flex-col gap-8">
          {(section.items || [1, 2, 3]).map((item, i) => (
            <DraggableElement
              key={item?.id || i}
@@ -1343,9 +1343,9 @@ const AboutStats = ({ section, settings, isSelected, onUpdateSection }: SectionP
 const AboutTeam = ({ section, settings, isSelected, onUpdateSection }: SectionProps) => (
   <SectionWrapper section={section} settings={settings} className="py-20 bg-white">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <div className="space-y-12">
+      <div className="flex flex-col gap-12">
         {section.showTitle !== false && (
-          <div className="space-y-5 sm:mx-auto sm:max-w-xl sm:space-y-4 lg:max-w-5xl">
+          <div className="flex flex-col gap-5 sm:mx-auto sm:max-w-xl sm:space-y-4 lg:max-w-5xl">
             <DraggableElement section={section} isSelected={isSelected} elementKey="title" onUpdateSection={onUpdateSection}>
               <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ fontFamily: getTitleFontFamily(section, settings) }}>
                 {section.title || 'Наша команда'}
@@ -1371,9 +1371,9 @@ const AboutTeam = ({ section, settings, isSelected, onUpdateSection }: SectionPr
                 className="bg-white/80 backdrop-blur border border-gray-200/70 shadow-sm p-7"
                 style={{ borderRadius: settings.borderRadius || '1rem' }}
               >
-                <div className="space-y-5">
+                <div className="flex flex-col gap-5">
                   <img className="mx-auto h-40 w-40 object-cover ring-1 ring-black/10" style={{ borderRadius: settings.borderRadius || '9999px' }} src={person.image || `https://source.unsplash.com/random/200x200?sig=${i+50}`} alt="" />
-                  <div className="space-y-1">
+                  <div className="flex flex-col gap-1">
                     <h3 className="text-lg font-extrabold text-gray-900">{person.name || 'Имя Фамилия'}</h3>
                     <p className="font-semibold" style={{ color: settings.primaryColor }}>{person.role || 'Должность'}</p>
                   </div>
@@ -1408,7 +1408,7 @@ const PricingThreeCol = ({ section, settings, isSelected, onUpdateSection }: Sec
           </DraggableElement>
         )}
       </div>
-      <div className="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-3">
+      <div className="mt-12 flex flex-col gap-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-4xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-3">
         {(section.items || [1, 2, 3]).map((item, i) => (
           <DraggableElement
             key={item?.id || i}
@@ -1444,7 +1444,7 @@ const PricingThreeCol = ({ section, settings, isSelected, onUpdateSection }: Sec
             </div>
             <div className="pt-6 pb-8 px-6 border-t border-gray-200/70">
               <h3 className="text-xs font-extrabold text-gray-900 tracking-wide uppercase">Что включено</h3>
-              <ul className="mt-6 space-y-4">
+              <ul className="mt-6 flex flex-col gap-4">
                 {(item.features ? item.features.split(',') : ['Опция 1', 'Опция 2', 'Опция 3']).map((feature: string, idx: number) => (
                   <li key={idx} className="flex space-x-3">
                     <CheckCircle className="flex-shrink-0 h-5 w-5" aria-hidden="true" style={{ color: settings.primaryColor }} />
@@ -1473,7 +1473,7 @@ const FAQAccordion = ({ section, settings, isSelected, onUpdateSection }: Sectio
             </h2>
           </DraggableElement>
         )}
-        <dl className="mt-6 space-y-4">
+        <dl className="mt-6 flex flex-col gap-4">
           {(section.items || [1, 2, 3]).map((item, i) => (
             <DraggableElement
               key={item?.id || i}
@@ -1664,7 +1664,7 @@ const FooterColumns = ({ section, settings, isSelected, onUpdateSection }: Secti
         <DraggableElement section={section} isSelected={isSelected} elementKey="col:company" onUpdateSection={onUpdateSection}>
           <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Компания</h3>
-           <ul className="space-y-4">
+           <ul className="flex flex-col gap-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">О нас</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Блог</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Карьера</a></li>
@@ -1674,7 +1674,7 @@ const FooterColumns = ({ section, settings, isSelected, onUpdateSection }: Secti
         <DraggableElement section={section} isSelected={isSelected} elementKey="col:support" onUpdateSection={onUpdateSection}>
           <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Поддержка</h3>
-           <ul className="space-y-4">
+           <ul className="flex flex-col gap-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Помощь</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Контакты</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">FAQ</a></li>
@@ -1684,7 +1684,7 @@ const FooterColumns = ({ section, settings, isSelected, onUpdateSection }: Secti
         <DraggableElement section={section} isSelected={isSelected} elementKey="col:legal" onUpdateSection={onUpdateSection}>
           <div>
            <h3 className="text-sm font-semibold text-gray-400 tracking-wider uppercase mb-4">Юридическая инфо</h3>
-           <ul className="space-y-4">
+           <ul className="flex flex-col gap-4">
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Конфиденциальность</a></li>
              <li><a href="#" className="text-base text-gray-300 hover:text-white">Условия</a></li>
            </ul>

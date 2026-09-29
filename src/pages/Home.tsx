@@ -1,5 +1,4 @@
-import { motion } from 'framer-motion';
-import Layout from '../components/Layout';
+﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -70,21 +69,21 @@ const Home = () => {
         {/* HERO */}
         <section id="hero" className="relative min-h-screen flex items-center justify-center pt-24 pb-32 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white">
           <div className="absolute inset-0 z-0">
-            <motion.div
-              initial={{ scale: 1.1 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 20, repeat: Infinity, repeatType: 'reverse' }}
+            <div
+             
+             
+             
               className="w-full h-full opacity-20"
             >
               <div className="w-full h-full bg-[radial-gradient(circle_at_20%_50%,rgba(99,102,241,0.3),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.25),transparent_50%),radial-gradient(circle_at_50%_80%,rgba(236,72,153,0.15),transparent_50%)]" />
-            </motion.div>
+            </div>
           </div>
 
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+            <div
+             
+             
+             
               className="max-w-5xl mx-auto"
             >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-sm mb-8">
@@ -133,18 +132,18 @@ const Home = () => {
                   </div>
                 ))}
               </div>
-            </motion.div>
+            </div>
           </div>
 
-          <motion.a
+          <a
             href="#games"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, y: [0, 10, 0] }}
-            transition={{ delay: 1.2, duration: 2, repeat: Infinity }}
+           
+           
+           
             className="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-gray-400"
           >
             <ChevronDown size={32} />
-          </motion.a>
+          </a>
         </section>
 
         <GameServerConfigurator
@@ -169,12 +168,12 @@ const Home = () => {
               {FEATURES.map((f, idx) => {
                 const Icon = f.icon;
                 return (
-                  <motion.div
+                  <div
                     key={idx}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.08 }}
+                   
+                   
+                   
+                   
                     className="group bg-gray-50 hover:bg-white rounded-3xl p-8 border border-gray-100 hover:border-gray-200 hover:shadow-xl transition-all"
                   >
                     <div className={`w-14 h-14 rounded-2xl ${f.color} text-white flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
@@ -182,7 +181,7 @@ const Home = () => {
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">{f.title}</h3>
                     <p className="text-gray-500 leading-relaxed">{f.desc}</p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -202,12 +201,12 @@ const Home = () => {
               {STEPS.map((step, idx) => {
                 const Icon = step.icon;
                 return (
-                  <motion.div
+                  <div
                     key={idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.15 }}
+                   
+                   
+                   
+                   
                     className="relative bg-gray-50 pt-4"
                   >
                     <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg mb-6 border-4 border-gray-50 relative z-10">
@@ -215,7 +214,7 @@ const Home = () => {
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 text-center mb-3">{step.title}</h3>
                     <p className="text-gray-500 text-center text-sm leading-relaxed">{step.desc}</p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

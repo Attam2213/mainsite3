@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
-import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Users, 
@@ -1369,14 +1368,14 @@ const AdminDashboard = () => {
 
           {/* Content */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8">
+            <div className="flex flex-col gap-8">
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat, index) => (
-                  <motion.div
+                  <div
                     key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                   
+                   
+                   
                     className="overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100"
                   >
                     <div className="flex items-center">
@@ -1388,7 +1387,7 @@ const AdminDashboard = () => {
                         <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
 
@@ -1454,7 +1453,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="flex flex-col gap-6">
                   {/* Last 5 Invoices */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
@@ -1469,7 +1468,7 @@ const AdminDashboard = () => {
                         Все счета →
                       </button>
                     </div>
-                    <ul className="space-y-3">
+                    <ul className="flex flex-col gap-3">
                       {invoices.slice(0, 5).map((inv) => {
                         const u = users.find(x => x.id === inv.userId);
                         return (
@@ -1505,7 +1504,7 @@ const AdminDashboard = () => {
                       <h3 className="text-lg font-semibold text-gray-900">Ноды — загрузка RAM</h3>
                       <p className="text-sm text-gray-500">Распределение по локациям</p>
                     </div>
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                       {hostingNodes.length === 0 && (
                         <div className="py-6 text-center text-gray-500 text-sm">Ноды не добавлены</div>
                       )}
@@ -1806,7 +1805,7 @@ const AdminDashboard = () => {
 
 
           {activeTab === 'servers' && (
-            <div className="space-y-6">
+            <div className="flex flex-col gap-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900">Управление VDS серверами</h2>
                 <div className="flex gap-2">
@@ -1864,7 +1863,7 @@ const AdminDashboard = () => {
                            server.status === 'provisioning' ? 'Настройка' : 'Неактивен'}
                         </span>
                       </div>
-                      <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex flex-col gap-2 text-sm text-gray-600">
                         <div className="flex justify-between">
                           <span>IP Адрес:</span>
                           <span className="font-mono">{server.ipAddress || 'Ожидание...'}</span>
@@ -1927,7 +1926,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleAddServer} className="space-y-4">
+                <form onSubmit={handleAddServer} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Название сервера</label>
                     <input
@@ -1997,7 +1996,7 @@ const AdminDashboard = () => {
                 return 0;
               });
               return (
-                <div className="space-y-4">
+                <div className="flex flex-col gap-4">
                   {/* Filters */}
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                     <div className="flex flex-wrap items-center gap-4 justify-between">
@@ -2199,7 +2198,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'finances' && (
-            <div className="space-y-5">
+            <div className="flex flex-col gap-5">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -2414,7 +2413,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'invoices' && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <div></div>
                 <button
@@ -2609,7 +2608,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleSaveService} className="space-y-4">
+                <form onSubmit={handleSaveService} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Название</label>
                     <input
@@ -2716,7 +2715,7 @@ const AdminDashboard = () => {
                   </button>
                 </div>
                 
-                <div className="p-6 space-y-6">
+                <div className="p-6 flex flex-col gap-6">
                   {/* Basic Info */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -3040,7 +3039,7 @@ const AdminDashboard = () => {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
               <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Добавить Ноду</h2>
-                <div className="space-y-4">
+                <div className="flex flex-col gap-4">
                     <input type="text" placeholder="Название (MSK-1)" className="w-full p-2 border rounded" value={currentNode.name || ''} onChange={e => setCurrentNode({...currentNode, name: e.target.value})} />
                     <input type="text" placeholder="IP" className="w-full p-2 border rounded" value={currentNode.ip || ''} onChange={e => setCurrentNode({...currentNode, ip: e.target.value})} />
                     <div className="grid grid-cols-2 gap-3">
@@ -3111,7 +3110,7 @@ const AdminDashboard = () => {
                   </button>
                 </div>
 
-                <div className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Тип ноды</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -3148,7 +3147,7 @@ const AdminDashboard = () => {
                   )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Доступные игры</div>
                   {[
                     { id: 'minecraft', label: 'Minecraft (Java)' },
@@ -3170,7 +3169,7 @@ const AdminDashboard = () => {
                     </label>
                   ))}
                 </div>
-                <div className="pt-5 space-y-3">
+                <div className="pt-5 flex flex-col gap-3">
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Цены за слот</div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Minecraft (₽)</label>
@@ -3212,7 +3211,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'game_servers' && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <div className="flex flex-wrap items-center gap-3 justify-between">
                   <div className="flex flex-wrap items-center gap-3">
@@ -3415,7 +3414,7 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'web_sites' && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <div className="flex flex-wrap items-center gap-3 justify-between">
                   <div className="flex flex-wrap items-center gap-3">
@@ -3592,7 +3591,7 @@ const AdminDashboard = () => {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
               <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Создать Сервер</h2>
-                <div className="space-y-4">
+                <div className="flex flex-col gap-4">
                     <input type="text" placeholder="Название" className="w-full p-2 border rounded" value={currentGameServer.name || ''} onChange={e => setCurrentGameServer({...currentGameServer, name: e.target.value})} />
                     
                     <select className="w-full p-2 border rounded" value={currentGameServer.game || ''} onChange={e => setCurrentGameServer({...currentGameServer, game: e.target.value})}>
@@ -3632,7 +3631,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleSavePortfolio} className="space-y-4">
+                <form onSubmit={handleSavePortfolio} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Название</label>
                     <input
@@ -3726,7 +3725,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleSaveInvoice} className="space-y-4">
+                <form onSubmit={handleSaveInvoice} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Название счета</label>
                     <input
@@ -3816,7 +3815,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleSubmitManualInvoice} className="space-y-4">
+                <form onSubmit={handleSubmitManualInvoice} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Клиент *</label>
                     <select
@@ -3923,7 +3922,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <div className="space-y-4">
+                <div className="flex flex-col gap-4">
                      <p>Проект: <strong>{currentProject.title}</strong></p>
                      <p>Тариф: {currentProject.monthlyRate || currentProject.budget} ₽ / мес</p>
                      
@@ -3972,7 +3971,7 @@ const AdminDashboard = () => {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <form onSubmit={handleSaveProject} className="space-y-4">
+                <form onSubmit={handleSaveProject} className="flex flex-col gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Название проекта</label>
                     <input
@@ -4124,9 +4123,9 @@ const AdminDashboard = () => {
       {/* Chat Modal */}
       {isChatOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div 
+           
+           
             className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] h-[600px]"
           >
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -4146,7 +4145,7 @@ const AdminDashboard = () => {
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
                   Нет сообщений.
@@ -4196,7 +4195,7 @@ const AdminDashboard = () => {
                 </button>
               </div>
             </form>
-          </motion.div>
+          </div>
         </div>
       )}
 
@@ -4206,9 +4205,9 @@ const AdminDashboard = () => {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
           onClick={() => !adjustModal.loading && setAdjustModal((s) => ({ ...s, open: false }))}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
+           
+           
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
           >
@@ -4235,7 +4234,7 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Сумма операции</label>
                 <div className="relative">
@@ -4333,7 +4332,7 @@ const AdminDashboard = () => {
                 {adjustModal.loading ? 'Выполняем...' : adjustModal.sign === '+' ? 'Пополнить' : 'Списать'}
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
@@ -4348,7 +4347,7 @@ const AdminDashboard = () => {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Пользователь-владелец *</label>
                   <select className="w-full p-2.5 border rounded-lg"
@@ -4453,7 +4452,7 @@ const AdminDashboard = () => {
                   <X className="h-6 w-6" />
                 </button>
               </div>
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Сайт для миграции</label>
                   <select className="w-full p-2.5 border rounded-lg"
@@ -4487,7 +4486,7 @@ const AdminDashboard = () => {
                       ))}
                   </select>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-1">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 flex flex-col gap-1">
                   <p>Будет выполнено: <code className="bg-white px-1.5 rounded">rsync</code> файлов сайта + бэкапов между нодами,</p>
                   <p>на старой ноде: umount bind, userdel, pm2 delete, nginx conf rm.</p>
                   <p>на новой ноде: useradd / SFTP / pm2 ecosystem / nginx virtual host (вся провиженинг).</p>

@@ -1,7 +1,6 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Gamepad2, Server, MapPin, LogIn, User, LogOut } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,13 +28,13 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <motion.div
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.5 }}
+            <div
+             
+             
               className="p-2 bg-indigo-600 rounded-lg text-white"
             >
               <Gamepad2 size={24} />
-            </motion.div>
+            </div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               Wexa.su
             </span>
@@ -96,15 +95,14 @@ const Header = () => {
       </div>
 
       {/* Mobile Navigation */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+      {isOpen && (
+          <div
+           
+           
+           
             className="md:hidden bg-white border-b border-gray-100 overflow-hidden"
           >
-            <div className="px-4 py-4 space-y-4">
+            <div className="px-4 py-4 flex flex-col gap-4">
               {navItems.map((item) => (
                 <a
                   key={item.href}
@@ -154,9 +152,8 @@ const Header = () => {
                 </Link>
               )}
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </header>
   );
 };
