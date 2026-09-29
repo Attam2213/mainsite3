@@ -1863,14 +1863,14 @@ const ClientDashboard = () => {
           <div className="grid gap-8 lg:grid-cols-3">
             
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8 relative" style={{minHeight: '1400px'}}>
+            <div className="lg:col-span-2 flex flex-col gap-8 relative" style={{minHeight: '1400px'}}>
 
               {/* Overview Tab Content */}
-              <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none'}} className="space-y-8">
+              <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-8 flex flex-col gap-8">
                   {warningGameServers.length > 0 && (
                     <div
                      
-                      className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 space-y-3"
+                      className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 flex flex-col gap-3"
                     >
                       {overdueGameServers.length > 0 && (
                         <div className="rounded-2xl border-2 border-rose-200 bg-rose-50 p-4">
@@ -1949,7 +1949,7 @@ const ClientDashboard = () => {
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="flex flex-col gap-4">
                         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                           <div className="rounded-2xl bg-slate-50 p-4">
                             <div className="text-xs uppercase tracking-wide text-gray-500">Всего серверов</div>
@@ -2068,7 +2068,7 @@ const ClientDashboard = () => {
               </div>
 
               {/* Projects Tab */}
-              <div aria-hidden={activeTab !== 'projects'} style={{display: activeTab === 'projects' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'projects'} style={{display: activeTab === 'projects' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <h2 className="text-xl font-bold text-gray-900">Мои проекты</h2>
                   {projects.length === 0 ? (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
@@ -2159,7 +2159,7 @@ const ClientDashboard = () => {
               </div>
 
               {/* Billing Tab */}
-              <div aria-hidden={activeTab !== 'billing'} style={{display: activeTab === 'billing' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'billing'} style={{display: activeTab === 'billing' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <h2 className="text-xl font-bold text-gray-900">Финансы</h2>
                   <div className="grid gap-4 lg:grid-cols-3">
                     <div className="rounded-3xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm">
@@ -2273,7 +2273,7 @@ const ClientDashboard = () => {
               </div>
 
               {/* Balance Tab */}
-              <div aria-hidden={activeTab !== 'balance'} style={{display: activeTab === 'balance' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'balance'} style={{display: activeTab === 'balance' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <h2 className="text-xl font-bold text-gray-900">Баланс и операции</h2>
                   </div>
@@ -2427,7 +2427,7 @@ const ClientDashboard = () => {
               </div>
 
               {/* Leads Tab - Detailed View */}
-              <div aria-hidden={activeTab !== 'leads'} style={{display: activeTab === 'leads' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'leads'} style={{display: activeTab === 'leads' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-medium text-gray-900">Заявки с сайтов</h2>
@@ -2536,7 +2536,7 @@ const ClientDashboard = () => {
               </div>
 
               {/* Support Tab */}
-              <div aria-hidden={activeTab !== 'requests'} style={{display: activeTab === 'requests' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'requests'} style={{display: activeTab === 'requests' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -2672,7 +2672,7 @@ const ClientDashboard = () => {
                   </div>
               </div>
 
-              <div aria-hidden={activeTab !== 'game_servers'} style={{display: activeTab === 'game_servers' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'game_servers'} style={{display: activeTab === 'game_servers' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-indigo-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -2719,7 +2719,7 @@ const ClientDashboard = () => {
                       <p className="mt-2 text-sm text-gray-500">Создайте первый сервер и панель управления появится здесь автоматически.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                         <div className="flex flex-wrap items-stretch gap-3 flex-1 min-w-[260px]">
                           <div className="relative flex-1 min-w-[200px]">
@@ -2830,7 +2830,7 @@ const ClientDashboard = () => {
                             <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                                 <div className="mb-3 text-sm font-medium text-gray-900">Подключение</div>
-                                <div className="space-y-2 text-sm text-gray-600">
+                                <div className="flex flex-col gap-2 text-sm text-gray-600">
                                   <div className="flex items-center justify-between gap-3">
                                     <span>Узел</span>
                                     <span className="font-medium text-gray-900">{node?.name || 'Не указан'}</span>
@@ -2926,7 +2926,7 @@ const ClientDashboard = () => {
                   )}
               </div>
 
-              <div aria-hidden={activeTab !== 'websites'} style={{display: activeTab === 'websites' ? undefined : 'none'}} className="space-y-6">
+              <div aria-hidden={activeTab !== 'websites'} style={{display: activeTab === 'websites' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6 flex flex-col gap-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -3122,7 +3122,7 @@ const ClientDashboard = () => {
             </div>
 
             {/* Sidebar - Navigation */}
-            <div className="space-y-6">
+            <div className="flex flex-col gap-6">
               <div className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
                 <nav className="p-2">
                   <button
@@ -3367,7 +3367,7 @@ const ClientDashboard = () => {
                         <button onClick={() => setIsSettingsModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                         {/* Common Settings */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Описание (MOTD)</label>
@@ -3377,7 +3377,7 @@ const ClientDashboard = () => {
                         {/* Minecraft Settings */}
                         {currentSettingsServer.game === 'minecraft' && (
                             <>
-                                <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-lg space-y-3.5">
+                                <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-lg flex flex-col gap-3.5">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-xs font-extrabold uppercase tracking-wider text-indigo-700">Версия и ядро</h4>
                                         <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
@@ -3437,7 +3437,7 @@ const ClientDashboard = () => {
                                     </div>
 
                                     {((serverSettings.mcCore || serverSettings.core || 'paper') === 'custom') && (
-                                        <div className="space-y-2 p-3 bg-white border border-indigo-200 rounded">
+                                        <div className="flex flex-col gap-2 p-3 bg-white border border-indigo-200 rounded">
                                             <div className="flex items-start gap-1.5">
                                                 <span className="mt-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black">!</span>
                                                 <p className="text-[11px] text-indigo-800 leading-snug font-semibold">
@@ -3508,7 +3508,7 @@ const ClientDashboard = () => {
 
                         {/* CS 1.6 Build Selector */}
                         {currentSettingsServer.game === 'cs16' && (
-                            <div className="p-4 bg-amber-50/60 border border-amber-100 rounded-lg space-y-3.5">
+                            <div className="p-4 bg-amber-50/60 border border-amber-100 rounded-lg flex flex-col gap-3.5">
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-700">Сборка CS 1.6</h4>
                                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
@@ -3753,7 +3753,7 @@ const ClientDashboard = () => {
                   </div>
 
                   {serverPanelTab === 'overview' && (
-                    <div className="space-y-6">
+                    <div className="flex flex-col gap-6">
                       <div className="grid gap-4 lg:grid-cols-3">
                         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <div className="mb-4 flex items-center gap-3">
@@ -3765,7 +3765,7 @@ const ClientDashboard = () => {
                               <div className="text-xs text-gray-500">Основные сетевые данные сервера</div>
                             </div>
                           </div>
-                          <div className="space-y-3 text-sm text-gray-700">
+                          <div className="flex flex-col gap-3 text-sm text-gray-700">
                             <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
                               <span>IP и порт</span>
                               <span className="font-mono text-xs text-gray-900">{getServerNode(currentPanelServer)?.ip || 'не назначен'}:{currentPanelServer.port}</span>
@@ -3817,7 +3817,7 @@ const ClientDashboard = () => {
                               <div className="text-xs text-gray-500">Оплата, RCON и файл-доступ</div>
                             </div>
                           </div>
-                          <div className="space-y-3 text-sm text-gray-700">
+                          <div className="flex flex-col gap-3 text-sm text-gray-700">
                             <div className="rounded-xl bg-gray-50 px-4 py-3">
                               <div className="text-xs uppercase tracking-wide text-gray-500">Оплачено до</div>
                               <div className="mt-1 font-semibold text-gray-900">{currentPanelServer.paidUntil ? formatDate(currentPanelServer.paidUntil) : 'Не указано'}</div>
@@ -3862,7 +3862,7 @@ const ClientDashboard = () => {
 
                         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <div className="mb-4 text-sm font-medium text-gray-900">Состояние доступа</div>
-                          <div className="space-y-3 text-sm text-gray-700">
+                          <div className="flex flex-col gap-3 text-sm text-gray-700">
                             <div className="rounded-xl bg-gray-50 px-4 py-3">
                               <div className="text-xs uppercase tracking-wide text-gray-500">Файлы</div>
                               <div className="mt-1">Управление через вкладку `Файлы`</div>
@@ -3932,7 +3932,7 @@ const ClientDashboard = () => {
                   )}
 
                   {serverPanelTab === 'players' && currentPanelServer && (
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                         <div>
                           <div className="text-sm font-semibold text-gray-900">Список игроков</div>
@@ -4178,7 +4178,7 @@ const ClientDashboard = () => {
                   )}
 
                   {serverPanelTab === 'settings' && currentSettingsServer && (
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -4194,7 +4194,7 @@ const ClientDashboard = () => {
                       </div>
 
                       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                        <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">Описание (MOTD)</label>
                             <input
@@ -4320,10 +4320,10 @@ const ClientDashboard = () => {
                           )}
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="flex flex-col gap-4">
                           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                             <div className="mb-3 text-sm font-medium text-gray-900">Что можно изменить</div>
-                            <div className="space-y-3 text-sm text-gray-600">
+                            <div className="flex flex-col gap-3 text-sm text-gray-600">
                               <div className="rounded-xl bg-slate-50 px-4 py-3">Описание сервера и основные игровые параметры</div>
                               <div className="rounded-xl bg-slate-50 px-4 py-3">Ядро и режим запуска для Minecraft</div>
                               <div className="rounded-xl bg-slate-50 px-4 py-3">RCON, карту и пароль для Counter-Strike</div>
@@ -4347,7 +4347,7 @@ const ClientDashboard = () => {
                   )}
 
                   {serverPanelTab === 'access' && (
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm">
                           <div className="mb-4 flex items-center gap-3">
@@ -4394,7 +4394,7 @@ const ClientDashboard = () => {
 
                         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <div className="mb-3 text-sm font-medium text-gray-900">Рекомендации по доступу</div>
-                          <div className="space-y-3 text-sm text-gray-600">
+                          <div className="flex flex-col gap-3 text-sm text-gray-600">
                             <div className="rounded-xl bg-slate-50 px-4 py-3">Для быстрого редактирования конфигов используйте вкладку `Файлы`.</div>
                             <div className="rounded-xl bg-slate-50 px-4 py-3">SFTP удобно подключать для крупных сборок, карт и модов.</div>
                             <div className="rounded-xl bg-slate-50 px-4 py-3">После загрузки файлов при необходимости перезапустите сервер из верхней панели.</div>
@@ -4414,7 +4414,7 @@ const ClientDashboard = () => {
                         </div>
 
                         {sftpAccess[currentPanelServer.id]?.enabled ? (
-                          <div className="space-y-4">
+                          <div className="flex flex-col gap-4">
                             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                               <div className="rounded-xl bg-slate-50 px-4 py-3">
                                 <div className="text-xs uppercase tracking-wide text-gray-500">Host</div>
@@ -4701,7 +4701,7 @@ const ClientDashboard = () => {
                       <h3 className="text-lg font-medium leading-6 text-gray-900">
                         Кикнуть игрока {kickModal.name}
                       </h3>
-                      <div className="mt-4 space-y-3">
+                      <div className="mt-4 flex flex-col gap-3">
                         <p className="text-sm text-gray-500">
                           Игрок будет немедленно отключен от сервера. Укажите причину (отображается игроку).
                         </p>
@@ -4762,7 +4762,7 @@ const ClientDashboard = () => {
                       <h3 className="text-lg font-medium leading-6 text-gray-900">
                         Забанить игрока {banModal.name}
                       </h3>
-                      <div className="mt-4 space-y-3">
+                      <div className="mt-4 flex flex-col gap-3">
                         <p className="text-sm text-gray-500">
                           Игрок будет отключен и не сможет подключиться до окончания бана.
                         </p>
@@ -4834,7 +4834,7 @@ const ClientDashboard = () => {
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="flex flex-col gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Тема обращения</label>
                       <input
@@ -4961,10 +4961,10 @@ const ClientDashboard = () => {
                 <div className="bg-white px-6 py-5 min-h-[520px] flex-1 overflow-y-auto">
                   {webSettingsTab === 'overview' && (
                     <div className="grid gap-6 md:grid-cols-2">
-                      <div className="space-y-5">
+                      <div className="flex flex-col gap-5">
                         <div>
                           <h4 className="mb-2 text-sm font-semibold text-slate-900">Домен</h4>
-                          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
                             <label className="block text-xs font-medium text-slate-600">Ваш домен (например, orlan-taxi.ru)</label>
                             <div className="flex gap-2">
                               <input
@@ -5017,7 +5017,7 @@ const ClientDashboard = () => {
 
                       <div>
                         <h4 className="mb-2 text-sm font-semibold text-slate-900">Доступ SFTP</h4>
-                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-indigo-50/40 p-4 space-y-3">
+                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-indigo-50/40 p-4 flex flex-col gap-3">
                           <div className="flex items-start gap-2 rounded-lg bg-white p-3 border border-slate-200">
                             <KeyRound className="mt-0.5 h-4 w-4 text-indigo-600" />
                             <p className="text-xs text-slate-600">
@@ -5027,7 +5027,7 @@ const ClientDashboard = () => {
                           </div>
 
                           {webSftpCreds?.ok || webSftpCreds?.host ? (
-                            <div className="space-y-2">
+                            <div className="flex flex-col gap-2">
                               {([
                                 ['Host', webSftpCreds.host || currentWebSite.node?.ip, 'SFTP Host'],
                                 ['Port', webSftpCreds.port, 'Порт'],
@@ -5064,7 +5064,7 @@ const ClientDashboard = () => {
                                 </div>
                               )}
 
-                              <div className="rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100 space-y-1 overflow-x-auto">
+                              <div className="rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100 flex flex-col gap-1 overflow-x-auto">
                                 <div className="text-slate-400"># Пример подключения WinSCP/CLI:</div>
                                 <div>$ sftp -P {webSftpCreds.port} {webSftpCreds.user}@{webSftpCreds.host || currentWebSite.node?.ip}</div>
                               </div>
@@ -5378,7 +5378,7 @@ const ClientDashboard = () => {
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50" id="messages-container">
-                      <div className="space-y-4">
+                      <div className="flex flex-col gap-4">
                         {messages.length === 0 ? (
                           <div className="text-center text-gray-500 py-10">
                             <MessageCircle className="mx-auto h-12 w-12 text-gray-300 mb-2" />
