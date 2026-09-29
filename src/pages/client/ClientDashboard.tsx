@@ -257,6 +257,33 @@ const ClientDashboard = () => {
   const [txTotal, setTxTotal] = useState(0);
   const txLimit = 20;
   const QUICK_TOPUP_AMOUNTS = [100, 300, 500, 1000, 3000];
+
+  const scrollSaveRef = useRef(0);
+  const saveScrollNow = () => {
+    scrollSaveRef.current = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  };
+  const restoreScrollNow = () => {
+    const y = scrollSaveRef.current;
+    if (y > 0) {
+      window.scrollTo(0, y);
+      document.documentElement.scrollTop = y;
+      document.body.scrollTop = y;
+    }
+  };
+  type AnyHandler = ((...args: any[]) => any) | ((e?: any, ...rest: any[]) => any);
+  const withScrollSave = <H extends AnyHandler>(fn: H): H => {
+    return ((...args: any[]) => {
+      saveScrollNow();
+      const out = fn(...(args as any[]));
+      const checkAfter = (depth: number) => {
+        restoreScrollNow();
+        if (depth > 0) requestAnimationFrame(() => checkAfter(depth - 1));
+      };
+      queueMicrotask(() => checkAfter(2));
+      requestAnimationFrame(() => checkAfter(3));
+      return out;
+    }) as H;
+  };
   
   // Game Hosting State
   const [isCreateServerModalOpen, setIsCreateServerModalOpen] = useState(false);
@@ -337,14 +364,14 @@ const ClientDashboard = () => {
 
   const getServerNode = (server?: GameServer | null) =>
     server ? nodes.find(n => n.id === server.node?.id || (server.node as any)?.id === n.id) : undefined;
-  const openServerPanel = (
+  const openServerPanel = withScrollSave((
     server: GameServer,
     tab: 'overview' | 'console' | 'files' | 'settings' | 'access' = 'overview'
   ) => {
     setCurrentPanelServer(server);
     setServerPanelTab(tab);
     setIsServerPanelOpen(true);
-  };
+  });
   const runningGameServersCount = gameServers.filter(gs => gs.status === 'running').length;
   const suspendedGameServersCount = gameServers.filter(gs => gs.status === 'suspended' || gs.status === 'pending_payment').length;
   const totalPlayersOnline = gameServers.reduce((sum, gs) => sum + (playerCounts[gs.id]?.online ?? 0), 0);
@@ -1793,7 +1820,7 @@ const ClientDashboard = () => {
                               <div className="mt-1 text-xs text-rose-700">
                                 У вас {overdueGameServers.length} серверов с просроченной оплатой или приостановлено.
                               </div>
-                              <button onClick={() => setActiveTab('billing')} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
+                              <button onClick={withScrollSave(() => setActiveTab('billing'))} className="mt-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
                                 К оплате →
                               </button>
                             </div>
@@ -1809,7 +1836,7 @@ const ClientDashboard = () => {
                               <div className="mt-1 text-xs text-amber-700">
                                 Срок оплаты истекает менее чем через 5 дней. Рекомендуем продлить заранее.
                               </div>
-                              <button onClick={() => setActiveTab('game_servers')} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                              <button onClick={withScrollSave(() => setActiveTab('game_servers'))} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
                                 Продлить серверы →
                               </button>
                             </div>
@@ -1842,7 +1869,7 @@ const ClientDashboard = () => {
                     <div className="mb-4 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-gray-900">Игровые серверы</h2>
                       <button
-                        onClick={() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); }}
+                        onClick={withScrollSave(() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
                         className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -1855,7 +1882,7 @@ const ClientDashboard = () => {
                         <Server className="mx-auto mb-3 h-8 w-8 text-gray-400" />
                         <p>У вас пока нет игровых серверов</p>
                         <button
-                          onClick={() => setActiveTab('game_servers')}
+                          onClick={withScrollSave(() => setActiveTab('game_servers'))}
                           className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
                         >
                           Перейти к управлению →
@@ -1880,7 +1907,7 @@ const ClientDashboard = () => {
                             <div className="text-xs uppercase tracking-wide text-indigo-700">SFTP доступ</div>
                             <div className="mt-1 text-2xl font-semibold text-indigo-900">{sftpEnabledCount}</div>
                           </div>
-                          <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 cursor-pointer hover:shadow-md transition" onClick={() => setActiveTab('balance')}>
+                          <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 cursor-pointer hover:shadow-md transition" onClick={withScrollSave(() => setActiveTab('balance'))}>
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-xs uppercase tracking-wide text-indigo-700">Баланс</div>
@@ -1888,7 +1915,7 @@ const ClientDashboard = () => {
                               </div>
                               <div className="rounded-xl bg-indigo-500 p-2 text-white shadow"><Wallet className="h-5 w-5" /></div>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); setIsTopupModalOpen(true); }} className="mt-2 w-full text-xs bg-indigo-600 text-white py-1.5 rounded-lg hover:bg-indigo-700 transition">
+                            <button onClick={(e) => { e.stopPropagation(); withScrollSave(() => setIsTopupModalOpen(true))(); }} className="mt-2 w-full text-xs bg-indigo-600 text-white py-1.5 rounded-lg hover:bg-indigo-700 transition">
                               Пополнить
                             </button>
                           </div>
@@ -2610,7 +2637,7 @@ const ClientDashboard = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); }}
+                        onClick={withScrollSave(() => { setInitialConfiguratorTab('game'); setIsCreateServerModalOpen(true); })}
                         className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50"
                       >
                         <Plus className="h-4 w-4" />
@@ -2869,7 +2896,7 @@ const ClientDashboard = () => {
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => { setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); }}
+                          onClick={withScrollSave(() => { setInitialConfiguratorTab('website'); setIsCreateServerModalOpen(true); })}
                           className="inline-flex items-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-sky-50"
                         >
                           <Plus className="mr-2 h-4 w-4" />
@@ -3054,7 +3081,7 @@ const ClientDashboard = () => {
               <div className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
                 <nav className="p-2">
                   <button
-                    onClick={() => setActiveTab('overview')}
+                    onClick={withScrollSave(() => setActiveTab('overview'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'overview' 
                         ? 'bg-indigo-50 text-indigo-700' 
@@ -3065,7 +3092,7 @@ const ClientDashboard = () => {
                     Обзор
                   </button>
                   <button
-                    onClick={() => setActiveTab('game_servers')}
+                    onClick={withScrollSave(() => setActiveTab('game_servers'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'game_servers' 
                         ? 'bg-indigo-50 text-indigo-700' 
@@ -3076,7 +3103,7 @@ const ClientDashboard = () => {
                     Игровые серверы
                   </button>
                   <button
-                    onClick={() => setActiveTab('websites')}
+                    onClick={withScrollSave(() => setActiveTab('websites'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'websites' 
                         ? 'bg-indigo-50 text-indigo-700' 
@@ -3087,7 +3114,7 @@ const ClientDashboard = () => {
                     Сайты
                   </button>
                   <button
-                    onClick={() => setActiveTab('billing')}
+                    onClick={withScrollSave(() => setActiveTab('billing'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'billing' 
                         ? 'bg-indigo-50 text-indigo-700' 
@@ -3098,7 +3125,7 @@ const ClientDashboard = () => {
                     Финансы
                   </button>
                   <button
-                    onClick={() => setActiveTab('balance')}
+                    onClick={withScrollSave(() => setActiveTab('balance'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'balance' 
                         ? 'bg-indigo-50 text-indigo-700' 
@@ -3109,7 +3136,7 @@ const ClientDashboard = () => {
                     Баланс
                   </button>
                   <button
-                    onClick={() => setActiveTab('requests')}
+                    onClick={withScrollSave(() => setActiveTab('requests'))}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
                       activeTab === 'requests' 
                         ? 'bg-indigo-50 text-indigo-700' 
