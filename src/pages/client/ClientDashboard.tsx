@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+﻿import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -10,7 +10,6 @@ import GameServerConfigurator, {
   POPULAR_MINECRAFT_VERSIONS,
   CS16_BUILD_OPTIONS,
 } from '../../components/GameServerConfigurator';
-import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
@@ -1869,9 +1868,8 @@ const ClientDashboard = () => {
               {/* Overview Tab Content */}
               <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none'}} className="space-y-8">
                   {warningGameServers.length > 0 && (
-                    <motion.div
-                      initial={false}
-                      animate={{ opacity: 1, y: 0 }}
+                    <div
+                     
                       className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 space-y-3"
                     >
                       {overdueGameServers.length > 0 && (
@@ -1920,13 +1918,12 @@ const ClientDashboard = () => {
                           </div>
                         </div>
                       )}
-                    </motion.div>
+                    </div>
                   )}
 
                   {/* Game Servers Summary */}
-                  <motion.div 
-                    initial={false}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div 
+                   
                     className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
                   >
                     <div className="mb-4 flex items-center justify-between">
@@ -2067,7 +2064,7 @@ const ClientDashboard = () => {
                         </div>
                       </div>
                     )}
-                  </motion.div>
+                  </div>
               </div>
 
               {/* Projects Tab */}
@@ -2081,10 +2078,10 @@ const ClientDashboard = () => {
                     </div>
                   ) : (
                     projects.map(project => (
-                      <motion.div 
+                      <div 
                         key={project.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                       
+                       
                         className="rounded-xl bg-white p-6 shadow-sm border border-gray-100"
                       >
                         <div className="mb-4 flex items-center justify-between">
@@ -2156,7 +2153,7 @@ const ClientDashboard = () => {
                                 </div>
                             </div>
                         )}
-                      </motion.div>
+                      </div>
                     ))
                   )}
               </div>
@@ -2282,9 +2279,8 @@ const ClientDashboard = () => {
                   </div>
 
                   {/* Big Balance Widget */}
-                  <motion.div
-                    initial={false}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div
+                   
                     className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 p-8 text-white shadow-2xl"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-6">
@@ -2318,7 +2314,7 @@ const ClientDashboard = () => {
                         </button>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* Quick Top-up amounts */}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -2562,9 +2558,8 @@ const ClientDashboard = () => {
                     </div>
                   </div>
 
-                  <motion.div
-                    initial={false}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div
+                   
                     className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden"
                   >
                     <div className="divide-y divide-gray-100">
@@ -2674,7 +2669,7 @@ const ClientDashboard = () => {
                         })
                       )}
                     </div>
-                  </motion.div>
+                  </div>
               </div>
 
               <div aria-hidden={activeTab !== 'game_servers'} style={{display: activeTab === 'game_servers' ? undefined : 'none'}} className="space-y-6">
@@ -3200,9 +3195,8 @@ const ClientDashboard = () => {
               </div>
 
               {/* Sidebar - Support */}
-              <motion.div 
-                initial={false}
-                animate={{ opacity: 1, x: 0 }}
+              <div 
+               
                 className="rounded-xl bg-indigo-600 p-6 text-white shadow-lg"
               >
                 <h3 className="mb-2 text-lg font-semibold">Нужна помощь?</h3>
@@ -3216,7 +3210,7 @@ const ClientDashboard = () => {
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Написать менеджеру
                 </button>
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>
