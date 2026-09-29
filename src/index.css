@@ -18,6 +18,14 @@
 }
 
 @layer utilities {
+  .dashboard-no-flash *,
+  .dashboard-no-flash *::before,
+  .dashboard-no-flash *::after {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
   @keyframes cmsFadeUp {
     from {
       opacity: 0;

@@ -1,5 +1,5 @@
-﻿import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { flushSync } from 'react-dom';
+﻿import { useState, useEffect, useRef } from 'react';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import GameServerConfigurator, {
@@ -259,92 +259,12 @@ const ClientDashboard = () => {
   const QUICK_TOPUP_AMOUNTS = [100, 300, 500, 1000, 3000];
 
   // ============================================================
-  // НУКЛЕАРНЫЙ ФИКС SCROLL JUMP (flushSync + overflow lock + sync restore x3)
+  // SCROLL SAVE (без restore (DOM PERMANENCE уже сам держит scroll стабильно!)
   // ============================================================
-  const scrollSaveRef = useRef(0);
-  const scrollForceRestoreRef = useRef(0);
-  const pageHeightSaveRef = useRef(0);
-  // useLayoutEffect — СИНХРОННО ДО PAINT браузера (100% invisible for eye)
-  useLayoutEffect(() => {
-    if (scrollForceRestoreRef.current > 0) {
-      const y = scrollForceRestoreRef.current;
-      try {
-        window.scrollTo(0, y);
-        document.documentElement.scrollTop = y;
-        if (document.scrollingElement) (document.scrollingElement as any).scrollTop = y;
-        document.body.scrollTop = y;
-      } catch (_) {}
-    }
-  });
-
-  const saveScrollNow = () => {
-    scrollSaveRef.current = Math.max(0, window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
-    scrollForceRestoreRef.current = scrollSaveRef.current;
-    pageHeightSaveRef.current = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 0;
-  };
-  const restoreScrollNow = () => {
-    const y = Math.max(0, scrollForceRestoreRef.current);
-    if (y <= 0) return;
-    try {
-      window.scrollTo(0, y);
-      document.documentElement.scrollTop = y;
-      if (document.scrollingElement) (document.scrollingElement as any).scrollTop = y;
-      document.body.scrollTop = y;
-    } catch (_) {}
-  };
-  const clearScrollLock = () => {
-    setTimeout(() => { scrollForceRestoreRef.current = 0; }, 250);
-  };
-
-  if (typeof window !== 'undefined' && 'history' in window) {
-    try { (window.history as any).scrollRestoration = 'manual'; } catch (_) {}
-  }
-
   type AnyHandler = ((...args: any[]) => any) | ((e?: any, ...rest: any[]) => any);
   const withScrollSave = <H extends AnyHandler>(fn: H): H => {
     return ((...args: any[]) => {
-      saveScrollNow();
-
-      // BODY SCROLL LOCK на время setState/flushSync
-      // Предотвращает изменения положения скролла браузером из-за смены высоты
-      const de = document.documentElement;
-      const body = document.body;
-      const prevMinHeight = de.style.minHeight;
-      const savedH = Math.max(pageHeightSaveRef.current, de.scrollHeight, body.scrollHeight);
-      if (savedH > 0) de.style.minHeight = `${savedH}px`;
-
-      let out: any = undefined;
-      try {
-        // flushSync = запретить React batched updates. Сделать render/commit СРАЗУ СИНХРОННО.
-        flushSync(() => {
-          out = fn(...(args as any[]));
-        });
-      } catch (err) {
-        // flushSync может бросать в строгом режиме; повторяем без него
-        try { out = fn(...(args as any[])); } catch (_) { /* ignore */ }
-      }
-
-      // 1-ая синхронная восстановление (до layout браузера)
-      restoreScrollNow();
-
-      // rAF #1 (перед следующим paint)
-      requestAnimationFrame(() => {
-        restoreScrollNow();
-        // rAF #2 (после layout)
-        requestAnimationFrame(() => {
-          restoreScrollNow();
-          // rAF #3 + setTimeout последняя подстраховка
-          requestAnimationFrame(restoreScrollNow);
-          setTimeout(restoreScrollNow, 30);
-        });
-      });
-
-      if (prevMinHeight !== undefined) {
-        setTimeout(() => { try { de.style.minHeight = prevMinHeight; } catch (_){} }, 120);
-      }
-
-      clearScrollLock();
-      return out;
+      return fn(...(args as any[]));
     }) as H;
   };
   
@@ -1860,7 +1780,7 @@ const ClientDashboard = () => {
             <p className="mt-1 text-gray-500">Отслеживайте прогресс вашего проекта и оплачивайте услуги</p>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-3">
+          <div className="grid gap-8 lg:grid-cols-3 dashboard-no-flash">
             
             {/* Main Content */}
             <div className="lg:col-span-2 flex flex-col gap-8 relative" style={{minHeight: '1400px'}}>
