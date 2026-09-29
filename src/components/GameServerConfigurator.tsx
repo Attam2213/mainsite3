@@ -1185,38 +1185,54 @@ const GameServerConfigurator = ({
                 </button>
               </div>
 
-              {configuratorTab === 'game' ? (
-                <>
-                  <CompactGameSelector />
-                  <CompactLocationSelector />
-                  <PeriodSelector />
-                  {showNameField && <NameField />}
-                  <div className="space-y-6 pt-2">
-                    <Sliders />
-                    <McVersionSelector />
-                    <Cs16BuildSelector />
+              <div
+                aria-hidden={configuratorTab !== 'game'}
+                style={{display: configuratorTab === 'game' ? undefined : 'none'}}
+                className="flex flex-col gap-6"
+              >
+                <CompactGameSelector />
+                <CompactLocationSelector />
+                <PeriodSelector />
+                {showNameField && <NameField />}
+                <div className="flex flex-col gap-6 pt-2">
+                  <Sliders />
+                  <McVersionSelector />
+                  <Cs16BuildSelector />
+                </div>
+              </div>
+              <div
+                aria-hidden={configuratorTab !== 'website'}
+                style={{display: configuratorTab === 'website' ? undefined : 'none'}}
+                className="flex flex-col gap-6"
+              >
+                <WebsitePlanCards />
+                <PeriodSelector />
+                <WebsiteDomainField />
+                <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl">
+                  <Rocket size={20} className="text-sky-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-bold text-sky-800 mb-1">Быстрый старт</div>
+                    <p className="text-xs text-sky-700/90 leading-relaxed">
+                      После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — шаблон как Ordlan Такси (Express + EJS + админка), <b>Landing</b> — чистый HTML.
+                      Загружайте свои файлы через SFTP или файловый менеджер в ЛК.
+                    </p>
                   </div>
-                </>
-              ) : (
-                <>
-                  <WebsitePlanCards />
-                  <PeriodSelector />
-                  <WebsiteDomainField />
-                  <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl">
-                    <Rocket size={20} className="text-sky-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-sm font-bold text-sky-800 mb-1">Быстрый старт</div>
-                      <p className="text-xs text-sky-700/90 leading-relaxed">
-                        После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — шаблон как Ordlan Такси (Express + EJS + админка), <b>Landing</b> — чистый HTML.
-                        Загружайте свои файлы через SFTP или файловый менеджер в ЛК.
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
+                </div>
+              </div>
             </div>
             <div className="lg:col-span-2">
-              {configuratorTab === 'game' ? <PricePanel /> : <WebsitePricePanel />}
+              <div
+                aria-hidden={configuratorTab !== 'game'}
+                style={{display: configuratorTab === 'game' ? undefined : 'none'}}
+              >
+                <PricePanel />
+              </div>
+              <div
+                aria-hidden={configuratorTab !== 'website'}
+                style={{display: configuratorTab === 'website' ? undefined : 'none'}}
+              >
+                <WebsitePricePanel />
+              </div>
             </div>
           </div>
         </div>
