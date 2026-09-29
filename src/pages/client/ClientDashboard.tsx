@@ -1867,8 +1867,7 @@ const ClientDashboard = () => {
             <div className="lg:col-span-2 space-y-8 relative" style={{minHeight: '1400px'}}>
 
               {/* Overview Tab Content */}
-              {activeTab === 'overview' && (
-                <>
+              <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none'}} className="space-y-8">
                   {warningGameServers.length > 0 && (
                     <motion.div
                       initial={false}
@@ -2069,12 +2068,10 @@ const ClientDashboard = () => {
                       </div>
                     )}
                   </motion.div>
-                </>
-              )}
+              </div>
 
               {/* Projects Tab */}
-              {activeTab === 'projects' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'projects'} style={{display: activeTab === 'projects' ? undefined : 'none'}} className="space-y-6">
                   <h2 className="text-xl font-bold text-gray-900">Мои проекты</h2>
                   {projects.length === 0 ? (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
@@ -2162,12 +2159,10 @@ const ClientDashboard = () => {
                       </motion.div>
                     ))
                   )}
-                </div>
-              )}
+              </div>
 
               {/* Billing Tab */}
-              {activeTab === 'billing' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'billing'} style={{display: activeTab === 'billing' ? undefined : 'none'}} className="space-y-6">
                   <h2 className="text-xl font-bold text-gray-900">Финансы</h2>
                   <div className="grid gap-4 lg:grid-cols-3">
                     <div className="rounded-3xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm">
@@ -2278,12 +2273,10 @@ const ClientDashboard = () => {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
+              </div>
 
               {/* Balance Tab */}
-              {activeTab === 'balance' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'balance'} style={{display: activeTab === 'balance' ? undefined : 'none'}} className="space-y-6">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <h2 className="text-xl font-bold text-gray-900">Баланс и операции</h2>
                   </div>
@@ -2435,11 +2428,10 @@ const ClientDashboard = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+              </div>
 
               {/* Leads Tab - Detailed View */}
-              {activeTab === 'leads' && (
+              <div aria-hidden={activeTab !== 'leads'} style={{display: activeTab === 'leads' ? undefined : 'none'}} className="space-y-6">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-medium text-gray-900">Заявки с сайтов</h2>
@@ -2545,11 +2537,10 @@ const ClientDashboard = () => {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
               {/* Support Tab */}
-              {activeTab === 'requests' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'requests'} style={{display: activeTab === 'requests' ? undefined : 'none'}} className="space-y-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -2684,11 +2675,9 @@ const ClientDashboard = () => {
                       )}
                     </div>
                   </motion.div>
-                </div>
-              )}
+              </div>
 
-              {activeTab === 'game_servers' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'game_servers'} style={{display: activeTab === 'game_servers' ? undefined : 'none'}} className="space-y-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-900 to-indigo-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -2940,11 +2929,9 @@ const ClientDashboard = () => {
                       )}
                     </div>
                   )}
-                </div>
-              )}
+              </div>
 
-              {activeTab === 'websites' && (
-                <div className="space-y-6">
+              <div aria-hidden={activeTab !== 'websites'} style={{display: activeTab === 'websites' ? undefined : 'none'}} className="space-y-6">
                   <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-sky-900 to-cyan-700 p-6 text-white shadow-lg">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
@@ -3135,8 +3122,7 @@ const ClientDashboard = () => {
                       })}
                     </div>
                   )}
-                </div>
-              )}
+              </div>
 
             </div>
 
