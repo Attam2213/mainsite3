@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import GameServerConfigurator, {
@@ -259,28 +259,43 @@ const ClientDashboard = () => {
   const QUICK_TOPUP_AMOUNTS = [100, 300, 500, 1000, 3000];
 
   const scrollSaveRef = useRef(0);
+  const scrollForceRestoreRef = useRef(0);
+  // useLayoutEffect СРАБАТЫВАЕТ СИНХРОННО ПОСЛЕ COMMIT, ДО PAINT БРАУЗЕРА (глаз не видит jump!)
+  useLayoutEffect(() => {
+    if (scrollForceRestoreRef.current > 0) {
+      const y = scrollForceRestoreRef.current;
+      try {
+        window.scrollTo(0, y);
+        document.documentElement.scrollTop = y;
+        document.body.scrollTop = y;
+      } catch (_) {}
+    }
+  });
   const saveScrollNow = () => {
     scrollSaveRef.current = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    scrollForceRestoreRef.current = scrollSaveRef.current;
   };
   const restoreScrollNow = () => {
-    const y = scrollSaveRef.current;
-    if (y > 0) {
+    const y = scrollForceRestoreRef.current;
+    if (y <= 0) return;
+    try {
       window.scrollTo(0, y);
       document.documentElement.scrollTop = y;
       document.body.scrollTop = y;
-    }
+    } catch (_) {}
+  };
+  const clearScrollLock = () => {
+    setTimeout(() => { scrollForceRestoreRef.current = 0; }, 120);
   };
   type AnyHandler = ((...args: any[]) => any) | ((e?: any, ...rest: any[]) => any);
   const withScrollSave = <H extends AnyHandler>(fn: H): H => {
     return ((...args: any[]) => {
-      saveScrollNow();
+      saveScrollNow();          // (1) ДО setState: запомнили Y и заблокировали restore в useLayoutEffect
       const out = fn(...(args as any[]));
-      const checkAfter = (depth: number) => {
-        restoreScrollNow();
-        if (depth > 0) requestAnimationFrame(() => checkAfter(depth - 1));
-      };
-      queueMicrotask(() => checkAfter(2));
-      requestAnimationFrame(() => checkAfter(3));
+      // (2) Сразу после setState: useLayoutEffect ЧЕРЕЗ 1мкс синхронно восстановит.
+      // Дополнительно: подстрахуемся через rAF x2, если layout будет повторно измерился (второй проход layout)
+      requestAnimationFrame(() => { restoreScrollNow(); requestAnimationFrame(restoreScrollNow); });
+      clearScrollLock();
       return out;
     }) as H;
   };
@@ -1807,7 +1822,7 @@ const ClientDashboard = () => {
                 <>
                   {warningGameServers.length > 0 && (
                     <motion.div
-                      initial={{ opacity: 0, y: -10 }}
+                      initial={false}
                       animate={{ opacity: 1, y: 0 }}
                       className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm mb-6 space-y-3"
                     >
@@ -1862,7 +1877,7 @@ const ClientDashboard = () => {
 
                   {/* Game Servers Summary */}
                   <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-xl bg-white p-6 shadow-sm border border-gray-100 mb-6"
                   >
@@ -2226,7 +2241,7 @@ const ClientDashboard = () => {
 
                   {/* Big Balance Widget */}
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 p-8 text-white shadow-2xl"
                   >
@@ -2508,7 +2523,7 @@ const ClientDashboard = () => {
                   </div>
 
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden"
                   >
@@ -3151,9 +3166,8 @@ const ClientDashboard = () => {
 
               {/* Sidebar - Support */}
               <motion.div 
-                initial={{ opacity: 0, x: 20 }}
+                initial={false}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
                 className="rounded-xl bg-indigo-600 p-6 text-white shadow-lg"
               >
                 <h3 className="mb-2 text-lg font-semibold">Нужна помощь?</h3>
