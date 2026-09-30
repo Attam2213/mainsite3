@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -106,25 +106,10 @@ const Home = () => {
                   Перейти к конфигуратору
                   <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                 </a>
-                <a
-                  href="#pricing"
-                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-white/5 text-white font-bold text-lg border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2 backdrop-blur-sm"
-                >
-                  <Gamepad2 size={20} />
-                  Поддерживаемые игры
-                </a>
-                <a
-                  href="#websites"
-                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-white/5 text-white font-bold text-lg border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2 backdrop-blur-sm"
-                >
-                  <Globe size={20} />
-                  Создать сайт
-                </a>
               </div>
 
-              <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+              <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
                 {[
-                  { num: '15 ₽', label: 'от / слот' },
                   { num: '6', label: 'локаций' },
                   { num: '99.99%', label: 'Uptime SLA' },
                   { num: '60 сек', label: 'до запуска' },
@@ -255,16 +240,6 @@ const Home = () => {
           </div>
         </section>
 
-        {/* CONFIGURATOR ANCHOR */}
-        <div id="pricing" />
-        <GameServerConfigurator
-          compact={true}
-          isAuthenticated={isAuthenticated}
-          onOrder={handleOrder}
-          onWebsiteOrder={handleWebsiteOrder}
-        />
-
-
         {/* FEATURES */}
         <section className="py-24 bg-white">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -327,6 +302,16 @@ const Home = () => {
             </div>
           </div>
         </section>
+
+
+        {/* CONFIGURATOR ANCHOR */}
+        <div id="pricing" />
+        <GameServerConfigurator
+          compact={true}
+          isAuthenticated={isAuthenticated}
+          onOrder={handleOrder}
+          onWebsiteOrder={handleWebsiteOrder}
+        />
 
 
         {/* STATS */}
