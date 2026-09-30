@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -258,7 +258,7 @@ const Home = () => {
         {/* CONFIGURATOR ANCHOR */}
         <div id="pricing" />
         <GameServerConfigurator
-          compact={false}
+          compact={true}
           isAuthenticated={isAuthenticated}
           onOrder={handleOrder}
           onWebsiteOrder={handleWebsiteOrder}
