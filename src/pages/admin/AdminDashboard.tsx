@@ -1,4 +1,4 @@
-﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -4365,7 +4365,7 @@ const AdminDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Домен</label>
-                    <input type="text" placeholder="orlan-taxi.ru" className="w-full p-2.5 border rounded-lg font-mono"
+                    <input type="text" placeholder="mycompany.ru" className="w-full p-2.5 border rounded-lg font-mono"
                       value={currentWebSite.domain || ''}
                       onChange={e => setCurrentWebSite({ ...currentWebSite, domain: e.target.value.trim() })} />
                   </div>
@@ -4417,8 +4417,8 @@ const AdminDashboard = () => {
                   <select className="w-full p-2.5 border rounded-lg"
                     value={currentWebSite.coreTemplate || ''}
                     onChange={e => setCurrentWebSite({ ...currentWebSite, coreTemplate: e.target.value || undefined })}>
-                    <option value="">По умолчанию (Landing → static, Business/Premium → orlan-taxi)</option>
-                    <option value="orlan-taxi-business">Ordlan Taxi Business (Express/EJS)</option>
+                    <option value="">По умолчанию (Landing → static, Business/Premium → Express Business)</option>
+                    <option value="orlan-taxi-business">Express Business шаблон (Express/EJS + админка)</option>
                     <option value="static-blank">Static blank (empty public_html)</option>
                     <option value="node-blank">Node.js blank (package.json + server.js)</option>
                   </select>

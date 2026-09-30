@@ -836,7 +836,7 @@ const GameServerConfigurator = ({
               defaultValue={websiteSubdomainName}
               onChange={(e) => setWebsiteSubdomainNameStable(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); checkSubdomainNow(); } }}
-              placeholder="например: orlan-taxi, ilves-shop, lk-my-site"
+              placeholder="например: my-business, ilves-shop, lk-my-site"
               className="flex-1 px-4 py-3 bg-transparent outline-none text-gray-900 font-medium"
               maxLength={42}
               autoComplete="off"
@@ -890,7 +890,7 @@ const GameServerConfigurator = ({
             type="text"
             value={websiteDomain}
             onChange={e => setWebsiteDomain(e.target.value)}
-            placeholder="например: orlan-taxi.ru или ilves.com"
+            placeholder="например: mycompany.ru или ilves.com"
             className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
           />
           <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
@@ -1219,7 +1219,7 @@ const GameServerConfigurator = ({
                   <div>
                     <div className="text-sm font-bold text-sky-800 mb-1">Быстрый старт</div>
                     <p className="text-xs text-sky-700/90 leading-relaxed">
-                      После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — шаблон как Ordlan Такси (Express + EJS + админка), <b>Landing</b> — чистый HTML.
+                      После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — готовый шаблон на Express + EJS с&nbsp;админкой, <b>Landing</b> — чистый HTML.
                       Загружайте свои файлы через SFTP или файловый менеджер в ЛК.
                     </p>
                   </div>

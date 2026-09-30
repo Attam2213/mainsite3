@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -84,7 +84,7 @@ const Home = () => {
             <div className="max-w-6xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-sm mb-8">
                 <Sparkles size={16} className="text-yellow-400" />
-                <span className="text-sm font-medium text-gray-200">НОВИНКА&nbsp;•&nbsp;Шаблон «Орлан Такси» — готовый сайт за 1 минуту</span>
+                <span className="text-sm font-medium text-gray-200">НОВИНКА&nbsp;•&nbsp;Готовые шаблоны сайтов за&nbsp;1&nbsp;клик</span>
               </div>
 
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-8 leading-[1.05]">
@@ -215,7 +215,7 @@ const Home = () => {
                   </p>
                   <ul className="flex flex-col gap-3 mb-8">
                     {[
-                      'Шаблон «Орлан Такси» — готовый сайт за 1 минуту',
+                      'Готовый шаблон сайта за&nbsp;1&nbsp;минуту · Express/EJS + админка',
                       'Старт от 149 ₽/мес · Node.js от 499 ₽/мес · Авто-бэкапы',
                       'Свой домен + Let\'s Encrypt SSL · Nginx + PHP-FPM / Node.js 22',
                     ].map((t, i) => (
@@ -346,10 +346,10 @@ const Home = () => {
                 },
                 {
                   name: 'Ольга В.',
-                  role: 'Создал сайт для Таксопарка · Node.js Business',
+                  role: 'Создала сайт компании · Node.js Business',
                   initials: 'ОВ',
                   color: 'from-purple-500 to-pink-500',
-                  text: 'Взяла шаблон «Орлан Такси» — выбрала 1 клик, через 2 минуты сайт был готов! Подключила свой домен, SSL выставился автоматически. Админка простая, даже я разобралась. Сайт стал принимать заявки с первого дня 🔥',
+                  text: 'Выбрала готовый шаблон сайта — 1 клик и через 2 минуты сайт был готов! Подключила свой домен, SSL выставился автоматически. Админка простая, даже я разобралась. Сайт стал принимать заявки с первого дня 🔥',
                 },
               ].map((t, i) => (
                 <div key={i} className="bg-white rounded-[2rem] p-8 border border-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all">

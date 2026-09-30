@@ -1,4 +1,4 @@
-﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -5061,7 +5061,7 @@ const ClientDashboard = () => {
                         <div>
                           <h4 className="mb-2 text-sm font-semibold text-slate-900">Домен</h4>
                           <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                            <label className="block text-xs font-medium text-slate-600">Ваш домен (например, orlan-taxi.ru)</label>
+                            <label className="block text-xs font-medium text-slate-600">Ваш домен (например, mycompany.ru)</label>
                             <div className="flex gap-2">
                               <input
                                 type="text"
