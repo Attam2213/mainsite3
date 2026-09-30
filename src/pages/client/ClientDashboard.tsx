@@ -1,4 +1,4 @@
-﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -3061,7 +3061,7 @@ const ClientDashboard = () => {
                       </div>
                       <h3 className="mb-2 text-lg font-bold text-gray-900">Пока нет сайтов</h3>
                       <p className="mb-1 mx-auto max-w-md text-sm text-gray-500 leading-relaxed">
-                        Закажите хостинг сайта — статический Landing или Node.js Business/Premium с админ-панелью. Шаблон Ordlan Такси разворачивается автоматически.
+                        Закажите хостинг сайта — статический Landing или Node.js Business/Premium с админ-панелью.
                       </p>
                     </div>
                   ) : (
