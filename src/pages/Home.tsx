@@ -1,14 +1,16 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
   type GameServerOrderPayload,
   type WebsiteOrderPayload,
 } from '../components/GameServerConfigurator';
+import ContactForm from '../components/ContactForm';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
 import {
-  ArrowRight, Gamepad2, Zap, ChevronDown,
+  ArrowRight, Gamepad2, Zap, ChevronDown, X,
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
   Headphones, MapPin, Mail, Star,
@@ -17,6 +19,7 @@ import {
 const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const handleOrder = async (payload: GameServerOrderPayload) => {
     if (isAuthenticated) {
@@ -31,8 +34,23 @@ const Home = () => {
           navigate('/dashboard?tab=game_servers');
           return;
         }
-      } catch {
-        // fallthrough: save intent
+        if (res.status === 401) {
+          // сессия истекла — редирект на логин
+          localStorage.setItem('wexa_order_intent', JSON.stringify(payload));
+          navigate('/login');
+          return;
+        }
+        let message = `Ошибка оформления заказа (${res.status})`;
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+          else if (data?.message) message = data.message;
+        } catch {}
+        alert(message);
+        return;
+      } catch (e) {
+        alert('Сетевая ошибка, попробуйте позже');
+        return;
       }
     }
     localStorage.setItem('wexa_order_intent', JSON.stringify(payload));
@@ -53,9 +71,23 @@ const Home = () => {
           navigate('/dashboard?tab=websites');
           return;
         }
-      } catch {
-          // fallthrough
+        if (res.status === 401) {
+          localStorage.setItem('wexa_order_intent', JSON.stringify(intent));
+          navigate('/login');
+          return;
         }
+        let message = `Ошибка оформления заказа (${res.status})`;
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+          else if (data?.message) message = data.message;
+        } catch {}
+        alert(message);
+        return;
+      } catch (e) {
+        alert('Сетевая ошибка, попробуйте позже');
+        return;
+      }
     }
     localStorage.setItem('wexa_order_intent', JSON.stringify(intent));
     navigate('/login');
@@ -427,13 +459,14 @@ const Home = () => {
                     Перейти к конфигуратору
                     <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                   </a>
-                  <a
-                    href="mailto:support@wexa.su"
+                  <button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
                     className="group inline-flex items-center gap-3 px-10 py-5 rounded-2xl bg-white/5 text-white font-bold text-lg border-2 border-white/20 hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm w-full sm:w-auto justify-center"
                   >
                     <Mail size={20} />
                     Написать менеджеру
-                  </a>
+                  </button>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-indigo-100 text-sm font-medium">
                   {['Оплата картами и СБП', 'СЧЁТ сразу исполняется', 'Бэкапы 7 дней бесплатно', 'SSL сертификаты'].map((t, i) => (
@@ -446,6 +479,27 @@ const Home = () => {
             </div>
           </div>
         </section>
+
+        {contactModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setContactModalOpen(false)}
+          >
+            <div
+              className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white text-gray-600 hover:text-gray-900 shadow-xl flex items-center justify-center z-10 border border-gray-200"
+                onClick={() => setContactModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+              <ContactForm />
+            </div>
+          </div>
+        )}
 
       </div>
     </Layout>

@@ -41,7 +41,7 @@ export const WEB_PLANS: Record<WebPlanId, WebPlan> = {
     id: 'business',
     label: 'Бизнес',
     priceMonthly: 299,
-    description: 'Node.js Express + EJS админка / динамические страницы. Как шаблон Орлан-Такси.',
+    description: 'Node.js Express + EJS. Встроенная админ-панель и динамические страницы.',
     features: [
       '~5 000 посещений/сутки',
       '10 000 файлов / 5 ГБ диска',
