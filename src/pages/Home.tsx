@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -11,7 +11,7 @@ import {
   ArrowRight, Gamepad2, Zap, ChevronDown,
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
-  Headphones, MapPin, Mail,
+  Headphones, MapPin, Mail, Star,
 } from 'lucide-react';
 
 const Home = () => {
@@ -312,6 +312,67 @@ const Home = () => {
           onOrder={handleOrder}
           onWebsiteOrder={handleWebsiteOrder}
         />
+
+
+        {/* TESTIMONIALS */}
+        <section className="py-24 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto mb-16">
+              <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Отзывы</h2>
+              <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl">Что говорят наши клиенты</p>
+              <div className="mt-6 flex items-center justify-center gap-1">
+                {[0,1,2,3,4].map(i => (
+                  <Star key={i} size={22} className="fill-yellow-400 text-yellow-400" />
+                ))}
+                <span className="ml-2 text-gray-600 font-semibold">4.9 / 5.0 · 300+ отзывов</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {[
+                {
+                  name: 'Артём Д.',
+                  role: 'Владелец Minecraft-сервера · 40 слотов',
+                  initials: 'АД',
+                  color: 'from-blue-500 to-cyan-500',
+                  text: 'Заказывал сервер Minecraft на 40 слотов с Paper — запустился буквально за 40 секунд после оплаты. Установил плагины через SFTP за 5 минут. Пинг 10–15 мс, ни одного лага за 2 месяца. Рекомендую!',
+                },
+                {
+                  name: 'Михаил К.',
+                  role: 'Админ CS 1.6 Deathmatch · 32 слота',
+                  initials: 'МК',
+                  color: 'from-orange-500 to-red-500',
+                  text: 'Поднял сервер CS 1.6 ReHLDS — сборка «Stable 2021» с AMX Mod X и FastDL предустановлена. Меняю карты, ставлю моды — всё работает как часы. Поддержка ответила за 3 минуты когда переносил карту с другого хостинга.',
+                },
+                {
+                  name: 'Ольга В.',
+                  role: 'Создал сайт для Таксопарка · Node.js Business',
+                  initials: 'ОВ',
+                  color: 'from-purple-500 to-pink-500',
+                  text: 'Взяла шаблон «Орлан Такси» — выбрала 1 клик, через 2 минуты сайт был готов! Подключила свой домен, SSL выставился автоматически. Админка простая, даже я разобралась. Сайт стал принимать заявки с первого дня 🔥',
+                },
+              ].map((t, i) => (
+                <div key={i} className="bg-white rounded-[2rem] p-8 border border-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all">
+                  <div className="flex items-center gap-1 mb-5">
+                    {[0,1,2,3,4].map(j => (
+                      <Star key={j} size={16} className="fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-gray-700 leading-relaxed mb-6">«{t.text}»</p>
+                  <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${t.color} text-white flex items-center justify-center font-black shadow-md`}>
+                      {t.initials}
+                    </div>
+                    <div>
+                      <div className="font-bold text-gray-900">{t.name}</div>
+                      <div className="text-sm text-gray-500">{t.role}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
 
         {/* STATS */}
