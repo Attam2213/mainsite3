@@ -1,4 +1,4 @@
-﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -49,6 +49,9 @@ import {
   ShieldCheck,
   KeyRound,
   HardDrive,
+  Database,
+  Bot,
+  Sparkles,
   Terminal as TerminalIcon,
 } from 'lucide-react';
 
@@ -333,7 +336,7 @@ const ClientDashboard = () => {
   const [webSites, setWebSites] = useState<any[]>([]);
   const [isWebSettingsOpen, setIsWebSettingsOpen] = useState(false);
   const [currentWebSite, setCurrentWebSite] = useState<any>(null);
-  const [webSettingsTab, setWebSettingsTab] = useState<'overview' | 'files' | 'logs' | 'backups'>('overview');
+  const [webSettingsTab, setWebSettingsTab] = useState<'overview' | 'files' | 'logs' | 'backups' | 'ssh' | 'database' | 'ai'>('overview');
   const [webFiles, setWebFiles] = useState<any[]>([]);
   const [webFilesPath, setWebFilesPath] = useState('/');
   const [webFilesLoading, setWebFilesLoading] = useState(false);
@@ -345,6 +348,16 @@ const ClientDashboard = () => {
   const [webLoadingAction, setWebLoadingAction] = useState<string | null>(null);
   const [webDomainInput, setWebDomainInput] = useState('');
   const [webFileUploadFile, setWebFileUploadFile] = useState<File | null>(null);
+
+  // Delete / toast UX states
+  const [toast, setToast] = useState<{ id: number; type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const toastTimerRef = useRef<any>(null);
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: Date.now(), type, message });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200);
+  };
+  const [deletedGameServerIds, setDeletedGameServerIds] = useState<Record<string, 'deleting' | 'deleted'>>({});
 
   const getServerNode = (server?: GameServer | null) =>
     server ? nodes.find(n => n.id === server.node?.id || (server.node as any)?.id === n.id) : undefined;
@@ -1197,21 +1210,48 @@ const ClientDashboard = () => {
   };
 
   const handleDeleteServer = async (id: string) => {
+    const gs = gameServers.find(x => x.id === id);
+    const name = gs?.name || `Сервер ${id.slice(0, 8)}`;
     try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/game-servers/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+      // 1) Optimistic: mark as deleting UI state
+      setDeletedGameServerIds(prev => ({ ...prev, [id]: 'deleting' }));
 
-        if (res.ok) {
-            fetchData();
-        } else {
-            alert('Ошибка при удалении сервера');
-        }
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/game-servers/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        // 2) Success → status deleted, fade out + toast
+        setDeletedGameServerIds(prev => ({ ...prev, [id]: 'deleted' }));
+        showToast('success', `✅ Сервер «${name}» удалён`);
+
+        // 3) After 1.3s fade animation — remove from local array
+        setTimeout(() => {
+          setGameServers(prev => prev.filter(x => x.id !== id));
+          setDeletedGameServerIds(prev => {
+            const n = { ...prev }; delete n[id]; return n;
+          });
+          fetchData();
+        }, 1300);
+      } else {
+        setDeletedGameServerIds(prev => {
+          const n = { ...prev }; delete n[id]; return n;
+        });
+        let msg = 'Ошибка при удалении сервера';
+        try { const d = await res.json(); if (d?.error) msg = d.error; else if (d?.message) msg = d.message; } catch {}
+        showToast('error', `❌ ${msg}`);
+        alert(msg);
+      }
     } catch (error) {
-        console.error('Delete server error:', error);
-        alert('Ошибка при удалении сервера');
+      setDeletedGameServerIds(prev => {
+        const n = { ...prev }; delete n[id]; return n;
+      });
+      console.error('Delete server error:', error);
+      const msg = 'Сетевая ошибка при удалении сервера';
+      showToast('error', `❌ ${msg}`);
+      alert(msg);
     }
   };
 
@@ -1488,7 +1528,7 @@ const ClientDashboard = () => {
   useEffect(() => {
     if (!isWebSettingsOpen || !currentWebSite) return;
     const id = currentWebSite.id;
-    if (webSettingsTab === 'overview') {
+    if (webSettingsTab === 'overview' || webSettingsTab === 'ssh' || webSettingsTab === 'database' || webSettingsTab === 'ai') {
       if (!webSftpCreds) loadWebSftpCreds(id);
     }
     if (webSettingsTab === 'logs') {
@@ -1780,6 +1820,30 @@ const ClientDashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">Личный кабинет</h1>
             <p className="mt-1 text-gray-500">Отслеживайте прогресс вашего проекта и оплачивайте услуги</p>
           </div>
+
+          {/* TOAST NOTIFICATION */}
+          {toast && (
+            <div
+              key={toast.id}
+              className={`fixed top-24 right-4 sm:right-8 z-[60] max-w-md rounded-2xl border px-5 py-4 shadow-2xl shadow-black/10 backdrop-blur-sm ${
+                toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : toast.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-sky-50 border-sky-200 text-sky-900'
+              }`}
+              style={{ animation: 'toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both' }}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  toast.type === 'success' ? 'bg-emerald-100 text-emerald-600'
+                  : toast.type === 'error' ? 'bg-rose-100 text-rose-600'
+                  : 'bg-sky-100 text-sky-600'
+                }`}>
+                  {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'}
+                </div>
+                <div className="text-sm font-semibold leading-snug">{toast.message}</div>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-8 lg:grid-cols-3 dashboard-no-flash">
             
@@ -2883,14 +2947,54 @@ const ClientDashboard = () => {
                         <div className="grid gap-5 xl:grid-cols-2">
                       {filteredGameServers.map((gs) => {
                         const node = getServerNode(gs);
-                        const statusMeta = getGameServerStatusMeta(gs.status);
+                        const deleteState = deletedGameServerIds[gs.id]; // 'deleting' | 'deleted' | undefined
+                        const isDeletingOrDeleted = !!deleteState;
+                        const statusMeta = deleteState === 'deleted'
+                          ? { badgeClassName: 'bg-gray-100 text-gray-500 border border-gray-200', label: 'Удалён' }
+                          : deleteState === 'deleting'
+                          ? { badgeClassName: 'bg-orange-100 text-orange-700 border border-orange-200 animate-pulse', label: '🗑️ Удаляется...' }
+                          : getGameServerStatusMeta(gs.status);
                         const actionState = getGameServerActionState(gs.status);
                         const connectionValue = `${node?.ip || 'IP не назначен'}:${gs.port}`;
+                        const cardBaseClass = deleteState === 'deleted'
+                          ? 'transition-all duration-[1300ms] ease-in-out opacity-0 scale-95 grayscale blur-[2px] translate-y-[-20px] overflow-hidden max-h-0 border-0 p-0 m-0 shadow-none'
+                          : deleteState === 'deleting'
+                          ? 'transition-all duration-500 grayscale opacity-60 saturate-50'
+                          : 'transition hover:-translate-y-0.5 hover:shadow-lg';
                         return (
                           <div
                             key={gs.id}
-                            className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                            className={`rounded-3xl border border-gray-100 bg-white p-5 shadow-sm relative overflow-hidden ${cardBaseClass}`}
                           >
+                            {isDeletingOrDeleted && (
+                              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 backdrop-blur-[1px] rounded-3xl pointer-events-none">
+                                <div className="flex flex-col items-center gap-3 text-center px-6">
+                                  {deleteState === 'deleting' ? (
+                                    <>
+                                      <div className="relative">
+                                        <div className="w-14 h-14 rounded-full border-4 border-gray-200" />
+                                        <div className="absolute top-0 left-0 w-14 h-14 rounded-full border-4 border-transparent border-t-orange-500 animate-spin" />
+                                        <div className="absolute inset-0 flex items-center justify-center text-xl">🗑️</div>
+                                      </div>
+                                      <div>
+                                        <div className="font-bold text-gray-900 text-base">Сервер удаляется...</div>
+                                        <div className="text-sm text-gray-500 mt-0.5">Очищаем ноду, бэкапы и базу</div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-2xl animate-bounce">
+                                        ✅
+                                      </div>
+                                      <div>
+                                        <div className="font-bold text-emerald-700 text-base">Готово!</div>
+                                        <div className="text-sm text-gray-500 mt-0.5">Сервер успешно удалён</div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                               <div className="min-w-0">
                                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -5027,10 +5131,13 @@ const ClientDashboard = () => {
                     </button>
                   </div>
 
-                  <div className="mt-4 flex gap-1 rounded-xl bg-white p-1 shadow-sm">
+                  <div className="mt-4 flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-sm">
                     {([
                       { id: 'overview', label: 'Общие', icon: ShieldCheck },
                       { id: 'files', label: 'Файлы', icon: HardDrive },
+                      { id: 'ssh', label: 'SSH/SFTP', icon: KeyRound },
+                      { id: 'database', label: 'База данных', icon: Database },
+                      { id: 'ai', label: 'AI-Ассистент', icon: Sparkles },
                       { id: 'logs', label: 'Логи', icon: TerminalIcon },
                       { id: 'backups', label: 'Бэкапы', icon: FileArchive },
                     ] as const).map((t) => {
@@ -5040,14 +5147,15 @@ const ClientDashboard = () => {
                         <button
                           key={t.id}
                           onClick={() => setWebSettingsTab(t.id)}
-                          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium transition flex-1 sm:flex-none ${
                             active
                               ? 'bg-indigo-600 text-white shadow'
                               : 'text-slate-600 hover:bg-slate-100'
                           }`}
                         >
                           <Icon className="h-4 w-4" />
-                          {t.label}
+                          <span className="hidden sm:inline">{t.label}</span>
+                          <span className="sm:hidden">{t.label.split(' ')[0]}</span>
                         </button>
                       );
                     })}
@@ -5419,6 +5527,439 @@ const ClientDashboard = () => {
                       </div>
                     </div>
                   )}
+
+                  {webSettingsTab === 'ssh' && (() => {
+                    const s = webSftpCreds;
+                    const ws = currentWebSite;
+                    const id = String(ws?.id || '');
+                    const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
+                    const sftpUrl = s && s.host && s.username ? `sftp://${encodeURIComponent(s.username)}@${s.host}:${s.port || 22}${s.rootPath || '/'}` : '';
+                    const sshHost = ws?.node?.ip || s?.host || '';
+                    return (
+                      <div className="grid gap-6 lg:grid-cols-2">
+                        <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                              <KeyRound className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-900">SFTP доступ (редактирование файлов)</h4>
+                              <p className="text-xs text-slate-500">FileZilla, WinSCP, VSCode Remote, ForkLift</p>
+                            </div>
+                          </div>
+                          {s && s.ok !== false ? (
+                            <div className="space-y-3">
+                              {[
+                                { k: 'Хост / IP', v: s?.host || sshHost, id: 'sftp-host', copyable: true },
+                                { k: 'Порт', v: String(s?.port || 22), id: 'sftp-port', copyable: true },
+                                { k: 'Пользователь', v: s?.username || '', id: 'sftp-user', copyable: true },
+                                { k: 'Пароль', v: s?.passwordOnce || s?.password || (s?.host ? '⚠️ Пароль показан только 1 раз. Сброс — напишите менеджеру.' : 'Загрузка...'), id: 'sftp-pass', copyable: !!s?.passwordOnce || !!s?.password, sensitive: true },
+                                { k: 'Путь (Root Folder)', v: s?.rootPath || '/public_html', id: 'sftp-path', copyable: true },
+                              ].map((row) => (
+                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
+                                    <div className={`font-mono text-sm truncate ${row.sensitive ? 'tracking-[0.05em] text-slate-800' : 'text-slate-900'}`}>
+                                      {row.v || '—'}
+                                    </div>
+                                  </div>
+                                  {row.copyable && row.v && row.v.startsWith('⚠️') !== true ? (
+                                    <button
+                                      onClick={() => copyToClipboard(row.v, row.k)}
+                                      className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
+                                      title={`Скопировать ${row.k}`}
+                                    >
+                                      {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                              {sftpUrl && (
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-600/90 text-white px-3.5 py-2.5 mt-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-indigo-100 font-bold">Ссылка для подключения (один клик)</div>
+                                    <a href={sftpUrl} className="block font-mono text-xs truncate text-white hover:text-yellow-100">{sftpUrl}</a>
+                                  </div>
+                                  <button
+                                    onClick={() => copyToClipboard(sftpUrl, 'SFTP URL')}
+                                    className="rounded-lg bg-white/20 p-1.5 text-white hover:bg-white/30 transition shrink-0"
+                                  >
+                                    {copiedValue === 'SFTP URL' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-4 py-6 text-slate-500">
+                              <Loader className="h-5 w-5 animate-spin text-indigo-500" />
+                              Загрузка SFTP-данных...
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-5">
+                          <div className="rounded-2xl border-2 border-sky-100 bg-gradient-to-br from-sky-50 to-cyan-50 p-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-sm">
+                                <Bot className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900">Прямой SSH-терминал</h4>
+                                <p className="text-xs text-slate-500">Командная строка, bash, npm, node, git</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2.5">
+                              {[
+                                { k: 'Хост SSH', v: sshHost, id: 'ssh-host', copyable: true },
+                                { k: 'Порт SSH', v: '22', id: 'ssh-port', copyable: true },
+                                { k: 'Пользователь', v: s?.username || '', id: 'ssh-user', copyable: true },
+                                { k: 'Пароль', v: s?.passwordOnce || s?.password || (sshHost ? '⚠️ пароль показан 1 раз (см. блок SFTP выше)' : ''), id: 'ssh-pass', copyable: !!s?.passwordOnce || !!s?.password, sensitive: true },
+                              ].map((row) => (
+                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
+                                    <div className={`font-mono text-sm truncate ${row.sensitive ? 'tracking-wider' : ''}`}>{row.v || '—'}</div>
+                                  </div>
+                                  {row.copyable && row.v && !row.v.startsWith('⚠️') ? (
+                                    <button onClick={() => copyToClipboard(row.v, row.k)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 shrink-0">
+                                      {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-3 rounded-xl bg-slate-950 text-amber-100 font-mono text-[12px] p-3 overflow-x-auto">
+                              <div className="text-slate-500 mb-1"># Быстрый вход (вставить в терминал):</div>
+                              ssh {s?.username || 'USER'}@{sshHost || 'HOST'} -p 22
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+                            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-500"/> Переменные окружения (env)</h4>
+                            <p className="text-xs text-slate-500 mb-3">Используйте `process.env.NAME` в Node.js / EJS.</p>
+                            <div className="space-y-2.5">
+                              {[
+                                { k: 'PORT', v: String(hostPort), id: 'env-port' },
+                                { k: 'NODE_ENV', v: 'production', id: 'env-env' },
+                                { k: 'SITE_ID', v: id, id: 'env-siteid' },
+                                { k: 'SITE_DOMAIN', v: ws?.domain || '', id: 'env-domain' },
+                                { k: 'PUBLIC_PATH', v: `/var/lib/wexa/sites/${id}/public`, id: 'env-public' },
+                                { k: 'SITE_ROOT', v: `/var/lib/wexa/sites/${id}`, id: 'env-root' },
+                              ].map((row) => (
+                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                                  <div className="font-mono text-xs font-semibold text-slate-600">{row.k}=</div>
+                                  <div className="flex items-center gap-2 flex-1 justify-end">
+                                    <div className="font-mono text-xs text-slate-900 truncate">{row.v || '""'}</div>
+                                    <button onClick={() => copyToClipboard(`${row.k}=${row.v || ''}`, row.k)} className="rounded p-1 text-slate-400 hover:text-indigo-600 shrink-0">
+                                      {copiedValue === row.k ? <Check className="h-3.5 w-3.5 text-emerald-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {webSettingsTab === 'database' && (() => {
+                    const ws = currentWebSite;
+                    const id = String(ws?.id || '');
+                    const sqlitePath = `/var/lib/wexa/sites/${id}/data/app.db`;
+                    const sqliteUrl = `file:${sqlitePath}`;
+                    return (
+                      <div className="grid gap-6 lg:grid-cols-2">
+                        <div className="rounded-2xl border-2 border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-5">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                              <Database className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-900">SQLite (встроенная · по умолчанию)</h4>
+                              <p className="text-xs text-slate-500">Без настроек · 0运维 · работает на любом тарифе</p>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            {[
+                              { k: 'Файл базы', v: sqlitePath, id: 'db-sqlite-path' },
+                              { k: 'URL (better-sqlite3)', v: sqliteUrl, id: 'db-sqlite-url' },
+                              { k: 'Журнал WAL', v: 'включён (по умолчанию)', id: 'db-wal' },
+                              { k: 'Бэкапы БД', v: 'вместе с ежедневными бэкапами сайта', id: 'db-backup' },
+                            ].map((row) => (
+                              <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
+                                  <div className="font-mono text-sm text-slate-900 truncate">{row.v}</div>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(row.v, row.k)}
+                                  className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 shrink-0"
+                                >
+                                  {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                </button>
+                              </div>
+                            ))}
+                            <div className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600/90 text-white px-3.5 py-2.5">
+                              <CheckCircle className="h-4 w-4 shrink-0"/>
+                              <div className="text-xs flex-1">Уже работает. Создайте /data/ папку в корне сайта (или она будет создана при первом запросе). Откат — через ежедневные бэкапы.</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-5">
+                          <div className="rounded-2xl border-2 border-violet-100 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-sm">
+                                <TerminalIcon className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900">Подключение (Node.js)</h4>
+                                <p className="text-xs text-slate-500">better-sqlite3 · sqlite3 · knex · prisma · drizzle</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2.5">
+                              <div className="rounded-xl bg-slate-950 text-emerald-200 font-mono text-[12px] p-3 overflow-x-auto leading-relaxed">
+{`// ✅ package.json → npm i better-sqlite3
+import Database from 'better-sqlite3';
+import path from 'node:path';
+
+const DB_PATH = process.env.DB_PATH
+  || path.join(process.cwd(), 'data', 'app.db');
+
+const db = new Database(DB_PATH, { readonly: false });
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+export default db;`}
+                              </div>
+                              <div className="rounded-xl bg-white border border-slate-200 p-3 space-y-2">
+                                <div className="text-xs font-semibold text-slate-700 mb-1.5">Переменные окружения для .env</div>
+                                {[
+                                  { k: 'DATABASE_URL', v: sqliteUrl },
+                                  { k: 'DB_PATH', v: sqlitePath },
+                                  { k: 'DB_ENGINE', v: 'sqlite' },
+                                ].map((row) => (
+                                  <div key={row.k} className="flex items-center justify-between gap-2">
+                                    <code className="text-[12px] font-mono text-slate-800 bg-slate-50 border border-slate-100 rounded px-2 py-1 flex-1 truncate">{row.k}={row.v}</code>
+                                    <button onClick={() => copyToClipboard(`${row.k}=${row.v}`, row.k)} className="rounded border border-slate-200 p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 shrink-0">
+                                      {copiedValue === row.k ? <Check className="h-3.5 w-3.5 text-emerald-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+                            <h4 className="font-bold text-slate-900 mb-2">🚀 Скоро: PostgreSQL / Redis</h4>
+                            <p className="text-sm text-slate-600 leading-relaxed mb-3">
+                              На тарифах Премиум+ будет доступен managed Postgres 16 (отдельный кластер с PITR) + Redis 7 для кеша/сессий.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => { showToast('info', 'ℹ️ Postgres/Redis beta — заявки в чат менеджеру, бесплатно 30 дней'); }}
+                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow hover:from-slate-800 hover:to-slate-600 transition"
+                            >
+                              <MessageSquare className="h-4 w-4"/> Написать менеджеру →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {webSettingsTab === 'ai' && (() => {
+                    const ws = currentWebSite;
+                    const id = String(ws?.id || '');
+                    const s = webSftpCreds;
+                    const planLabel = getWebPlanLabel(ws?.plan);
+                    const domain = ws?.domain || `${id.slice(0, 8)}.wexa.su`;
+                    const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
+                    const sqlitePath = `/var/lib/wexa/sites/${id}/data/app.db`;
+                    const tech = ws?.coreTemplate === 'nodejs'
+                      ? 'Node.js 20 LTS · Express · EJS (Server Side Render) · PM2 auto-restart'
+                      : 'Static HTML/CSS/JS (nginx) — не требует сборки';
+                    const markdownConfig = `# 🛠️ Wexa.su — AI Access to Project
+## 🎯 ЗАДАЧА: Отредактируй сайт — пиши код, загружай через SFTP
+
+---
+## 📦 SFTP / SSH доступ
+*   **Host / IP:** \`${s?.host || ws?.node?.ip || 'NO_HOST'}\`
+*   **SFTP Port:** \`${s?.port || 22}\`
+*   **SSH Port:** \`22\`
+*   **User:** \`${s?.username || ''}\`
+*   **Password:** \`${s?.passwordOnce || s?.password || 'Сбросить пароль — менеджер wexa.su'}\`
+*   **Корень сайта (загружать СЮДА):** \`${s?.rootPath || '/public_html'}\`
+*   **SFTP one-click URL:** \`sftp://${encodeURIComponent(s?.username || '')}@${s?.host || ws?.node?.ip || 'HOST'}:${s?.port || 22}${s?.rootPath || '/'}\`
+
+---
+## 🌐 Ресурсы сайта
+*   **Live URL:** [https://${domain}](https://${domain})
+*   **Тариф:** ${planLabel} · ${ws?.priceMonthly || '?'} ₽/мес
+*   **Технологии:** ${tech}
+*   **Статус:** ${ws?.status || 'active'}
+
+---
+## ⚙️ process.env (переменные)
+\`\`\`dotenv
+PORT=${hostPort}
+NODE_ENV=production
+SITE_ID=${id}
+SITE_DOMAIN=${domain}
+SITE_ROOT="/var/lib/wexa/sites/${id}"
+PUBLIC_PATH="/var/lib/wexa/sites/${id}/public"
+
+DATABASE_URL="file:/var/lib/wexa/sites/${id}/data/app.db"
+DB_PATH="${sqlitePath}"
+DB_ENGINE="sqlite"
+\`\`\`
+
+---
+## 💾 База данных SQLite
+*   **Файл:** \`${sqlitePath}\`
+*   **Журнал:** WAL mode ON
+*   **Бэкапы:** ежедневно 04:05 MSK, 7 дней
+
+---
+## 📁 Структура /public_html
+\`\`\`
+/
+├── server.js              # точка входа
+├── package.json
+├── public/                # статика nginx
+│   ├── css/  js/  img/
+├── views/                 # EJS шаблоны
+├── routes/                # Express routes
+├── data/
+│   └── app.db             # SQLite
+└── logs/
+    ├── pm2.log
+    └── nginx.access.log
+\`\`\`
+
+---
+## 🔧 Команды (SSH bash)
+\`\`\`bash
+# подключение
+ssh ${s?.username || 'USER'}@${s?.host || ws?.node?.ip || 'HOST'} -p 22
+
+# логи / рестарт
+pm2 logs
+pm2 restart all
+
+# деплой package.json
+cd /var/lib/wexa/sites/${id} && npm install --production --no-audit
+
+# бэкап ручной
+tar -czf /tmp/backup-$(date +%F).tar.gz /var/lib/wexa/sites/${id}
+\`\`\`
+
+---
+## ✅ ПРАВИЛА AI
+1.  ⚠️ **СНАЧАЛА — БЭКАП** сайта перед массовой правкой!
+2.  Загружай файлы через SFTP. Не трогай \`node_modules/\`, \`data/app.db\`, логи.
+3.  После npm install / крупных фич — **pm2 restart all**.
+4.  После правок SQLite — делай \`VACUUM;\` + бэкап.
+5.  **ВСЕГДА** проверяй https://${domain} на **200 OK** после деплоя!
+`;
+                    return (
+                      <div className="grid gap-6 lg:grid-cols-5">
+                        <div className="lg:col-span-3 rounded-2xl border-2 border-indigo-100 bg-white p-5">
+                          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                            <div>
+                              <h4 className="font-bold text-slate-900 flex items-center gap-2"><Sparkles className="h-5 w-5 text-indigo-500"/> 🤖 Конфиг для AI-агентов</h4>
+                              <p className="text-sm text-slate-500 mt-1">Вставьте это <b>целиком</b> в чат <b>Trae</b> / <b>Cursor</b> / <b>Codex</b> — AI сам подключится по SFTP, напишет код, проверит онлайн.</p>
+                            </div>
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <button
+                                onClick={() => copyToClipboard(markdownConfig, 'AI Config')}
+                                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] transition"
+                              >
+                                {copiedValue === 'AI Config' ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
+                                {copiedValue === 'AI Config' ? 'Скопировано!' : '📋 Копировать для AI'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const blob = new Blob([markdownConfig], { type: 'text/markdown' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url; a.download = `wexa-ai-project-${domain.split('.')[0]}.md`;
+                                  document.body.appendChild(a); a.click();
+                                  document.body.removeChild(a); URL.revokeObjectURL(url);
+                                  showToast('success', `✅ Скачан ${a.download}`);
+                                }}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                              >
+                                <Download className="h-3.5 w-3.5"/> .MD файл
+                              </button>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-950 text-slate-100 font-mono text-[11px] leading-relaxed p-3.5 max-h-[580px] overflow-y-auto">
+                            <pre className="whitespace-pre-wrap break-words">{markdownConfig}</pre>
+                          </div>
+                        </div>
+
+                        <div className="lg:col-span-2 space-y-5">
+                          <div className="rounded-2xl border-2 border-cyan-100 bg-gradient-to-br from-cyan-50 to-sky-50 p-5">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center shadow-sm">
+                                <Bot className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-sm">🚀 Быстрые ссылки AI-IDE</h4>
+                                <p className="text-[11px] text-slate-500">Открой IDE прямо с этим сайтом</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {[
+                                { label: '🪄 Cursor.sh', desc: 'вставьте скопированный конфиг в чат', href: 'https://cursor.sh' },
+                                { label: '💎 Trae IDE', desc: 'вставьте Markdown в «Agent Task»', href: 'https://trae.ai' },
+                                { label: '🧠 Codex.codes', desc: 'приложите скачанный .md-файл', href: 'https://codex.codes' },
+                                {
+                                  label: '📟 VS Code Remote SSH',
+                                  desc: 'подключение напрямую, редактируй и деплой',
+                                  href: s && s.host && s.username
+                                    ? `vscode://vscode-remote/ssh-remote+${s.username}@${s.host}:22/var/lib/wexa/sites/${id}`
+                                    : '#',
+                                },
+                              ].map((x, i) => (
+                                <a
+                                  key={i}
+                                  href={x.href}
+                                  target={x.href.startsWith('http') ? '_blank' : undefined}
+                                  rel="noreferrer"
+                                  className="block rounded-xl bg-white border border-slate-200 px-3.5 py-2.5 hover:bg-slate-50 hover:border-cyan-200 transition"
+                                >
+                                  <div className="text-sm font-bold text-slate-900">{x.label}</div>
+                                  <div className="text-[11px] text-slate-500">{x.desc}</div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border-2 border-amber-100 bg-gradient-to-br from-amber-50 to-yellow-50 p-5">
+                            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-amber-600"/> Что может AI?
+                            </h4>
+                            <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
+                              <li>Сверстать новый landing page / раздел сайта</li>
+                              <li>Поправить CSS / адаптив / баг на странице</li>
+                              <li>Сделать админку (Express + EJS + SQLite CRUD)</li>
+                              <li>Интегрировать Telegram-bot / оплаты СБП / Platega</li>
+                              <li>Написать SEO meta, OG:image, карточку товара</li>
+                              <li>Миграция Static → Node.js EJS dynamic</li>
+                              <li>Формы в Telegram / email без backend-кода</li>
+                            </ul>
+                            <div className="mt-3 rounded-lg bg-white/80 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                              💡 Pro tip: в конец скопированного Markdown добавь ТЗ текстом — например: <i>«сделай форму в footer, отправку в @my_bot, mobile-first, адаптив 390px»</i>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5 shrink-0">

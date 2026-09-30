@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 const ContactForm = () => {
@@ -32,7 +32,7 @@ const ContactForm = () => {
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+    <div className="w-full mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-100">
       <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Связаться с нами</h3>
       
       {status === 'success' ? (

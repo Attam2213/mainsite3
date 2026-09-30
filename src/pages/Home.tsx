@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -482,19 +482,19 @@ const Home = () => {
 
         {contactModalOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm py-6 px-4 overflow-y-auto"
             onClick={() => setContactModalOpen(false)}
           >
             <div
-              className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-2xl my-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
-                className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white text-gray-600 hover:text-gray-900 shadow-xl flex items-center justify-center z-10 border border-gray-200"
+                className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-white text-gray-600 hover:text-gray-900 shadow-2xl flex items-center justify-center z-10 border-2 border-gray-200"
                 onClick={() => setContactModalOpen(false)}
               >
-                <X size={20} />
+                <X size={22} />
               </button>
               <ContactForm />
             </div>
