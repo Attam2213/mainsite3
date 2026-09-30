@@ -1248,8 +1248,12 @@ const GameServerConfigurator = ({
 
   return (
     <>
-      <GamesHeroSection />
-      <LocationsHeroSection />
+      {!compact && (
+        <>
+          <GamesHeroSection />
+          <LocationsHeroSection />
+        </>
+      )}
       <ConfiguratorPanel />
     </>
   );
