@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -3060,16 +3060,9 @@ const ClientDashboard = () => {
                         <Globe size={32} />
                       </div>
                       <h3 className="mb-2 text-lg font-bold text-gray-900">Пока нет сайтов</h3>
-                      <p className="mb-5 mx-auto max-w-md text-sm text-gray-500 leading-relaxed">
+                      <p className="mb-1 mx-auto max-w-md text-sm text-gray-500 leading-relaxed">
                         Закажите хостинг сайта — статический Landing или Node.js Business/Premium с админ-панелью. Шаблон Ordlan Такси разворачивается автоматически.
                       </p>
-                      <a
-                        href="/#pricing"
-                        className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Перейти к конфигуратору
-                      </a>
                     </div>
                   ) : (
                     <div className="grid gap-5 md:grid-cols-2">
