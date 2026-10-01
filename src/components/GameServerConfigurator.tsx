@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -1171,7 +1171,7 @@ const GameServerConfigurator = ({
   );
 
   const ConfiguratorPanel = () => (
-    <section id="pricing" className={`${compact ? '' : 'py-24'} ${compact ? 'bg-white' : 'bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 relative'}`}>
+    <section id="pricing" className={`${compact ? 'py-2 sm:py-4' : 'py-24'} ${compact ? 'bg-white' : 'bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 relative'}`}>
       {!compact && (
         <>
           <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/40 rounded-full filter blur-3xl opacity-8" />
@@ -1346,10 +1346,11 @@ const GameServerConfigurator = ({
           </div>
           </>)}
 
-          {/* configurator container centered, NO shadow NO border! */}
-          <div className={`relative z-20 ${compact ? 'w-full' : 'max-w-[68rem] mx-auto'}`}>
-          <div className={`grid lg:grid-cols-12 overflow-hidden bg-white ${compact ? 'rounded-none' : 'rounded-2xl'}`}>
-            <div className={`lg:col-span-8 space-y-7 relative ${compact ? 'p-1 sm:p-2' : 'p-6 md:p-8'}`}>
+          {/* configurator container: ALWAYS CENTERED + MAX WIDTH (no stretch to full viewport!) */}
+          <div className={`relative z-20 mx-auto ${compact ? 'w-full max-w-[76rem] px-2 sm:px-4' : 'max-w-[68rem]'}`}>
+          {/* always white rounded card (no conditional remove rounded/padding that caused breakage) */}
+          <div className={`grid lg:grid-cols-12 overflow-hidden bg-white shadow-lg border border-slate-100 ${compact ? 'rounded-2xl' : 'rounded-2xl'}`}>
+            <div className={`lg:col-span-8 space-y-7 relative p-6 md:p-8`}>
               {configuratorMode === 'both' && (
                 <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100/70">
                   <button

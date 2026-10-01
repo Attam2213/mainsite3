@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -3468,15 +3468,15 @@ const ClientDashboard = () => {
               </div>
               <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
               
-              <div className="inline-block transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-[96vw] sm:max-w-[92rem] sm:align-middle">
+              <div className="inline-block transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-2xl transition-all sm:my-4 sm:w-full sm:max-w-[80rem] sm:align-middle">
                 <div className="bg-white">
-                  <div className="flex justify-between items-center px-4 pt-4 sm:px-6 sm:pt-4">
-                    <h3 className="text-lg font-bold text-gray-900">Заказать сервис</h3>
-                    <button onClick={() => setIsCreateServerModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                  <div className="flex justify-between items-center px-5 py-3 sm:px-6 sm:py-4 border-b border-slate-100">
+                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Заказать сервис</h3>
+                    <button onClick={() => setIsCreateServerModalOpen(false)} className="text-gray-500 hover:text-gray-800 hover:bg-slate-100 rounded-lg p-2 transition-all">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="pb-1 sm:pb-2">
+                  <div className="px-3 py-4 sm:px-5 sm:py-5">
                   <GameServerConfigurator
                     key={configuratorMode + '-' + initialConfiguratorTab + '-' + String(isCreateServerModalOpen)}
                     compact={true}
