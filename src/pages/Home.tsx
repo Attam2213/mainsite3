@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -10,10 +10,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import {
-  ArrowRight, Gamepad2, Zap, ChevronDown, X,
+  ArrowRight, Zap, ChevronDown, X, Code2,
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
-  Headphones, MapPin, Mail, Star, Server, Database, Code2, Layers,
+  Headphones, MapPin, Mail, Star, Server, Database, Layers,
 } from 'lucide-react';
 
 const Home = () => {
@@ -321,7 +321,7 @@ const Home = () => {
             <div className="hidden 2xl:block absolute left-[max(1rem,calc((100%-88rem)/2))] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
               <div className="flex flex-col items-center gap-5">
                 <div className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-center shadow-sm">
-                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center mb-1.5"><Gamepad2 size={20} /></div>
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center mb-1.5"><Code2 size={20} /></div>
                   <div className="text-[11px] font-bold text-indigo-700">GAME NODES</div>
                   <div className="text-[9px] text-indigo-500 font-semibold uppercase tracking-wider">6 locations</div>
                 </div>
@@ -359,7 +359,7 @@ const Home = () => {
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                      <Gamepad2 size={30} />
+                      <Code2 size={30} />
                     </div>
                     <div>
                       <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-bold mb-1">Популярно</div>

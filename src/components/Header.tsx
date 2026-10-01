@@ -1,6 +1,6 @@
-﻿﻿﻿﻿﻿﻿import { useState } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Gamepad2, Server, MapPin, LogIn, User, LogOut } from 'lucide-react';
+import { Menu, X, Gamepad2, Server, MapPin, LogIn, User, LogOut, Code2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 
@@ -33,7 +33,7 @@ const Header = () => {
              
               className="p-2 bg-indigo-600 rounded-lg text-white"
             >
-              <Gamepad2 size={24} />
+              <Code2 size={24} />
             </div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               Wexa.su
