@@ -1186,7 +1186,7 @@ const GameServerConfigurator = ({
                     }`}
                   >
                     <Globe size={18} />
-                    Сайты под заказ
+                    Сайты
                   </button>
                 </div>
               )}

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -97,7 +97,7 @@ const Home = () => {
     <Layout>
       <SEO
         title="Аренда игровых серверов Minecraft, CS2, CS 1.6 + Сайты — Wexa.su"
-        description="Хостинг игровых серверов Wexa.su. Minecraft, CS2, CS 1.6. Быстрые NVMe ноды, защита от DDoS, SFTP, панель управления. Мгновенный запуск за 60 секунд. Сайты под заказ — Landing, Node.js."
+        description="Хостинг игровых серверов Wexa.su. Minecraft, CS2, CS 1.6. Быстрые NVMe ноды, защита от DDoS, SFTP, панель управления. Мгновенный запуск за 60 секунд. Сайты — Landing, Node.js."
       />
       <div className="bg-white overflow-hidden font-sans">
 
@@ -127,7 +127,7 @@ const Home = () => {
               </h1>
 
               <p className="mt-6 text-xl md:text-2xl text-gray-300 leading-relaxed max-w-3xl mx-auto font-light">
-                Аренда серверов Minecraft, CS2 и&nbsp;CS&nbsp;1.6&nbsp;— NVMe SSD, защита от&nbsp;DDoS 1&nbsp;Тбит/с, SFTP-доступ и&nbsp;удобная панель управления. <span className="text-white font-semibold">Сайты под заказ</span>: статический Landing или Node.js Business/Premium.
+                Аренда серверов Minecraft, CS2 и&nbsp;CS&nbsp;1.6&nbsp;— NVMe SSD, защита от&nbsp;DDoS 1&nbsp;Тбит/с, SFTP-доступ и&nbsp;удобная панель управления. <span className="text-white font-semibold">Сайты</span>: статический Landing или Node.js Business/Premium.
               </p>
 
               <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
@@ -239,7 +239,7 @@ const Home = () => {
                     </div>
                     <div>
                       <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold mb-1">NEW 🔥</div>
-                      <h3 className="text-2xl md:text-3xl font-black text-gray-900">Сайты под заказ</h3>
+                      <h3 className="text-2xl md:text-3xl font-black text-gray-900">Сайты</h3>
                     </div>
                   </div>
                   <p className="text-gray-600 text-lg mb-8 leading-relaxed">
