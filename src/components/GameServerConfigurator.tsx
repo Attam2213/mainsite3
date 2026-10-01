@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -510,7 +510,7 @@ const GameServerConfigurator = ({
               onClick={(e) => { e.preventDefault(); setSelectedGameStable(g.id); }}
               className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50 shadow-inner'
+                  ? 'border-indigo-500 bg-indigo-50'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -565,7 +565,7 @@ const GameServerConfigurator = ({
               onClick={(e) => { e.preventDefault(); setPeriodMonthsStable(p); }}
               className={`flex items-center justify-center py-4 px-4 rounded-2xl border-2 font-bold transition-all ${
                 active
-                  ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-700 shadow-inner ring-4 ring-indigo-100 scale-[1.02]'
+                  ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-700 ring-4 ring-indigo-100 scale-[1.02]'
                   : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
               }`}
             >
@@ -784,18 +784,18 @@ const GameServerConfigurator = ({
               key={p.id}
               type="button"
               onClick={(e) => { e.preventDefault(); setSelectedWebsitePlanStable(p.id); }}
-              className={`text-left p-6 md:p-7 rounded-3xl border-2 transition-all relative bg-white hover:shadow-xl ${
-                popular ? '-translate-y-2 shadow-2xl' : ''
+              className={`text-left p-6 md:p-7 rounded-3xl border-2 transition-all relative bg-white ${
+                popular ? '-translate-y-2' : ''
               } ${
-                active ? `${accent.border} ring-4 ${accent.bg}/60 shadow-inner scale-[1.015]` : 'border-gray-200 hover:border-gray-300 hover:-translate-y-0.5'
+                active ? `${accent.border} ring-4 ${accent.bg}/60 scale-[1.015]` : 'border-gray-200 hover:border-gray-300 hover:-translate-y-0.5'
               }`}
             >
               {popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black tracking-wider uppercase shadow-lg">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black tracking-wider uppercase">
                   ⭐ Популярный
                 </div>
               )}
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${accent.grad} text-white flex items-center justify-center mb-5 shadow-xl`}>
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${accent.grad} text-white flex items-center justify-center mb-5`}>
                 <Icon size={26} />
               </div>
               <div className="flex items-baseline justify-between mb-2.5">
@@ -816,7 +816,7 @@ const GameServerConfigurator = ({
                 ))}
               </ul>
               {active && (
-                <div className={`absolute top-4 right-4 w-8 h-8 rounded-full ${accent.border.replace('border-', 'bg-')} text-white flex items-center justify-center shadow-lg ring-4 ring-white`}>
+                <div className={`absolute top-4 right-4 w-8 h-8 rounded-full ${accent.border.replace('border-', 'bg-')} text-white flex items-center justify-center ring-4 ring-white`}>
                   <CheckCircle size={18} />
                 </div>
               )}
@@ -837,14 +837,14 @@ const GameServerConfigurator = ({
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); setWebsiteDomainModeStable('subdomain'); }}
-          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'subdomain' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'subdomain' ? 'bg-white text-indigo-700 ring-2 ring-indigo-200' : 'text-slate-500 hover:text-slate-700'}`}
         >
           🎁 Бесплатный поддомен
         </button>
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); setWebsiteDomainModeStable('custom'); }}
-          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'custom' ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${websiteDomainMode === 'custom' ? 'bg-white text-indigo-700 ring-2 ring-indigo-200' : 'text-slate-500 hover:text-slate-700'}`}
         >
           🌐 Свой домен
         </button>
@@ -884,7 +884,7 @@ const GameServerConfigurator = ({
               type="button"
               onClick={(e) => { e.preventDefault(); checkSubdomainNow(); }}
               disabled={subdomainCheck.status === 'loading'}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 disabled:opacity-70 disabled:cursor-wait text-white px-4 py-2 text-sm font-bold shadow-sm transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 disabled:opacity-70 disabled:cursor-wait text-white px-4 py-2 text-sm font-bold transition-all"
             >
               {subdomainCheck.status === 'loading' ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
               {subdomainCheck.status === 'loading' ? 'Проверяем…' : '🔍 Проверить доступность'}
@@ -1105,18 +1105,18 @@ const GameServerConfigurator = ({
                
                
                
-                className={`group text-left p-8 rounded-3xl transition-all border-2 relative bg-white shadow-lg hover:shadow-2xl ${
+                className={`group text-left p-8 rounded-3xl transition-all border-2 relative bg-white ${
                   selected ? 'border-indigo-500 ring-4 ring-indigo-100' : 'border-transparent hover:border-gray-200'
                 }`}
               >
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${g.color} text-white flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${g.color} text-white flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                   <Icon size={30} />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">{g.name}</h3>
                 <p className="text-gray-500 mb-4 leading-relaxed">{g.description}</p>
                 <div className={`text-sm font-bold ${g.textColor}`}>от {g.slotPrice} ₽ / слот</div>
                 {selected && (
-                  <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg">
+                  <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
                     <CheckCircle size={20} />
                   </div>
                 )}
@@ -1152,8 +1152,8 @@ const GameServerConfigurator = ({
                
                 className={`p-6 rounded-2xl text-center transition-all border-2 ${
                   selected
-                    ? 'border-indigo-500 bg-indigo-50 shadow-lg'
-                    : 'border-gray-100 bg-gray-50 hover:bg-white hover:shadow-lg hover:border-gray-200'
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-200'
                 }`}
               >
                 <div className="text-4xl mb-3">{loc.flag}</div>
@@ -1172,8 +1172,8 @@ const GameServerConfigurator = ({
 
   const ConfiguratorPanel = () => (
     <section id="pricing" className="py-24 bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 relative">
-      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/50 rounded-full mix-blend-multiply filter blur-3xl opacity-15" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/50 rounded-full mix-blend-multiply filter blur-3xl opacity-15" />
+      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/40 rounded-full filter blur-3xl opacity-8" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/40 rounded-full filter blur-3xl opacity-8" />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {!compact && (
           <div className="text-center max-w-3xl mx-auto mb-16">
@@ -1184,13 +1184,13 @@ const GameServerConfigurator = ({
         )}
         <div className={`relative ${compact ? '' : 'py-10 md:py-14'}`}>
           <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute -top-16 -left-24 w-[24rem] h-[24rem] bg-indigo-200/15 rounded-full blur-3xl" />
-            <div className="absolute top-1/3 -right-20 w-[22rem] h-[22rem] bg-violet-200/12 rounded-full blur-3xl" />
-            <div className="absolute -bottom-20 left-1/3 w-[20rem] h-[20rem] bg-pink-100/12 rounded-full blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(250,204,21,0.04),transparent_40%),radial-gradient(circle_at_90%_90%,rgba(16,185,129,0.05),transparent_45%)]" />
+            <div className="absolute -top-12 -left-20 w-[20rem] h-[20rem] bg-indigo-200/8 rounded-full blur-3xl" />
+            <div className="absolute top-1/3 -right-16 w-[18rem] h-[18rem] bg-violet-200/6 rounded-full blur-3xl" />
+            <div className="absolute -bottom-16 left-1/3 w-[16rem] h-[16rem] bg-pink-100/6 rounded-full blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(250,204,21,0.02),transparent_45%),radial-gradient(circle_at_90%_90%,rgba(16,185,129,0.03),transparent_50%)]" />
           </div>
 
-          <div className="hidden xl:block absolute left-0 top-32 z-10 pointer-events-none" style={{transform: 'translate(calc(-100% - 1.25rem), 0)'}}>
+          <div className="hidden xl:block absolute left-0 top-32 z-10 pointer-events-none" style={{transform: 'translate(calc(-100% - 0.5rem), 0)'}}>
             <div className="w-64">
               <div style={{display: actualTab === 'game' ? undefined : 'none'}} className="flex flex-col gap-4">
                 <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-100/60 p-5 rotate-[-6deg] animate-[floatLeft_7s_ease-in-out_infinite]">
@@ -1264,7 +1264,7 @@ const GameServerConfigurator = ({
             </div>
           </div>
 
-          <div className="hidden xl:block absolute right-0 top-36 z-10 pointer-events-none" style={{transform: 'translate(calc(100% + 1.25rem), 0)'}}>
+          <div className="hidden xl:block absolute right-0 top-36 z-10 pointer-events-none" style={{transform: 'translate(calc(100% + 0.5rem), 0)'}}>
             <div className="w-64">
               <div style={{display: actualTab === 'game' ? undefined : 'none'}} className="flex flex-col gap-4">
                 <div className="w-full rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-100/60 p-5 rotate-[6deg] animate-[floatRight_8s_ease-in-out_infinite]">
@@ -1349,7 +1349,7 @@ const GameServerConfigurator = ({
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
                     className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
                       actualTab === 'game'
-                        ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                        ? 'bg-white text-indigo-700 border border-indigo-100 ring-2 ring-indigo-200'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
@@ -1361,7 +1361,7 @@ const GameServerConfigurator = ({
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
                     className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
                       actualTab === 'website'
-                        ? 'bg-white shadow text-indigo-700 border border-indigo-100'
+                        ? 'bg-white text-indigo-700 border border-indigo-100 ring-2 ring-indigo-200'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
