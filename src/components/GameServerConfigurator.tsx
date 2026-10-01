@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -508,10 +508,10 @@ const GameServerConfigurator = ({
               key={g.id}
               type="button"
               onClick={(e) => { e.preventDefault(); setSelectedGameStable(g.id); }}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'border-indigo-400/90 bg-indigo-50'
+                  : 'border-slate-100/80 hover:border-slate-200/80 hover:bg-gray-50'
               }`}
             >
               <Icon size={24} className={active ? game.textColor : 'text-gray-500'} />
@@ -534,10 +534,10 @@ const GameServerConfigurator = ({
               key={loc.id}
               type="button"
               onClick={(e) => { e.preventDefault(); setSelectedLocationStable(loc.id); }}
-              className={`p-3 rounded-xl border-2 text-center transition-all text-sm font-bold ${
+              className={`p-3 rounded-xl border text-center transition-all text-sm font-bold ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                  : 'border-gray-200 hover:border-gray-300 text-gray-600 hover:bg-gray-50'
+                  ? 'border-indigo-400/90 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-100/80 hover:border-slate-200/80 text-gray-600 hover:bg-gray-50'
               }`}
             >
               <div className="text-lg">{loc.flag}</div>
@@ -563,10 +563,10 @@ const GameServerConfigurator = ({
               key={p}
               type="button"
               onClick={(e) => { e.preventDefault(); setPeriodMonthsStable(p); }}
-              className={`flex items-center justify-center py-4 px-4 rounded-2xl border-2 font-bold transition-all ${
+              className={`flex items-center justify-center py-4 px-4 rounded-2xl border font-bold transition-all ${
                 active
-                  ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-700 ring-4 ring-indigo-100 scale-[1.02]'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+                  ? 'border-indigo-400/90 bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-700 ring-2 ring-indigo-100/80 scale-[1.02]'
+                  : 'border-slate-100/80 text-gray-700 hover:border-slate-200/80 hover:bg-gray-50 hover:-translate-y-0.5'
               }`}
             >
               <span className="text-base">{periodLabel(p)}</span>
@@ -587,7 +587,7 @@ const GameServerConfigurator = ({
         onChange={e => setName(e.target.value)}
         maxLength={60}
         placeholder={`${game.name} #1`}
-        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
+        className="w-full px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-gray-900 font-medium"
       />
     </div>
   );
@@ -637,7 +637,7 @@ const GameServerConfigurator = ({
                 if (v === '__custom__') return;
                 setMcVersionStable(v);
               }}
-              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+              className="flex-1 px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-sm font-medium bg-white"
             >
               {POPULAR_MINECRAFT_VERSIONS.map(v => (
                 <option key={v} value={v}>{v}</option>
@@ -649,7 +649,7 @@ const GameServerConfigurator = ({
               value={mcVersion}
               onChange={e => setMcVersionStable(e.target.value)}
               placeholder="например 1.20.1"
-              className="w-40 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium font-mono text-indigo-900"
+              className="w-40 px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-sm font-medium font-mono text-indigo-900"
             />
           </div>
           <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
@@ -664,7 +664,7 @@ const GameServerConfigurator = ({
           <select
             value={mcCore}
             onChange={e => setMcCoreStable(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+            className="w-full px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-sm font-medium bg-white"
           >
             {MINECRAFT_CORE_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -691,7 +691,7 @@ const GameServerConfigurator = ({
                 value={mcCustomJarUrl}
                 onChange={e => setMcCustomJarUrl(e.target.value)}
                 placeholder="https://example.com/modpacks/mycore-1.20.4.jar"
-                className="w-full px-3 py-2.5 rounded-lg border-2 border-indigo-200 focus:border-indigo-500 focus:ring-0 outline-none text-xs font-mono bg-white"
+                className="w-full px-3 py-2.5 rounded-lg border border-indigo-200 focus:border-indigo-400/90 focus:ring-0 outline-none text-xs font-mono bg-white"
               />
             </div>
             <div>
@@ -701,7 +701,7 @@ const GameServerConfigurator = ({
                 value={mcCustomJarName}
                 onChange={e => setMcCustomJarName(e.target.value)}
                 placeholder="my-awesome-server.jar"
-                className="w-full px-3 py-2.5 rounded-lg border-2 border-indigo-200 focus:border-indigo-500 focus:ring-0 outline-none text-xs font-mono bg-white"
+                className="w-full px-3 py-2.5 rounded-lg border border-indigo-200 focus:border-indigo-400/90 focus:ring-0 outline-none text-xs font-mono bg-white"
               />
               <p className="mt-1 text-[10px] text-indigo-600/80 leading-relaxed">
                 Загрузите свой .jar по SFTP в папку сервера (/data), укажите точное имя файла, сервер запустит его.
@@ -729,7 +729,7 @@ const GameServerConfigurator = ({
           <select
             value={cs16Build}
             onChange={e => setCs16BuildStable(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-0 outline-none text-sm font-medium bg-white"
+            className="w-full px-4 py-3 rounded-xl border border-slate-100/80 focus:border-amber-500 focus:ring-0 outline-none text-sm font-medium bg-white"
           >
             {CS16_BUILD_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -776,7 +776,7 @@ const GameServerConfigurator = ({
           const accent = p.id === 'landing'
             ? { border: 'border-sky-500', bg: 'bg-sky-50', text: 'text-sky-700', grad: 'from-sky-500 to-cyan-500' }
             : p.id === 'business'
-            ? { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700', grad: 'from-indigo-500 to-purple-500' }
+            ? { border: 'border-indigo-400/90', bg: 'bg-indigo-50', text: 'text-indigo-700', grad: 'from-indigo-500 to-purple-500' }
             : { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', grad: 'from-amber-500 to-orange-500' };
           const Icon = p.id === 'landing' ? FileText : p.id === 'business' ? Rocket : Award;
           return (
@@ -784,10 +784,10 @@ const GameServerConfigurator = ({
               key={p.id}
               type="button"
               onClick={(e) => { e.preventDefault(); setSelectedWebsitePlanStable(p.id); }}
-              className={`text-left p-6 md:p-7 rounded-3xl border-2 transition-all relative bg-white ${
+              className={`text-left p-6 md:p-7 rounded-3xl border transition-all relative bg-white ${
                 popular ? '-translate-y-2' : ''
               } ${
-                active ? `${accent.border} ring-4 ${accent.bg}/60 scale-[1.015]` : 'border-gray-200 hover:border-gray-300 hover:-translate-y-0.5'
+                active ? `${accent.border} ring-4 ${accent.bg}/60 scale-[1.015]` : 'border-slate-100/80 hover:border-slate-200/80 hover:-translate-y-0.5'
               }`}
             >
               {popular && (
@@ -852,7 +852,7 @@ const GameServerConfigurator = ({
 
       {websiteDomainMode === 'subdomain' && (
         <>
-          <div className="flex items-stretch gap-2 rounded-2xl border-2 border-slate-200 focus-within:border-indigo-500 bg-white overflow-hidden">
+          <div className="flex items-stretch gap-2 rounded-2xl border border-slate-200 focus-within:border-indigo-400/90 bg-white overflow-hidden">
             <input
               ref={websiteSubdomainRef}
               type="text"
@@ -914,7 +914,7 @@ const GameServerConfigurator = ({
             value={websiteDomain}
             onChange={e => setWebsiteDomain(e.target.value)}
             placeholder="например: mycompany.ru или ilves.com"
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none text-gray-900 font-medium"
+            className="w-full px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-gray-900 font-medium"
           />
           <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
             Купите домен у любого регистратора (reg.ru / webnames.ru / nic.ru). Затем в DNS добавьте A-запись <code className="rounded bg-slate-100 px-1.5 py-0.5">@ → 82.146.47.246</code> и подождите 5–60 минут. Привязать домен можно позже в ЛК.
@@ -1105,8 +1105,8 @@ const GameServerConfigurator = ({
                
                
                
-                className={`group text-left p-8 rounded-3xl transition-all border-2 relative bg-white ${
-                  selected ? 'border-indigo-500 ring-4 ring-indigo-100' : 'border-transparent hover:border-gray-200'
+                className={`group text-left p-8 rounded-3xl transition-all border relative bg-white ${
+                  selected ? 'border-indigo-400/90 ring-2 ring-indigo-100/80' : 'border-transparent hover:border-slate-100/80'
                 }`}
               >
                 <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${g.color} text-white flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -1150,10 +1150,10 @@ const GameServerConfigurator = ({
                
                
                
-                className={`p-6 rounded-2xl text-center transition-all border-2 ${
+                className={`p-6 rounded-2xl text-center transition-all border ${
                   selected
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-100 bg-gray-50 hover:bg-white hover:border-gray-200'
+                    ? 'border-indigo-400/90 bg-indigo-50'
+                    : 'border-gray-100 bg-gray-50 hover:bg-white hover:border-slate-100/80'
                 }`}
               >
                 <div className="text-4xl mb-3">{loc.flag}</div>
@@ -1343,13 +1343,13 @@ const GameServerConfigurator = ({
           <div className="grid lg:grid-cols-12 rounded-2xl overflow-hidden bg-white">
             <div className="lg:col-span-8 p-6 md:p-8 space-y-7 relative">
               {configuratorMode === 'both' && (
-                <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
+                <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100/70">
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-lg font-bold transition-all ${
                       actualTab === 'game'
-                        ? 'bg-white text-indigo-700 border border-indigo-100 ring-2 ring-indigo-200'
+                        ? 'bg-white text-indigo-700 border border-slate-100'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
@@ -1359,9 +1359,9 @@ const GameServerConfigurator = ({
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-lg font-bold transition-all ${
                       actualTab === 'website'
-                        ? 'bg-white text-indigo-700 border border-indigo-100 ring-2 ring-indigo-200'
+                        ? 'bg-white text-indigo-700 border border-slate-100'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
