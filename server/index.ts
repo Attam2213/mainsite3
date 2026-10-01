@@ -350,7 +350,7 @@ const startServer = async () => {
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "domainType" VARCHAR(16) DEFAULT 'custom';`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "subdomainName" VARCHAR(64) UNIQUE;`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sftpPassword" VARCHAR(128);`); } catch (_) {}
-        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sshUsername" VARCHAR(128) UNIQUE;`); } catch (_) {}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sshUsername" VARCHAR(128);`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sshPassword" VARCHAR(128);`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sshPasswordHash" VARCHAR(256);`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sshPort" INTEGER DEFAULT 22;`); } catch (_) {}

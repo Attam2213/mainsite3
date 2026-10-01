@@ -73,7 +73,7 @@ WebSite.init(
     sftpPassword: { type: DataTypes.STRING, allowNull: true },
     sftpPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 22 },
     sftpChroot: { type: DataTypes.STRING, allowNull: true },
-    sshUsername: { type: DataTypes.STRING, allowNull: true, unique: true },
+    sshUsername: { type: DataTypes.STRING, allowNull: true },
     sshPassword: { type: DataTypes.STRING(128), allowNull: true },
     sshPasswordHash: { type: DataTypes.STRING, allowNull: true },
     sshPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 22 },
