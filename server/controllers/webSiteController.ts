@@ -312,9 +312,9 @@ const control = async (req: any, res: Response, action: 'start' | 'stop' | 'rest
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 };
 
-router.post('/:id/start', async (req: any, res: Response) => control(req, res, 'start'));
-router.post('/:id/stop', async (req: any, res: Response) => control(req, res, 'stop'));
-router.post('/:id/restart', async (req: any, res: Response) => control(req, res, 'restart'));
+router.post('/:id/start', authenticateToken, async (req: any, res: Response) => control(req, res, 'start'));
+router.post('/:id/stop', authenticateToken, async (req: any, res: Response) => control(req, res, 'stop'));
+router.post('/:id/restart', authenticateToken, async (req: any, res: Response) => control(req, res, 'restart'));
 
 router.patch('/:id/settings', async (req: any, res: Response) => {
   const site = req.site as any;
@@ -410,7 +410,17 @@ router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response)
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
   const node = site.node;
-  const password = site.sftpPassword || site.sftpPasswordPlainOnce || null;
+  let password = site.sftpPassword || site.sftpPasswordPlainOnce || null;
+  if (!password && site.sftpUsername && node && node.ip && node.ip !== '127.0.0.1') {
+    try {
+      password = genRandomPassword(18);
+      const cfg = getSshConfigForNode(node);
+      const hash = bcrypt.hashSync(password, SALT_ROUNDS);
+      const shadow = await execCommand(cfg, `openssl passwd -1 '${password.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      try { await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' '${site.sftpUsername}'`); } catch (_) {}
+      try { await site.update({ sftpPassword: password, sftpPasswordHash: hash, sftpPasswordPlainOnce: password }); } catch (_) {}
+    } catch (e) { console.warn('[sftp-creds] auto-reset failed:', e); password = null; }
+  }
   if (password && !site.sftpPassword) {
     try { await site.update({ sftpPassword: password }); } catch (_) {}
   }
@@ -419,11 +429,36 @@ router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response)
     host: node?.ip || '',
     port: site.sftpPort || 22,
     username: site.sftpUsername || '',
+    user: site.sftpUsername || '',
     password,
     passwordOnce: password,
     rootPath: '/public_html',
     note: 'SFTP / SSH доступ. Загружать/редактировать файлы сайта можно в /public_html.',
   });
+});
+
+router.post('/:id/sftp-password-reset', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const site = req.site as any;
+    const node = site.node;
+    if (!node || node.ip === '127.0.0.1') return res.status(400).json({ ok:false, message:'Сайт на локальной ноде — сброс не нужен' });
+    const shortId = String(site.id || '').slice(0, 8);
+    const sftpUser = site.sftpUsername || `wexa_site_${shortId}`;
+    const password = genRandomPassword(18);
+    const cfg = getSshConfigForNode(node);
+    const hash = bcrypt.hashSync(password, SALT_ROUNDS);
+    const shadow = await execCommand(cfg, `openssl passwd -1 '${password.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+    await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
+    await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
+    const siteDir = `/var/lib/wexa/sites/${site.id}`;
+    const sftpChroot = site.sftpChroot || `/srv/sftp/${sftpUser}`;
+    await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}" 2>/dev/null || true`);
+    await site.update({ sftpUsername: sftpUser, sftpPassword: password, sftpPasswordHash: hash, sftpPasswordPlainOnce: password, sftpChroot });
+    return res.json({ ok:true, message:'SFTP пароль сброшен', username: sftpUser, password });
+  } catch (e: any) {
+    console.error('[sftp-reset] error:', e);
+    return res.status(500).json({ ok:false, message: String(e?.message ?? e) });
+  }
 });
 
 // ================= Files API (multer) =================

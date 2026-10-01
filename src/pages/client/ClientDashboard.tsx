@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -1387,6 +1387,42 @@ const ClientDashboard = () => {
       if (res.ok) { alert('Бэкап создан'); loadWebSiteBackups(siteId); }
       else { const e = await res.json().catch(() => ({})); alert(e.message || 'Ошибка создания бэкапа'); }
     } catch (e) { alert('Ошибка соединения'); console.error(e); }
+  };
+
+  const restartWebSite = async (siteId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/restart`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.skipped) showToast('info', 'ℹ️ Статический сайт — перезапуск не требуется');
+        else showToast('success', '✅ Сайт перезапущен (PM2 reload + nginx apply)');
+      } else {
+        const e = await res.json().catch(() => ({}));
+        showToast('error', `❌ ${e.message || 'Ошибка перезапуска'}`);
+      }
+    } catch (e) { console.error(e); showToast('error', '❌ Ошибка соединения'); }
+  };
+
+  const resetSftpPasswordWebSite = async (siteId: string) => {
+    try {
+      if (!confirm('Сгенерировать новый SFTP/SSH пароль?\n\nСтарый пароль перестанет работать.')) return;
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/sftp-password-reset`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast('success', '✅ Новый SFTP пароль сгенерирован!');
+        setWebSftpCreds((prev: any) => ({ ...(prev || {}), username: data.username || '', user: data.username || '', password: data.password || '', passwordOnce: data.password || '' }));
+        loadWebSftpCreds(siteId);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        showToast('error', `❌ ${e.message || 'Ошибка сброса пароля'}`);
+      }
+    } catch (e) { console.error(e); showToast('error', '❌ Ошибка соединения'); }
   };
 
   const attachWebDomain = async (siteId: string, domain: string) => {
@@ -5219,68 +5255,133 @@ const ClientDashboard = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <h4 className="mb-2 text-sm font-semibold text-slate-900">Доступ SFTP</h4>
-                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-indigo-50/40 p-4 flex flex-col gap-3">
-                          <div className="flex items-start gap-2 rounded-lg bg-white p-3 border border-slate-200">
-                            <KeyRound className="mt-0.5 h-4 w-4 text-indigo-600" />
-                            <p className="text-xs text-slate-600">
-                              Подключитесь через <b>WinSCP</b> / FileZilla / Cyberduck по протоколу SFTP.
-                              Вы попадёте в изолированную папку <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">/public_html</code>.
-                            </p>
+                      <div className="flex flex-col gap-5">
+                        <div>
+                          <h4 className="mb-2 text-sm font-semibold text-slate-900">Состояние сайта</h4>
+                          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 p-4 flex flex-col gap-3">
+                            {(() => {
+                              const paidUntil = currentWebSite.paidUntil ? new Date(currentWebSite.paidUntil + 'T00:00:00').getTime() : 0;
+                              const daysLeftRaw = paidUntil ? Math.ceil((paidUntil - Date.now()) / (24*60*60*1000)) : null;
+                              const sslExp = (currentWebSite as any).sslExpiresAt ? new Date(String((currentWebSite as any).sslExpiresAt)).getTime() : 0;
+                              const sslDaysLeft = sslExp ? Math.ceil((sslExp - Date.now())/(24*60*60*1000)) : null;
+                              const status = String(currentWebSite.status || 'pending').toLowerCase();
+                              const statusLabel: Record<string,string> = { active:'Работает ✅', suspended:'Приостановлен ⏸', pending:'Ожидает активации ⏳', provisioning:'Настраивается ⚙️', deleting:'Удаляется 🗑️', deleted:'Удалён ❌' };
+                              const statusColor: Record<string,string> = { active:'bg-emerald-50 text-emerald-700 border-emerald-200', suspended:'bg-amber-50 text-amber-800 border-amber-200', pending:'bg-slate-50 text-slate-700 border-slate-200', provisioning:'bg-sky-50 text-sky-700 border-sky-200', deleting:'bg-rose-50 text-rose-700 border-rose-200', deleted:'bg-gray-100 text-gray-600 border-gray-200' };
+                              const siteUrl = (currentWebSite.domain ? `https://${currentWebSite.domain}` : '');
+                              return (
+                                <>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusColor[status] || statusColor.pending}`}>
+                                      {status === 'active' ? <CheckCircle className="h-3.5 w-3.5"/> : <AlertCircle className="h-3.5 w-3.5"/>}
+                                      {statusLabel[status] || status}
+                                    </span>
+                                    {siteUrl && (
+                                      <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition">
+                                        <Globe className="h-3.5 w-3.5"/> Открыть сайт →
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+                                        <Wallet className="h-3 w-3"/> Оплата
+                                      </div>
+                                      {daysLeftRaw === null ? (
+                                        <div className="text-sm font-semibold text-slate-500">—</div>
+                                      ) : (
+                                        <>
+                                          <div className={`text-xl font-bold ${daysLeftRaw < 0 ? 'text-rose-600' : daysLeftRaw <= 7 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                            {daysLeftRaw >= 0 ? `+${daysLeftRaw} дн.` : `просрочено ${-daysLeftRaw} дн.`}
+                                          </div>
+                                          <div className="text-[11px] text-slate-500 font-medium">{currentWebSite.paidUntil}</div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+                                        <ShieldCheck className="h-3 w-3"/> SSL
+                                      </div>
+                                      {sslDaysLeft === null ? (
+                                        <div className="text-sm font-semibold text-slate-500">не выпущен</div>
+                                      ) : sslDaysLeft <= 0 ? (
+                                        <>
+                                          <div className="text-xl font-bold text-rose-600">истёк</div>
+                                          <div className="text-[11px] text-slate-500 font-medium">{(currentWebSite as any).sslExpiresAt}</div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className={`text-xl font-bold ${sslDaysLeft <= 14 ? 'text-amber-600' : 'text-emerald-600'}`}>+{sslDaysLeft} дн.</div>
+                                          <div className="text-[11px] text-slate-500 font-medium">{(currentWebSite as any).sslExpiresAt}</div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+                                        <HardDrive className="h-3 w-3"/> Шаблон
+                                      </div>
+                                      <div className="text-sm font-semibold text-slate-900">
+                                        {currentWebSite.coreTemplate === 'nodejs' ? 'Node.js + Express' : currentWebSite.coreTemplate === 'wordpress' ? 'WordPress' : 'Static HTML / CSS'}
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 font-medium">ID: {String(currentWebSite.id||'').slice(0,8)}</div>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+                                        <Server className="h-3 w-3"/> Процесс
+                                      </div>
+                                      <div className="text-sm font-semibold text-slate-900 truncate">
+                                        {currentWebSite.pm2ProcessName || (currentWebSite.coreTemplate==='nodejs' ? `wexa-site-${String(currentWebSite.id||'').slice(0,8)}` : 'Статика / nginx')}
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 font-medium">
+                                        {currentWebSite.coreTemplate==='nodejs' ? 'PM2 auto-restart' : 'Nginx serve'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
+                        </div>
 
-                          {webSftpCreds?.ok || webSftpCreds?.host ? (
-                            <div className="flex flex-col gap-2">
-                              {([
-                                ['Host', webSftpCreds.host || currentWebSite.node?.ip, 'SFTP Host'],
-                                ['Port', webSftpCreds.port, 'Порт'],
-                                ['User', webSftpCreds.user, 'Пользователь'],
-                              ] as const).map(([k, v, label]) => (
-                                <div key={k} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
-                                    <div className="font-mono text-sm text-slate-900 break-all">{String(v ?? '—')}</div>
-                                  </div>
-                                  {v && (
-                                    <button
-                                      onClick={() => copyToClipboard(String(v), label)}
-                                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition"
-                                    >
-                                      {copiedValue === label ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-
-                              {webSftpCreds.passwordOnce && (
-                                <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-[10px] uppercase tracking-wider text-amber-600">Пароль (показывается один раз — сохраните)</div>
-                                    <div className="font-mono text-sm text-amber-900 break-all">{webSftpCreds.passwordOnce}</div>
-                                  </div>
-                                  <button
-                                    onClick={() => copyToClipboard(webSftpCreds.passwordOnce, 'SFTP Пароль')}
-                                    className="shrink-0 rounded-md p-1.5 text-amber-600 hover:bg-amber-100 transition"
-                                  >
-                                    {copiedValue === 'SFTP Пароль' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </button>
-                                </div>
-                              )}
-
-                              <div className="rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100 flex flex-col gap-1 overflow-x-auto">
-                                <div className="text-slate-400"># Пример подключения WinSCP/CLI:</div>
-                                <div>$ sftp -P {webSftpCreds.port} {webSftpCreds.user}@{webSftpCreds.host || currentWebSite.node?.ip}</div>
-                              </div>
-                            </div>
-                          ) : (
+                        <div>
+                          <h4 className="mb-2 text-sm font-semibold text-slate-900">Быстрые действия</h4>
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4 grid grid-cols-2 gap-2.5">
                             <button
-                              onClick={() => loadWebSftpCreds(currentWebSite.id)}
-                              className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                              onClick={() => restartWebSite(currentWebSite.id)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-indigo-200 hover:text-indigo-700 hover:shadow-sm transition"
                             >
-                              Загрузить учетные данные SFTP
+                              <RotateCcw className="h-4 w-4"/> Перезапустить
                             </button>
-                          )}
+                            <button
+                              onClick={() => triggerWebBackup(currentWebSite.id)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-violet-200 hover:text-violet-700 hover:shadow-sm transition"
+                            >
+                              <FileArchive className="h-4 w-4"/> Бэкап сейчас
+                            </button>
+                            <button
+                              onClick={() => resetSftpPasswordWebSite(currentWebSite.id)}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-amber-200 hover:text-amber-700 hover:shadow-sm transition"
+                            >
+                              <KeyRound className="h-4 w-4"/> Сбросить SFTP пароль
+                            </button>
+                            <button
+                              onClick={() => setWebSettingsTab('ssh')}
+                              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 hover:shadow-sm transition"
+                            >
+                              <KeyRound className="h-4 w-4"/> SSH/SFTP доступ →
+                            </button>
+                            <button
+                              onClick={() => setWebSettingsTab('database')}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-emerald-200 hover:text-emerald-700 hover:shadow-sm transition"
+                            >
+                              <Database className="h-4 w-4"/> База данных
+                            </button>
+                            <button
+                              onClick={() => setWebSettingsTab('ai')}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-fuchsia-200 hover:text-fuchsia-700 hover:shadow-sm transition"
+                            >
+                              <Sparkles className="h-4 w-4"/> AI-ассистент
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -5536,20 +5637,32 @@ const ClientDashboard = () => {
                     const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
                     const fallbackUsername = shortId ? `wexa_site_${shortId}` : '';
                     const sftpUsername = s?.username || ws?.sftpUsername || fallbackUsername;
-                    const sftpPassword = s?.password || s?.passwordOnce || (s && s.host ? 'Настраивается...' : 'Загрузка...');
+                    const hasPassword = !!(s?.password || s?.passwordOnce);
+                    const sftpPassword = hasPassword
+                      ? (s?.password || s?.passwordOnce)
+                      : (s && s.host ? '' : 'Загрузка...');
                     const sshHost = ws?.node?.ip || s?.host || '';
                     const sftpUrl = s && s.host && sftpUsername ? `sftp://${encodeURIComponent(sftpUsername)}@${s.host}:${s.port || 22}${s.rootPath || '/'}` : '';
                     return (
                       <div className="grid gap-6 lg:grid-cols-2">
                         <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                              <KeyRound className="h-5 w-5" />
+                          <div className="flex items-center justify-between gap-2 mb-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                                <KeyRound className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900">SFTP доступ (редактирование файлов)</h4>
+                                <p className="text-xs text-slate-500">FileZilla, WinSCP, VSCode Remote, ForkLift</p>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-slate-900">SFTP доступ (редактирование файлов)</h4>
-                              <p className="text-xs text-slate-500">FileZilla, WinSCP, VSCode Remote, ForkLift</p>
-                            </div>
+                            <button
+                              onClick={() => resetSftpPasswordWebSite(ws.id)}
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 hover:shadow-sm transition"
+                              title="Сгенерировать новый пароль"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5"/> Новый пароль
+                            </button>
                           </div>
                           {s && s.ok !== false ? (
                             <div className="space-y-3">
@@ -5557,15 +5670,11 @@ const ClientDashboard = () => {
                                 { k: 'Хост / IP', v: s?.host || sshHost, id: 'sftp-host', copyable: true },
                                 { k: 'Порт', v: String(s?.port || 22), id: 'sftp-port', copyable: true },
                                 { k: 'Пользователь', v: sftpUsername, id: 'sftp-user', copyable: !!sftpUsername },
-                                { k: 'Пароль', v: sftpPassword, id: 'sftp-pass', copyable: !!s?.password || !!s?.passwordOnce, sensitive: true },
-                                { k: 'Путь (Root Folder)', v: s?.rootPath || '/public_html', id: 'sftp-path', copyable: true },
                               ].map((row) => (
                                 <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
                                   <div className="min-w-0 flex-1">
                                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
-                                    <div className={`font-mono text-sm truncate ${row.sensitive ? 'tracking-[0.05em] text-slate-800' : 'text-slate-900'}`}>
-                                      {row.v || '—'}
-                                    </div>
+                                    <div className="font-mono text-sm truncate text-slate-900">{row.v || '—'}</div>
                                   </div>
                                   {row.copyable && row.v ? (
                                     <button
@@ -5578,6 +5687,45 @@ const ClientDashboard = () => {
                                   ) : null}
                                 </div>
                               ))}
+
+                              {hasPassword ? (
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-2 border-emerald-200 px-3.5 py-2.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Пароль (постоянный доступ)</div>
+                                    <div className="font-mono text-sm tracking-[0.05em] text-slate-900 break-all">{sftpPassword}</div>
+                                  </div>
+                                  <button onClick={() => copyToClipboard(String(sftpPassword), 'Пароль')} className="shrink-0 rounded-lg border border-emerald-200 p-1.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                                    {copiedValue === 'Пароль' ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-3.5 py-3 flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
+                                  <div className="flex items-start gap-2 min-w-0">
+                                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"/>
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-bold text-amber-800">Пароль ещё не сгенерирован</div>
+                                      <div className="text-[11px] text-amber-700/90">Нажмите «Сгенерировать пароль» справа — он создастся на ноде и сохранится в профиле.</div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => resetSftpPasswordWebSite(ws.id)}
+                                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:shadow-md hover:from-amber-600 hover:to-orange-600 transition"
+                                  >
+                                    <KeyRound className="h-3.5 w-3.5"/> Сгенерировать пароль
+                                  </button>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Путь (Root Folder)</div>
+                                  <div className="font-mono text-sm text-slate-900">{s?.rootPath || '/public_html'}</div>
+                                </div>
+                                <button onClick={() => copyToClipboard(s?.rootPath || '/public_html', 'Root Path')} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
+                                  {copiedValue === 'Root Path' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                </button>
+                              </div>
+
                               {sftpUrl && (
                                 <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-600/90 text-white px-3.5 py-2.5 mt-2">
                                   <div className="min-w-0 flex-1">
@@ -5603,13 +5751,15 @@ const ClientDashboard = () => {
 
                         <div className="space-y-5">
                           <div className="rounded-2xl border-2 border-sky-100 bg-gradient-to-br from-sky-50 to-cyan-50 p-5">
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-sm">
-                                <Bot className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-slate-900">Прямой SSH-терминал</h4>
-                                <p className="text-xs text-slate-500">Командная строка, bash, npm, node, git</p>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-sm">
+                                  <Bot className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-slate-900">Прямой SSH-терминал</h4>
+                                  <p className="text-xs text-slate-500">Командная строка, bash, npm, node, git</p>
+                                </div>
                               </div>
                             </div>
                             <div className="space-y-2.5">
@@ -5617,12 +5767,11 @@ const ClientDashboard = () => {
                                 { k: 'Хост SSH', v: sshHost, id: 'ssh-host', copyable: true },
                                 { k: 'Порт SSH', v: '22', id: 'ssh-port', copyable: true },
                                 { k: 'Пользователь', v: sftpUsername, id: 'ssh-user', copyable: !!sftpUsername },
-                                { k: 'Пароль', v: sftpPassword, id: 'ssh-pass', copyable: !!s?.password || !!s?.passwordOnce, sensitive: true },
                               ].map((row) => (
                                 <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
                                   <div className="min-w-0 flex-1">
                                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
-                                    <div className={`font-mono text-sm truncate ${row.sensitive ? 'tracking-wider' : ''}`}>{row.v || '—'}</div>
+                                    <div className="font-mono text-sm truncate">{row.v || '—'}</div>
                                   </div>
                                   {row.copyable && row.v ? (
                                     <button onClick={() => copyToClipboard(row.v, row.k)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 shrink-0">
@@ -5631,6 +5780,34 @@ const ClientDashboard = () => {
                                   ) : null}
                                 </div>
                               ))}
+
+                              {hasPassword ? (
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-sky-50 via-white to-sky-50 border-2 border-sky-200 px-3.5 py-2.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-sky-700 font-bold">Пароль SSH</div>
+                                    <div className="font-mono text-sm tracking-wider text-slate-900 break-all">{sftpPassword}</div>
+                                  </div>
+                                  <button onClick={() => copyToClipboard(String(sftpPassword), 'SSH Пароль')} className="shrink-0 rounded-lg border border-sky-200 p-1.5 text-sky-700 hover:bg-sky-50 hover:text-sky-800 transition">
+                                    {copiedValue === 'SSH Пароль' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => resetSftpPasswordWebSite(ws.id)}
+                                  className="flex w-full flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 px-3.5 py-3 text-left hover:bg-sky-100 transition"
+                                >
+                                  <div className="flex items-start gap-2 min-w-0">
+                                    <AlertCircle className="h-5 w-5 text-sky-600 shrink-0 mt-0.5"/>
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-bold text-sky-800">SSH Пароль</div>
+                                      <div className="text-[11px] text-sky-700/90">Сгенерируется вместе с SFTP паролем (один пароль для двух протоколов).</div>
+                                    </div>
+                                  </div>
+                                  <span className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-sky-700 transition">
+                                    <KeyRound className="h-3 w-3"/> Сгенерировать
+                                  </span>
+                                </button>
+                              )}
                             </div>
                             <div className="mt-3 rounded-xl bg-slate-950 text-amber-100 font-mono text-[12px] p-3 overflow-x-auto">
                               <div className="text-slate-500 mb-1"># Быстрый вход (вставить в терминал):</div>
