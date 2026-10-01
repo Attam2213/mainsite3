@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -1171,10 +1171,14 @@ const GameServerConfigurator = ({
   );
 
   const ConfiguratorPanel = () => (
-    <section id="pricing" className="py-24 bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 relative">
-      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/40 rounded-full filter blur-3xl opacity-8" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/40 rounded-full filter blur-3xl opacity-8" />
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section id="pricing" className={`${compact ? '' : 'py-24'} ${compact ? 'bg-white' : 'bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 relative'}`}>
+      {!compact && (
+        <>
+          <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/40 rounded-full filter blur-3xl opacity-8" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/40 rounded-full filter blur-3xl opacity-8" />
+        </>
+      )}
+      <div className={`${compact ? '' : 'container mx-auto px-4 sm:px-6 lg:px-8'} relative z-10`}>
         {!compact && (
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Конфигуратор</h2>
@@ -1183,13 +1187,16 @@ const GameServerConfigurator = ({
           </div>
         )}
         <div className={`relative ${compact ? '' : 'py-10 md:py-14'}`}>
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute -top-12 -left-20 w-[20rem] h-[20rem] bg-indigo-200/8 rounded-full blur-3xl" />
-            <div className="absolute top-1/3 -right-16 w-[18rem] h-[18rem] bg-violet-200/6 rounded-full blur-3xl" />
-            <div className="absolute -bottom-16 left-1/3 w-[16rem] h-[16rem] bg-pink-100/6 rounded-full blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(250,204,21,0.02),transparent_45%),radial-gradient(circle_at_90%_90%,rgba(16,185,129,0.03),transparent_50%)]" />
-          </div>
+          {!compact && (
+            <div className="absolute inset-0 z-0 pointer-events-none">
+              <div className="absolute -top-12 -left-20 w-[20rem] h-[20rem] bg-indigo-200/8 rounded-full blur-3xl" />
+              <div className="absolute top-1/3 -right-16 w-[18rem] h-[18rem] bg-violet-200/6 rounded-full blur-3xl" />
+              <div className="absolute -bottom-16 left-1/3 w-[16rem] h-[16rem] bg-pink-100/6 rounded-full blur-3xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(250,204,21,0.02),transparent_45%),radial-gradient(circle_at_90%_90%,rgba(16,185,129,0.03),transparent_50%)]" />
+            </div>
+          )}
 
+          {!compact && (<>
           <div className="hidden xl:block absolute left-0 top-32 z-10 pointer-events-none" style={{transform: 'translate(calc(-100% - 0.5rem), 0)'}}>
             <div className="w-64">
               <div style={{display: actualTab === 'game' ? undefined : 'none'}} className="flex flex-col gap-4">
@@ -1337,11 +1344,12 @@ const GameServerConfigurator = ({
               </div>
             </div>
           </div>
+          </>)}
 
           {/* configurator container centered, NO shadow NO border! */}
-          <div className="relative z-20 max-w-[68rem] mx-auto">
-          <div className="grid lg:grid-cols-12 rounded-2xl overflow-hidden bg-white">
-            <div className="lg:col-span-8 p-6 md:p-8 space-y-7 relative">
+          <div className={`relative z-20 ${compact ? 'w-full' : 'max-w-[68rem] mx-auto'}`}>
+          <div className={`grid lg:grid-cols-12 overflow-hidden bg-white ${compact ? 'rounded-none' : 'rounded-2xl'}`}>
+            <div className={`lg:col-span-8 space-y-7 relative ${compact ? 'p-1 sm:p-2' : 'p-6 md:p-8'}`}>
               {configuratorMode === 'both' && (
                 <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100/70">
                   <button
