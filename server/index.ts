@@ -349,15 +349,18 @@ const startServer = async () => {
       if (dialect === 'postgres') {
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "domainType" VARCHAR(16) DEFAULT 'custom';`); } catch (_) {}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "subdomainName" VARCHAR(64) UNIQUE;`); } catch (_) {}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN IF NOT EXISTS "sftpPassword" VARCHAR(128);`); } catch (_) {}
       } else if (dialect === 'sqlite') {
         try { await ensureSqliteColumn('web_sites','domainType',"TEXT DEFAULT 'custom'"); } catch(_){}
         try { await ensureSqliteColumn('web_sites','subdomainName','TEXT UNIQUE'); } catch(_){}
+        try { await ensureSqliteColumn('web_sites','sftpPassword','TEXT'); } catch(_){}
       } else {
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN domainType VARCHAR(16) DEFAULT 'custom';`); } catch(_){}
         try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN subdomainName VARCHAR(64) UNIQUE;`); } catch(_){}
+        try { await sequelize.query(`ALTER TABLE web_sites ADD COLUMN sftpPassword VARCHAR(128);`); } catch(_){}
       }
     } catch (e) {
-      console.error('[DB] ensure web_sites domainType/subdomainName columns failed:', e);
+      console.error('[DB] ensure web_sites extra columns failed:', e);
     }
 
     await sequelize.sync({ alter: sequelize.getDialect() === 'postgres' });

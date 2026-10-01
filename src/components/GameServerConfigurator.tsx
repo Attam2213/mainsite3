@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,

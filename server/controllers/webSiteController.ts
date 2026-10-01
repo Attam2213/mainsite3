@@ -410,19 +410,19 @@ router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response)
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
   const node = site.node;
-  let passwordOnce: string | null = site.sftpPasswordPlainOnce;
-  if (passwordOnce) {
-    await site.update({ sftpPasswordPlainOnce: null });
+  const password = site.sftpPassword || site.sftpPasswordPlainOnce || null;
+  if (password && !site.sftpPassword) {
+    try { await site.update({ sftpPassword: password }); } catch (_) {}
   }
   return res.json({
     ok: true,
     host: node?.ip || '',
     port: site.sftpPort || 22,
     username: site.sftpUsername || '',
-    passwordOnce,
-    password: passwordOnce,
+    password,
+    passwordOnce: password,
     rootPath: '/public_html',
-    note: 'SFTP-only, shell отключен. Загружать/редактировать/удалять файлы можно только в /public_html.',
+    note: 'SFTP / SSH доступ. Загружать/редактировать файлы сайта можно в /public_html.',
   });
 });
 
@@ -651,7 +651,7 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
     }
 
     if (newNode.ip !== '127.0.0.1') {
-      const sftpPass = site.sftpPasswordPlainOnce || genRandomPassword(18);
+      const sftpPass = site.sftpPassword || site.sftpPasswordPlainOnce || genRandomPassword(18);
       const sftpPassHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
       const templateDir = site.coreTemplate === 'nodejs' ? '/var/lib/wexa/templates/orlan-taxi-business' : '/var/lib/wexa/templates/static-landing';
       await execCommand(newCfg, `mkdir -p "${siteDir}" "/var/lib/wexa/backups/sites/${site.id}" "${sftpChroot}/public_html" && chown root:root "${sftpChroot}" && chmod 755 "${sftpChroot}"; true`);
@@ -678,6 +678,7 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
     await site.update({
       nodeId: newNode.id,
       sftpUsername: sftpUser,
+      sftpPassword: sftpPass,
       sftpChroot,
       nginxConfPath: `/etc/nginx/sites-enabled/wexa-site-${shortId}.conf`,
     } as any);
@@ -798,6 +799,7 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
     await site.update({
       sftpUsername: sftpUser,
       sftpPasswordHash,
+      sftpPassword: sftpPass,
       sftpPasswordPlainOnce: sftpPass,
       sftpPort: node?.sshPort || 22,
       sftpChroot,

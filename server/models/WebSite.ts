@@ -21,6 +21,7 @@ class WebSite extends Model {
   declare sftpUsername: string | null;
   declare sftpPasswordHash: string | null;
   declare sftpPasswordPlainOnce: string | null;
+  declare sftpPassword: string | null;
   declare sftpPort: number | null;
   declare sftpChroot: string | null;
   declare nginxConfPath: string | null;
@@ -65,6 +66,7 @@ WebSite.init(
     sftpUsername: { type: DataTypes.STRING, allowNull: true, unique: true },
     sftpPasswordHash: { type: DataTypes.STRING, allowNull: true },
     sftpPasswordPlainOnce: { type: DataTypes.STRING, allowNull: true },
+    sftpPassword: { type: DataTypes.STRING, allowNull: true },
     sftpPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 22 },
     sftpChroot: { type: DataTypes.STRING, allowNull: true },
     nginxConfPath: { type: DataTypes.STRING, allowNull: true },

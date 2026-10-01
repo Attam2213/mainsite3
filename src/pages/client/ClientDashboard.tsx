@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -5532,9 +5532,13 @@ const ClientDashboard = () => {
                     const s = webSftpCreds;
                     const ws = currentWebSite;
                     const id = String(ws?.id || '');
+                    const shortId = id.slice(0, 8);
                     const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
-                    const sftpUrl = s && s.host && s.username ? `sftp://${encodeURIComponent(s.username)}@${s.host}:${s.port || 22}${s.rootPath || '/'}` : '';
+                    const fallbackUsername = shortId ? `wexa_site_${shortId}` : '';
+                    const sftpUsername = s?.username || ws?.sftpUsername || fallbackUsername;
+                    const sftpPassword = s?.password || s?.passwordOnce || (s && s.host ? 'Настраивается...' : 'Загрузка...');
                     const sshHost = ws?.node?.ip || s?.host || '';
+                    const sftpUrl = s && s.host && sftpUsername ? `sftp://${encodeURIComponent(sftpUsername)}@${s.host}:${s.port || 22}${s.rootPath || '/'}` : '';
                     return (
                       <div className="grid gap-6 lg:grid-cols-2">
                         <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
@@ -5552,8 +5556,8 @@ const ClientDashboard = () => {
                               {[
                                 { k: 'Хост / IP', v: s?.host || sshHost, id: 'sftp-host', copyable: true },
                                 { k: 'Порт', v: String(s?.port || 22), id: 'sftp-port', copyable: true },
-                                { k: 'Пользователь', v: s?.username || '', id: 'sftp-user', copyable: true },
-                                { k: 'Пароль', v: s?.passwordOnce || s?.password || (s?.host ? '⚠️ Пароль показан только 1 раз. Сброс — напишите менеджеру.' : 'Загрузка...'), id: 'sftp-pass', copyable: !!s?.passwordOnce || !!s?.password, sensitive: true },
+                                { k: 'Пользователь', v: sftpUsername, id: 'sftp-user', copyable: !!sftpUsername },
+                                { k: 'Пароль', v: sftpPassword, id: 'sftp-pass', copyable: !!s?.password || !!s?.passwordOnce, sensitive: true },
                                 { k: 'Путь (Root Folder)', v: s?.rootPath || '/public_html', id: 'sftp-path', copyable: true },
                               ].map((row) => (
                                 <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
@@ -5563,7 +5567,7 @@ const ClientDashboard = () => {
                                       {row.v || '—'}
                                     </div>
                                   </div>
-                                  {row.copyable && row.v && row.v.startsWith('⚠️') !== true ? (
+                                  {row.copyable && row.v ? (
                                     <button
                                       onClick={() => copyToClipboard(row.v, row.k)}
                                       className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
@@ -5612,15 +5616,15 @@ const ClientDashboard = () => {
                               {[
                                 { k: 'Хост SSH', v: sshHost, id: 'ssh-host', copyable: true },
                                 { k: 'Порт SSH', v: '22', id: 'ssh-port', copyable: true },
-                                { k: 'Пользователь', v: s?.username || '', id: 'ssh-user', copyable: true },
-                                { k: 'Пароль', v: s?.passwordOnce || s?.password || (sshHost ? '⚠️ пароль показан 1 раз (см. блок SFTP выше)' : ''), id: 'ssh-pass', copyable: !!s?.passwordOnce || !!s?.password, sensitive: true },
+                                { k: 'Пользователь', v: sftpUsername, id: 'ssh-user', copyable: !!sftpUsername },
+                                { k: 'Пароль', v: sftpPassword, id: 'ssh-pass', copyable: !!s?.password || !!s?.passwordOnce, sensitive: true },
                               ].map((row) => (
                                 <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
                                   <div className="min-w-0 flex-1">
                                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
                                     <div className={`font-mono text-sm truncate ${row.sensitive ? 'tracking-wider' : ''}`}>{row.v || '—'}</div>
                                   </div>
-                                  {row.copyable && row.v && !row.v.startsWith('⚠️') ? (
+                                  {row.copyable && row.v ? (
                                     <button onClick={() => copyToClipboard(row.v, row.k)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 shrink-0">
                                       {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                                     </button>
@@ -5630,7 +5634,7 @@ const ClientDashboard = () => {
                             </div>
                             <div className="mt-3 rounded-xl bg-slate-950 text-amber-100 font-mono text-[12px] p-3 overflow-x-auto">
                               <div className="text-slate-500 mb-1"># Быстрый вход (вставить в терминал):</div>
-                              ssh {s?.username || 'USER'}@{sshHost || 'HOST'} -p 22
+                              ssh {sftpUsername || 'USER'}@{sshHost || 'HOST'} -p 22
                             </div>
                           </div>
 
@@ -5773,10 +5777,14 @@ export default db;`}
                     const ws = currentWebSite;
                     const id = String(ws?.id || '');
                     const s = webSftpCreds;
+                    const shortId = id.slice(0, 8);
+                    const sftpUsername = s?.username || ws?.sftpUsername || (shortId ? `wexa_site_${shortId}` : '');
+                    const sftpPassword = s?.password || s?.passwordOnce || '';
                     const planLabel = getWebPlanLabel(ws?.plan);
                     const domain = ws?.domain || `${id.slice(0, 8)}.wexa.su`;
                     const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
                     const sqlitePath = `/var/lib/wexa/sites/${id}/data/app.db`;
+                    const sshHost = s?.host || ws?.node?.ip || 'HOST';
                     const tech = ws?.coreTemplate === 'nodejs'
                       ? 'Node.js 20 LTS · Express · EJS (Server Side Render) · PM2 auto-restart'
                       : 'Static HTML/CSS/JS (nginx) — не требует сборки';
@@ -5785,13 +5793,13 @@ export default db;`}
 
 ---
 ## 📦 SFTP / SSH доступ
-*   **Host / IP:** \`${s?.host || ws?.node?.ip || 'NO_HOST'}\`
+*   **Host / IP:** \`${sshHost}\`
 *   **SFTP Port:** \`${s?.port || 22}\`
 *   **SSH Port:** \`22\`
-*   **User:** \`${s?.username || ''}\`
-*   **Password:** \`${s?.passwordOnce || s?.password || 'Сбросить пароль — менеджер wexa.su'}\`
+*   **User:** \`${sftpUsername}\`
+*   **Password:** \`${sftpPassword || 'Запросить в панели управления wexa.su — вкладка SSH/SFTP'}\`
 *   **Корень сайта (загружать СЮДА):** \`${s?.rootPath || '/public_html'}\`
-*   **SFTP one-click URL:** \`sftp://${encodeURIComponent(s?.username || '')}@${s?.host || ws?.node?.ip || 'HOST'}:${s?.port || 22}${s?.rootPath || '/'}\`
+*   **SFTP one-click URL:** \`sftp://${encodeURIComponent(sftpUsername)}@${sshHost}:${s?.port || 22}${s?.rootPath || '/'}\`
 
 ---
 ## 🌐 Ресурсы сайта
@@ -5842,7 +5850,7 @@ DB_ENGINE="sqlite"
 ## 🔧 Команды (SSH bash)
 \`\`\`bash
 # подключение
-ssh ${s?.username || 'USER'}@${s?.host || ws?.node?.ip || 'HOST'} -p 22
+ssh ${sftpUsername}@${sshHost} -p 22
 
 # логи / рестарт
 pm2 logs
