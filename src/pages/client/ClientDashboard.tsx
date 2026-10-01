@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -3294,7 +3294,7 @@ const ClientDashboard = () => {
                               )}
                               <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
                                 <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Цена</div>
-                                <div className="font-semibold text-slate-700">{(ws.priceMonthly && ws.priceMonthly > 0) ? ws.priceMonthly : ({ landing: 400, business: 750, premium: 1200 } as Record<string,number>)[String(ws.plan || 'landing')] ?? 400} ₽/мес</div>
+                                <div className="font-semibold text-slate-700">{(ws.priceMonthly && ws.priceMonthly > 0) ? ws.priceMonthly : ({ landing: 399, business: 799, premium: 1299 } as Record<string,number>)[String(ws.plan || 'landing')] ?? 399} ₽/мес</div>
                               </div>
                             </div>
 
@@ -5255,7 +5255,7 @@ const ClientDashboard = () => {
                               ['Нода', currentWebSite.node?.name || currentWebSite.node?.ip || '—'],
                               ['IP ноды', currentWebSite.node?.ip || '—'],
                               ['Оплачено до', currentWebSite.paidUntil ? new Date(currentWebSite.paidUntil).toLocaleString('ru-RU') : '—'],
-                              ['Стоимость', `${(currentWebSite.priceMonthly && currentWebSite.priceMonthly > 0) ? currentWebSite.priceMonthly : ({ landing: 400, business: 750, premium: 1200 } as Record<string,number>)[String(currentWebSite.plan || 'landing')] ?? 400} ₽/мес`],
+                              ['Стоимость', `${(currentWebSite.priceMonthly && currentWebSite.priceMonthly > 0) ? currentWebSite.priceMonthly : ({ landing: 399, business: 799, premium: 1299 } as Record<string,number>)[String(currentWebSite.plan || 'landing')] ?? 399} ₽/мес`],
                             ].map(([k, v]) => (
                               <div key={k} className="flex items-center justify-between px-4 py-2.5 text-sm">
                                 <span className="text-slate-500">{k}</span>

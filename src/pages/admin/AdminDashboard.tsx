@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -4374,9 +4374,9 @@ const AdminDashboard = () => {
                     <select className="w-full p-2.5 border rounded-lg"
                       value={currentWebSite.plan || 'business'}
                       onChange={e => setCurrentWebSite({ ...currentWebSite, plan: e.target.value as any })}>
-                      <option value="landing">Landing (статика) · 149 ₽/мес</option>
-                      <option value="business">Business (Node.js EJS · Ordlan template) · 299 ₽/мес</option>
-                      <option value="premium">Premium (24/7 priority) · 599 ₽/мес</option>
+                      <option value="landing">Landing (статика) · 399 ₽/мес</option>
+                      <option value="business">Business (Node.js EJS · Ordlan template) · 799 ₽/мес</option>
+                      <option value="premium">Premium (24/7 priority) · 1299 ₽/мес</option>
                     </select>
                   </div>
                 </div>

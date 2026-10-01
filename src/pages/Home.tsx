@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -412,7 +412,7 @@ const Home = () => {
                   <ul className="flex flex-col gap-3 mb-8">
                     {[
                       'Готовый шаблон сайта за&nbsp;1&nbsp;минуту · Express/EJS + админка',
-                      'Старт от 149 ₽/мес · Node.js от 499 ₽/мес · Авто-бэкапы',
+                      'Старт от 399 ₽/мес · Node.js Business от 799 ₽/мес · Авто-бэкапы 7&nbsp;дней',
                       'Свой домен + Let\'s Encrypt SSL · Nginx + PHP-FPM / Node.js 22',
                     ].map((t, i) => (
                       <li key={i} className="flex items-start gap-3">
@@ -424,7 +424,7 @@ const Home = () => {
                   <div className="flex items-end justify-between">
                     <div>
                       <div className="text-sm text-gray-500 font-semibold">Цены от</div>
-                      <div className="text-4xl font-black text-gray-900">149 ₽<span className="text-lg font-semibold text-gray-500">/ мес</span></div>
+                      <div className="text-4xl font-black text-gray-900">399 ₽<span className="text-lg font-semibold text-gray-500">/ мес</span></div>
                     </div>
                     <a href="#pricing" className="group/btn inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:-translate-y-0.5 hover:shadow-xl transition-all">
                       Создать сайт <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
