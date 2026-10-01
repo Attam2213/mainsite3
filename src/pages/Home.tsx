@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -14,6 +14,7 @@ import {
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
   Headphones, MapPin, Mail, Star, Server, Database, Layers,
+  Users, Bot, Brain, Heart, Cpu, Network,
 } from 'lucide-react';
 
 const Home = () => {
@@ -429,6 +430,122 @@ const Home = () => {
                       Создать сайт <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
                     </a>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ABOUT US */}
+        <section id="about" className="py-24 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/60 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-[28rem] h-[28rem] bg-indigo-200/20 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3" />
+          <div className="absolute bottom-0 right-0 w-[28rem] h-[28rem] bg-purple-200/20 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="text-center max-w-4xl mx-auto mb-20">
+              <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">О нас</h2>
+              <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl mb-5">
+                Кто мы и&nbsp;почему <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">первый в&nbsp;России</span> с&nbsp;поддержкой ИИ-агентов
+              </p>
+              <div className="h-1.5 w-40 mx-auto rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 mb-7" />
+              <p className="text-lg text-gray-600 leading-relaxed">
+                <b className="text-gray-900">Wexa.su</b> — это команда энтузиастов с&nbsp;2018&nbsp;года, которые устали от&nbsp;неудобных хостингов с&nbsp;устаревшими панелями и&nbsp;медленной поддержкой. Мы&nbsp;сами запускали игровые сервера и&nbsp;сайты для своих проектов&nbsp;— поэтому решили сделать <b className="text-gray-900">идеальный сервис</b>, который самим хотелось&nbsp;бы использовать каждый день.
+              </p>
+              <p className="mt-4 text-lg text-gray-600 leading-relaxed">
+                Сегодня мы&nbsp;— не&nbsp;просто очередной хостинг. Это <b className="text-indigo-700 font-semibold">первый российский провайдер</b>, который встроил полноценную поддержку <b className="text-gray-900">ИИ-агентов</b> на&nbsp;все уровни платформы: от&nbsp;предустановленных шаблонов агентов в&nbsp;один клик до&nbsp;AI-менеджера в&nbsp;ЛК, который сам чинит ошибки и&nbsp;оптимизирует ваши проекты.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto mb-16">
+              <div className="group bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform">
+                  <Users size={28} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-3">Наша миссия — простота для всех</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  Не важно, ты&nbsp;владелец Minecraft-сервера для друзей, создатель лендинга для бизнеса или разработчик LangChain-агента. Мы&nbsp;убираем рутину: <b>установка, настройка, обновления, мониторинг, бэкапы</b>&nbsp;— всё автоматически. От&nbsp;тебя нужна только идея.
+                </p>
+              </div>
+              <div className="group bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-fuchsia-500/20 group-hover:scale-110 transition-transform">
+                  <Cpu size={28} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-3">Игры + Сайты + ИИ&nbsp;— всё в&nbsp;одном ЛК</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  Большинство провайдеров умеют что-то одно: либо хостинг сайтов, либо игровые сервера. У&nbsp;нас&nbsp;— <b>единая платформа</b>. Один ЛК, один баланс, одна поддержка. А&nbsp;сверху — <b>ИИ-агенты</b>, которых ещё никто в&nbsp;России не&nbsp;давал.
+                </p>
+              </div>
+              <div className="md:col-span-2 group bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-3xl p-8 md:p-10 border-2 border-indigo-100 shadow-lg hover:shadow-2xl transition-all relative overflow-hidden">
+                <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-20 -left-16 w-72 h-72 bg-gradient-to-br from-fuchsia-400/10 to-pink-400/10 rounded-full blur-3xl" />
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6">
+                  <div className="flex-shrink-0 w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 text-white flex items-center justify-center shadow-2xl shadow-purple-500/30 group-hover:rotate-6 group-hover:scale-110 transition-all">
+                    <Brain size={38} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-100/80 text-indigo-700 text-xs font-black uppercase tracking-wider mb-3">
+                      <Sparkles size={14} className="text-amber-500" /> УНИКАЛЬНО • ПЕРВЫЙ В&nbsp;РОССИИ
+                    </div>
+                    <h3 className="text-2xl md:text-3xl font-black text-gray-900 mb-4">
+                      В&nbsp;чём заключается «поддержка ИИ-агентов»? 3 уровня AI-интеграции:
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+                      <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-indigo-100/80">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center"><Bot size={18} /></div>
+                          <div className="text-sm font-black text-indigo-700 uppercase tracking-wide">1. Шаблоны</div>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">
+                          <b>Предустановленные ИИ-агенты</b> в&nbsp;один клик: <code>CrewAI • LangChain • AutoGen • RAG-поддержка</code>. Заливаешь свои данные (FAQ, товары, документацию)&nbsp;— готовый бот за&nbsp;60&nbsp;секунд на&nbsp;нашем GPU-кластере.
+                        </p>
+                      </div>
+                      <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-purple-100/80">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center"><Heart size={18} /></div>
+                          <div className="text-sm font-black text-purple-700 uppercase tracking-wide">2. Поддержка</div>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">
+                          <b>AI-менеджер в&nbsp;ЛК 24/7</b>: автоматически исправляет ошибки Nginx/PM2, подбирает оптимальный server.properties для Minecraft, мониторит CPU/RAM/Disc и&nbsp;пишет тебе в&nbsp;чём проблема, пока ты&nbsp;спишь.
+                        </p>
+                      </div>
+                      <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-fuchsia-100/80">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-fuchsia-500 text-white flex items-center justify-center"><Code2 size={18} /></div>
+                          <div className="text-sm font-black text-fuchsia-700 uppercase tracking-wide">3. SFTP + Dev</div>
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed">
+                          Поддерживаем <b>любые кастомные агенты</b>: SFTP + PM2-менеджер + GPU-quota, чтобы разворачивать свои AI-моделки с&nbsp;vector DB (SQLite уже встроен в&nbsp;Premium). API ключи OpenAI/A Claude — твои, данные не&nbsp;уходят третьим.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="group bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
+                  <Network size={28} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-3">Инфраструктура — наш конёк</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  6&nbsp;локаций (Москва • СПб • Казахстан • Франкфурт • Амстердам • Хельсинки), <b>DDoS-защита L3/L4 1&nbsp;Тбит/с</b>, NVMe SSD 9K&nbsp;MB/s, SLA 99.99% uptime, бэкапы 7&nbsp;дней ротация и&nbsp;поддержка <b>24/7 на&nbsp;русском языке</b>.
+                </p>
+              </div>
+              <div className="group bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
+                  <Headphones size={28} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-3">Мы&nbsp;рядом с&nbsp;тобой, а&nbsp;не&nbsp;где-то за&nbsp;бугром</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  Команда в&nbsp;Москве и&nbsp;Санкт-Петербурге. Русскоязычная поддержка <b>в&nbsp;рабочее время за&nbsp;3&nbsp;минуты</b>. Не&nbsp;перекидываем тикеты 3&nbsp;недели, как европейские хостинги&nbsp;— решаем на&nbsp;месте. Если нужна персональная конфигурация&nbsp;— пиши, подберём.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center max-w-3xl mx-auto">
+              <div className="inline-block px-6 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform cursor-pointer" onClick={() => { const el = document.getElementById('pricing'); if (el) { el.scrollIntoView({behavior:'smooth', block:'start'}); } }}>
+                <div className="flex items-center gap-3">
+                  <Rocket size={22} />
+                  <span className="text-lg font-black">Попробовать Wexa.su — первый заказ 60&nbsp;секунд ⚡</span>
+                  <ArrowRight size={20} />
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
-﻿﻿﻿﻿﻿﻿﻿﻿import { useState } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Gamepad2, Server, MapPin, LogIn, User, LogOut, Code2 } from 'lucide-react';
+import { Menu, X, Server, MapPin, LogIn, User, LogOut, Code2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,8 +11,7 @@ const Header = () => {
 
   const navItems = [
     { name: 'Тарифы', href: '/#pricing', icon: Server },
-    { name: 'Игры', href: '/#games', icon: Gamepad2 },
-    { name: 'Локации', href: '/#locations', icon: MapPin },
+    { name: 'О нас', href: '/#about', icon: MapPin },
   ];
 
   const isActive = (href: string) => {
