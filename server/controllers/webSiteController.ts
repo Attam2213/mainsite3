@@ -410,30 +410,74 @@ router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response)
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
   const node = site.node;
-  let password = site.sftpPassword || site.sftpPasswordPlainOnce || null;
-  if (!password && site.sftpUsername && node && node.ip && node.ip !== '127.0.0.1') {
+  const shortId = String(site.id || '').slice(0, 8);
+  let sftpPassword = site.sftpPassword || site.sftpPasswordPlainOnce || null;
+  let sshPassword = site.sshPassword || null;
+  const sftpUser = site.sftpUsername || `wexa_site_${shortId}`;
+  const sshUser = site.sshUsername || `wexa_ssh_${shortId}`;
+  const siteDir = `/var/lib/wexa/sites/${site.id}`;
+
+  // Auto-regen SFTP password if missing + user exists on node
+  if (!sftpPassword && sftpUser && node && node.ip && node.ip !== '127.0.0.1') {
     try {
-      password = genRandomPassword(18);
+      sftpPassword = genRandomPassword(18);
       const cfg = getSshConfigForNode(node);
-      const hash = bcrypt.hashSync(password, SALT_ROUNDS);
-      const shadow = await execCommand(cfg, `openssl passwd -1 '${password.replace(/'/g, "'\\''")}'`).then(o => o.trim());
-      try { await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' '${site.sftpUsername}'`); } catch (_) {}
-      try { await site.update({ sftpPassword: password, sftpPasswordHash: hash, sftpPasswordPlainOnce: password }); } catch (_) {}
-    } catch (e) { console.warn('[sftp-creds] auto-reset failed:', e); password = null; }
+      const hash = bcrypt.hashSync(sftpPassword, SALT_ROUNDS);
+      const shadow = await execCommand(cfg, `openssl passwd -1 '${sftpPassword.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      try { await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true; usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sftpUser}"`); } catch (_) {}
+      try { await site.update({ sftpUsername: sftpUser, sftpPassword, sftpPasswordHash: hash, sftpPasswordPlainOnce: sftpPassword }); } catch (_) {}
+    } catch (e) { console.warn('[sftp-creds] auto-reset SFTP failed:', e); sftpPassword = null; }
+  } else if (sftpPassword && !site.sftpPassword) {
+    try { await site.update({ sftpPassword }); } catch (_) {}
   }
-  if (password && !site.sftpPassword) {
-    try { await site.update({ sftpPassword: password }); } catch (_) {}
+
+  // Auto-create/regen SSH shell password if missing (separate user — NOT sftponly)
+  if (!sshPassword && node && node.ip && node.ip !== '127.0.0.1') {
+    try {
+      sshPassword = genRandomPassword(18);
+      const cfg = getSshConfigForNode(node);
+      const hash = bcrypt.hashSync(sshPassword, SALT_ROUNDS);
+      const shadow = await execCommand(cfg, `openssl passwd -1 '${sshPassword.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      try {
+        await execCommand(cfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
+        await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
+      } catch (_) {}
+      try { await site.update({ sshUsername: sshUser, sshPassword, sshPasswordHash: hash, sshPort: node?.sshPort || 22 }); } catch (_) {}
+    } catch (e) { console.warn('[sftp-creds] auto-create SSH user failed:', e); sshPassword = null; }
+  } else if (sshPassword && !site.sshPassword) {
+    try { await site.update({ sshPassword }); } catch (_) {}
   }
+
   return res.json({
     ok: true,
     host: node?.ip || '',
     port: site.sftpPort || 22,
-    username: site.sftpUsername || '',
-    user: site.sftpUsername || '',
-    password,
-    passwordOnce: password,
+    username: sftpUser,
+    user: sftpUser,
+    password: sftpPassword,
+    passwordOnce: sftpPassword,
     rootPath: '/public_html',
-    note: 'SFTP / SSH доступ. Загружать/редактировать файлы сайта можно в /public_html.',
+    note: 'SFTP доступ для редактирования файлов (FileZilla/WinSCP). Для PuTTY/bash используй отдельный SSH доступ ниже.',
+    sftp: {
+      host: node?.ip || '',
+      port: site.sftpPort || 22,
+      username: sftpUser,
+      user: sftpUser,
+      password: sftpPassword,
+      rootPath: '/public_html',
+      cli: `sftp -P ${site.sftpPort || 22} ${sftpUser}@${node?.ip || ''}`,
+      note: 'SFTP only — PuTTY закроется сразу (ForceCommand internal-sftp). Для терминала используй SSH Terminal ниже.',
+    },
+    ssh: {
+      host: node?.ip || '',
+      port: site.sshPort || node?.sshPort || 22,
+      username: sshUser,
+      user: sshUser,
+      password: sshPassword,
+      homeDir: siteDir,
+      cli: `ssh ${sshUser}@${node?.ip || ''} -p ${site.sshPort || node?.sshPort || 22}`,
+      note: 'SSH shell для PuTTY / Terminal / bash. Домашняя директория = корень сайта. Можно запускать pm2, npm, nginx -t (sudoers NOPASSWD).',
+    },
   });
 });
 
@@ -444,17 +488,40 @@ router.post('/:id/sftp-password-reset', authenticateToken, async (req: any, res:
     if (!node || node.ip === '127.0.0.1') return res.status(400).json({ ok:false, message:'Сайт на локальной ноде — сброс не нужен' });
     const shortId = String(site.id || '').slice(0, 8);
     const sftpUser = site.sftpUsername || `wexa_site_${shortId}`;
-    const password = genRandomPassword(18);
+    const sshUser = site.sshUsername || `wexa_ssh_${shortId}`;
+    const sftpPass = genRandomPassword(18);
+    const sshPass = genRandomPassword(18);
     const cfg = getSshConfigForNode(node);
-    const hash = bcrypt.hashSync(password, SALT_ROUNDS);
-    const shadow = await execCommand(cfg, `openssl passwd -1 '${password.replace(/'/g, "'\\''")}'`).then(o => o.trim());
-    await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
-    await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
+    const sftpHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
+    const sshHash = bcrypt.hashSync(sshPass, SALT_ROUNDS);
+    const sftpShadow = await execCommand(cfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+    const sshShadow = await execCommand(cfg, `openssl passwd -1 '${sshPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
     const siteDir = `/var/lib/wexa/sites/${site.id}`;
     const sftpChroot = site.sftpChroot || `/srv/sftp/${sftpUser}`;
+
+    // SFTP user (SFTP only, Chroot, nologin)
+    await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
+    await execCommand(cfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
     await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}" 2>/dev/null || true`);
-    await site.update({ sftpUsername: sftpUser, sftpPassword: password, sftpPasswordHash: hash, sftpPasswordPlainOnce: password, sftpChroot });
-    return res.json({ ok:true, message:'SFTP пароль сброшен', username: sftpUser, password });
+
+    // SSH shell user (bash, home=siteDir, NOT sftponly, sudoers NOPASSWD pm2)
+    await execCommand(cfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
+    await execCommand(cfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
+    await execCommand(cfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
+
+    // Ensure chroot + bind exist
+    await execCommand(cfg, `mkdir -p "${sftpChroot}/public_html" && chown root:root "${sftpChroot}" && chmod 755 "${sftpChroot}" 2>/dev/null || true`);
+    await execCommand(cfg, `grep -qF "${siteDir}" /etc/fstab || echo "${siteDir} ${sftpChroot}/public_html none bind 0 0" >> /etc/fstab; mount "${sftpChroot}/public_html" 2>/dev/null || true`);
+
+    await site.update({
+      sftpUsername: sftpUser, sftpPassword: sftpPass, sftpPasswordHash: sftpHash, sftpPasswordPlainOnce: sftpPass, sftpChroot,
+      sshUsername: sshUser, sshPassword: sshPass, sshPasswordHash: sshHash, sshPort: node?.sshPort || 22,
+    });
+    return res.json({
+      ok:true, message:'SFTP + SSH пароли сброшены',
+      sftp: { username: sftpUser, password: sftpPass, port: site.sftpPort || 22 },
+      ssh: { username: sshUser, password: sshPass, port: site.sshPort || node?.sshPort || 22, homeDir: siteDir },
+    });
   } catch (e: any) {
     console.error('[sftp-reset] error:', e);
     return res.status(500).json({ ok:false, message: String(e?.message ?? e) });
@@ -651,6 +718,7 @@ router.post('/admin/sites/:id/migrate', authenticateToken, isAdmin, async (req: 
     const siteDir = `/var/lib/wexa/sites/${site.id}`;
     const sftpChroot = `/srv/sftp/${site.sftpUsername || `wexa_site_${shortId}`}`;
     const sftpUser = site.sftpUsername || `wexa_site_${shortId}`;
+    const sshUser = site.sshUsername || `wexa_ssh_${shortId}`;
     const pm2Name = site.pm2ProcessName || `wexa-site-${shortId}`;
     const hostPort = 3000 + (Math.abs(site.id.charCodeAt(0) + site.id.charCodeAt(7)) % 1000);
 
@@ -674,6 +742,8 @@ fi; true`).catch(() => {});
 ( umount "${sftpChroot}/public_html" 2>/dev/null || true );
 ( sed -i "\#/var/lib/wexa/sites/${site.id}#d" /etc/fstab 2>/dev/null || true );
 ( id "${sftpUser}" >/dev/null 2>&1 && userdel -f -r "${sftpUser}" 2>/dev/null || true );
+( id "${sshUser}" >/dev/null 2>&1 && userdel -f -r "${sshUser}" 2>/dev/null || true );
+( rm -f "/etc/sudoers.d/wexa-ssh-${shortId}" 2>/dev/null || true );
 ( pm2 delete "${pm2Name}" 2>/dev/null || true );
 ( rm -f "/etc/nginx/sites-enabled/wexa-site-${shortId}.conf" );
 pm2 save 2>/dev/null || true;
@@ -687,14 +757,23 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
 
     if (newNode.ip !== '127.0.0.1') {
       const sftpPass = site.sftpPassword || site.sftpPasswordPlainOnce || genRandomPassword(18);
+      const sshPass = site.sshPassword || genRandomPassword(18);
       const sftpPassHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
+      const sshPassHash = bcrypt.hashSync(sshPass, SALT_ROUNDS);
       const templateDir = site.coreTemplate === 'nodejs' ? '/var/lib/wexa/templates/orlan-taxi-business' : '/var/lib/wexa/templates/static-landing';
       await execCommand(newCfg, `mkdir -p "${siteDir}" "/var/lib/wexa/backups/sites/${site.id}" "${sftpChroot}/public_html" && chown root:root "${sftpChroot}" && chmod 755 "${sftpChroot}"; true`);
       await execCommand(newCfg, `if [ ! -d "${siteDir}" ] || [ -z "$(ls -A ${siteDir} 2>/dev/null)" ]; then if [ -d "${templateDir}" ]; then cp -R "${templateDir}/." "${siteDir}/" 2>/dev/null; fi; fi; true`);
+      // SFTP user
       await execCommand(newCfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
-      const shadow = await execCommand(newCfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
-      await execCommand(newCfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
-      await execCommand(newCfg, `chown -R "${sftpUser}":users "${siteDir}" && chmod -R u+rwX,go+rX "${siteDir}"`);
+      const sftpShadow = await execCommand(newCfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      await execCommand(newCfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
+      // SSH shell user
+      await execCommand(newCfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
+      const sshShadow = await execCommand(newCfg, `openssl passwd -1 '${sshPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      await execCommand(newCfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
+      await execCommand(newCfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
+      // Perms
+      await execCommand(newCfg, `chown -R "${sshUser}":users "${siteDir}" 2>/dev/null || true; chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}"`);
       await execCommand(newCfg, `grep -qF "${siteDir}" /etc/fstab || echo "${siteDir} ${sftpChroot}/public_html none bind 0 0" >> /etc/fstab`);
       await execCommand(newCfg, `mount "${sftpChroot}/public_html" 2>/dev/null || true`);
       if (site.coreTemplate === 'nodejs') {
@@ -715,6 +794,8 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
       sftpUsername: sftpUser,
       sftpPassword: sftpPass,
       sftpChroot,
+      sshUsername: sshUser,
+      sshPassword: sshPass,
       nginxConfPath: `/etc/nginx/sites-enabled/wexa-site-${shortId}.conf`,
     } as any);
     try {
@@ -794,6 +875,9 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
     const sftpUser = `wexa_site_${shortId}`;
     const sftpPass = genRandomPassword(18);
     const sftpPasswordHash = bcrypt.hashSync(sftpPass, SALT_ROUNDS);
+    const sshUser = `wexa_ssh_${shortId}`;
+    const sshPass = genRandomPassword(18);
+    const sshPasswordHash = bcrypt.hashSync(sshPass, SALT_ROUNDS);
     const pm2Name = `wexa-site-${shortId}`;
     const siteDir = `/var/lib/wexa/sites/${site.id}`;
     const sftpChroot = `/srv/sftp/${sftpUser}`;
@@ -809,11 +893,18 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
       if (site.coreTemplate === 'static') {
         await execCommand(cfg, `[ -f "${siteDir}/index.html" ] || (echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Сайт на Wexa.su</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#fff}.box{padding:2rem 3rem;border-radius:1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}.tag{background:#22c55e22;color:#86efac;padding:.25rem .6rem;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.04em}</style></head><body><div class="box"><span class="tag">WEXA.SU · LANDING</span><h1>Сайт готов 🎉</h1><p>Загрузите свои файлы через SFTP (данные в ЛК wexa.su) или используйте файловый менеджер.</p></div></body></html>' > "${siteDir}/index.html"; fi; true`);
       }
-      // Create user
+      // SFTP user: sftponly group, nologin shell, Chroot + ForceCommand SFTP (PuTTY закрывается — это нормально)
       await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
-      const shadow = await execCommand(cfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
-      await execCommand(cfg, `usermod -p '${shadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
+      const sftpShadow = await execCommand(cfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      await execCommand(cfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
       await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" && chmod -R u+rwX,go+rX "${siteDir}"`);
+      // SSH shell user: NOT sftponly! shell bash, HOME = siteDir → PuTTY/Terminal OK
+      await execCommand(cfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
+      const sshShadow = await execCommand(cfg, `openssl passwd -1 '${sshPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
+      await execCommand(cfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
+      await execCommand(cfg, `chown -R "${sshUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}"`);
+      // Также добавим в sudoers NOPASSWD для pm2/logs чтобы можно было перезапустить свой pm2 из shell (опционально)
+      await execCommand(cfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
       // bind mount + fstab permanent
       await execCommand(cfg, `grep -qF "${siteDir}" /etc/fstab || echo "${siteDir} ${sftpChroot}/public_html none bind 0 0" >> /etc/fstab`);
       await execCommand(cfg, `mount "${sftpChroot}/public_html" 2>/dev/null || true`);
@@ -838,6 +929,10 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
       sftpPasswordPlainOnce: sftpPass,
       sftpPort: node?.sshPort || 22,
       sftpChroot,
+      sshUsername: sshUser,
+      sshPassword: sshPass,
+      sshPasswordHash,
+      sshPort: node?.sshPort || 22,
       pm2ProcessName: site.coreTemplate === 'nodejs' ? pm2Name : null,
       nginxConfPath: nginxConf,
       paidUntil,

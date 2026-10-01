@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -16,6 +16,7 @@ import {
   MessageCircle,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Download,
   CreditCard,
   Briefcase,
@@ -1408,15 +1409,23 @@ const ClientDashboard = () => {
 
   const resetSftpPasswordWebSite = async (siteId: string) => {
     try {
-      if (!confirm('Сгенерировать новый SFTP/SSH пароль?\n\nСтарый пароль перестанет работать.')) return;
+      if (!confirm('Сгенерировать новые SFTP + SSH пароли?\n\n⚠️ СТАРЫЕ пароли перестанут работать.\n\nБудут созданы 2 отдельных пользователя:\n• SFTP-only (для FileZilla/WinSCP редактирования файлов)\n• SSH shell (для PuTTY / bash / терминала)')) return;
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/sites/${siteId}/sftp-password-reset`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast('success', '✅ Новый SFTP пароль сгенерирован!');
-        setWebSftpCreds((prev: any) => ({ ...(prev || {}), username: data.username || '', user: data.username || '', password: data.password || '', passwordOnce: data.password || '' }));
+        showToast('success', '✅ SFTP + SSH пароли сброшены! Новые доступы появятся ниже (2 пользователя).');
+        setWebSftpCreds((prev: any) => ({
+          ...(prev || {}),
+          username: data?.sftp?.username || data?.username || '',
+          user: data?.sftp?.username || data?.username || '',
+          password: data?.sftp?.password || data?.password || '',
+          passwordOnce: data?.sftp?.password || data?.password || '',
+          sftp: data?.sftp || null,
+          ssh: data?.ssh || null,
+        }));
         loadWebSftpCreds(siteId);
       } else {
         const e = await res.json().catch(() => ({}));
@@ -5635,208 +5644,279 @@ const ClientDashboard = () => {
                     const id = String(ws?.id || '');
                     const shortId = id.slice(0, 8);
                     const hostPort = 3000 + Math.abs((id.charCodeAt(0) || 0) + (id.charCodeAt(7) || 0)) % 1000;
-                    const fallbackUsername = shortId ? `wexa_site_${shortId}` : '';
-                    const sftpUsername = s?.username || ws?.sftpUsername || fallbackUsername;
-                    const hasPassword = !!(s?.password || s?.passwordOnce);
-                    const sftpPassword = hasPassword
-                      ? (s?.password || s?.passwordOnce)
-                      : (s && s.host ? '' : 'Загрузка...');
-                    const sshHost = ws?.node?.ip || s?.host || '';
-                    const sftpUrl = s && s.host && sftpUsername ? `sftp://${encodeURIComponent(sftpUsername)}@${s.host}:${s.port || 22}${s.rootPath || '/'}` : '';
+                    const fallbackSftpUser = shortId ? `wexa_site_${shortId}` : '';
+                    const fallbackSshUser = shortId ? `wexa_ssh_${shortId}` : '';
+                    const sshData = s?.ssh || ws?.sshUsername ? {
+                      host: s?.ssh?.host || ws?.node?.ip || s?.host || '',
+                      port: s?.ssh?.port || ws?.sshPort || 22,
+                      username: s?.ssh?.username || ws?.sshUsername || fallbackSshUser,
+                      user: s?.ssh?.user || ws?.sshUsername || fallbackSshUser,
+                      password: s?.ssh?.password || ws?.sshPassword || '',
+                      homeDir: s?.ssh?.homeDir || `/var/lib/wexa/sites/${id}`,
+                      cli: s?.ssh?.cli || `ssh ${s?.ssh?.username || ws?.sshUsername || fallbackSshUser}@${ws?.node?.ip || s?.host || ''} -p ${s?.ssh?.port || ws?.sshPort || 22}`,
+                      note: s?.ssh?.note || '',
+                    } : null;
+                    const sftpData = {
+                      host: s?.sftp?.host || ws?.node?.ip || s?.host || '',
+                      port: s?.sftp?.port || ws?.sftpPort || s?.port || 22,
+                      username: s?.sftp?.username || s?.username || ws?.sftpUsername || fallbackSftpUser,
+                      user: s?.sftp?.user || s?.user || ws?.sftpUsername || fallbackSftpUser,
+                      password: s?.sftp?.password || s?.password || s?.passwordOnce || ws?.sftpPassword || '',
+                      rootPath: s?.sftp?.rootPath || s?.rootPath || '/public_html',
+                      cli: s?.sftp?.cli ||
+                        `sftp -P ${s?.sftp?.port || ws?.sftpPort || s?.port || 22} ${s?.sftp?.username || s?.username || ws?.sftpUsername || fallbackSftpUser}@${s?.sftp?.host || ws?.node?.ip || s?.host || ''}`,
+                      note: s?.sftp?.note || s?.note || '',
+                    };
+                    const sftpUrl = sftpData.host && sftpData.username
+                      ? `sftp://${encodeURIComponent(sftpData.username)}@${sftpData.host}:${sftpData.port}${sftpData.rootPath || '/'}`
+                      : '';
+                    const sftpHasPassword = !!sftpData.password;
+                    const sshHasPassword = sshData ? !!sshData.password : false;
                     return (
-                      <div className="grid gap-6 lg:grid-cols-2">
-                        <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
-                          <div className="flex items-center justify-between gap-2 mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                                <KeyRound className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-slate-900">SFTP доступ (редактирование файлов)</h4>
-                                <p className="text-xs text-slate-500">FileZilla, WinSCP, VSCode Remote, ForkLift</p>
-                              </div>
+                      <div className="space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 via-white to-rose-50 p-4">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow">
+                              <AlertTriangle className="h-5 w-5"/>
                             </div>
-                            <button
-                              onClick={() => resetSftpPasswordWebSite(ws.id)}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 hover:shadow-sm transition"
-                              title="Сгенерировать новый пароль"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5"/> Новый пароль
-                            </button>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-amber-900 text-sm">Важно! 2 разных пользователя для разных задач</h4>
+                              <p className="text-xs text-amber-800 mt-0.5">
+                                <strong>SFTP</strong> (файлы): пользователь <span className="font-mono bg-amber-100 px-1 rounded">wexa_site_XXXX</span> — PuTTY <strong>ЗАКРОЕТСЯ</strong> (ForceCommand internal-sftp). Только для FileZilla/WinSCP.
+                              </p>
+                              <p className="text-xs text-amber-800 mt-1">
+                                <strong>SSH Terminal</strong> (bash / PuTTY): пользователь <span className="font-mono bg-rose-100 px-1 rounded">wexa_ssh_XXXX</span> — shell bash, HOME = корень сайта. <strong>В PuTTY вводи именно эти данные (карточка №2 справа ↓)</strong>
+                              </p>
+                            </div>
                           </div>
-                          {s && s.ok !== false ? (
-                            <div className="space-y-3">
-                              {[
-                                { k: 'Хост / IP', v: s?.host || sshHost, id: 'sftp-host', copyable: true },
-                                { k: 'Порт', v: String(s?.port || 22), id: 'sftp-port', copyable: true },
-                                { k: 'Пользователь', v: sftpUsername, id: 'sftp-user', copyable: !!sftpUsername },
-                              ].map((row) => (
-                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
-                                    <div className="font-mono text-sm truncate text-slate-900">{row.v || '—'}</div>
-                                  </div>
-                                  {row.copyable && row.v ? (
-                                    <button
-                                      onClick={() => copyToClipboard(row.v, row.k)}
-                                      className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
-                                      title={`Скопировать ${row.k}`}
-                                    >
-                                      {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              ))}
-
-                              {hasPassword ? (
-                                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-2 border-emerald-200 px-3.5 py-2.5">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Пароль (постоянный доступ)</div>
-                                    <div className="font-mono text-sm tracking-[0.05em] text-slate-900 break-all">{sftpPassword}</div>
-                                  </div>
-                                  <button onClick={() => copyToClipboard(String(sftpPassword), 'Пароль')} className="shrink-0 rounded-lg border border-emerald-200 p-1.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
-                                    {copiedValue === 'Пароль' ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-3.5 py-3 flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
-                                  <div className="flex items-start gap-2 min-w-0">
-                                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"/>
-                                    <div className="min-w-0">
-                                      <div className="text-xs font-bold text-amber-800">Пароль ещё не сгенерирован</div>
-                                      <div className="text-[11px] text-amber-700/90">Нажмите «Сгенерировать пароль» справа — он создастся на ноде и сохранится в профиле.</div>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => resetSftpPasswordWebSite(ws.id)}
-                                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:shadow-md hover:from-amber-600 hover:to-orange-600 transition"
-                                  >
-                                    <KeyRound className="h-3.5 w-3.5"/> Сгенерировать пароль
-                                  </button>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Путь (Root Folder)</div>
-                                  <div className="font-mono text-sm text-slate-900">{s?.rootPath || '/public_html'}</div>
-                                </div>
-                                <button onClick={() => copyToClipboard(s?.rootPath || '/public_html', 'Root Path')} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
-                                  {copiedValue === 'Root Path' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
-                                </button>
-                              </div>
-
-                              {sftpUrl && (
-                                <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-600/90 text-white px-3.5 py-2.5 mt-2">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-indigo-100 font-bold">Ссылка для подключения (один клик)</div>
-                                    <a href={sftpUrl} className="block font-mono text-xs truncate text-white hover:text-yellow-100">{sftpUrl}</a>
-                                  </div>
-                                  <button
-                                    onClick={() => copyToClipboard(sftpUrl, 'SFTP URL')}
-                                    className="rounded-lg bg-white/20 p-1.5 text-white hover:bg-white/30 transition shrink-0"
-                                  >
-                                    {copiedValue === 'SFTP URL' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-4 py-6 text-slate-500">
-                              <Loader className="h-5 w-5 animate-spin text-indigo-500" />
-                              Загрузка SFTP-данных...
-                            </div>
-                          )}
+                          <button
+                            onClick={() => resetSftpPasswordWebSite(ws.id)}
+                            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:shadow-lg hover:brightness-110 transition"
+                            title="Сгенерировать/сбросить оба пароля сразу"
+                          >
+                            <KeyRound className="h-4 w-4"/>
+                            Сгенерировать / сбросить оба пароля
+                          </button>
                         </div>
 
-                        <div className="space-y-5">
-                          <div className="rounded-2xl border-2 border-sky-100 bg-gradient-to-br from-sky-50 to-cyan-50 p-5">
-                            <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="grid gap-5 lg:grid-cols-2">
+                          {/* ======== CARD 1: SFTP ONLY ======== */}
+                          <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
+                            <div className="flex items-center justify-between gap-2 mb-4">
                               <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-sm">
-                                  <Bot className="h-5 w-5" />
+                                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                                  <KeyRound className="h-5 w-5"/>
                                 </div>
                                 <div>
-                                  <h4 className="font-bold text-slate-900">Прямой SSH-терминал</h4>
-                                  <p className="text-xs text-slate-500">Командная строка, bash, npm, node, git</p>
+                                  <h4 className="font-bold text-slate-900">1️⃣ SFTP доступ (файлы)</h4>
+                                  <p className="text-xs text-slate-500">FileZilla · WinSCP · ForkLift · VSCode Remote</p>
+                                  <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-bold">
+                                    <Ban className="h-3 w-3"/>
+                                    НЕ ДЛЯ PUTTY (закроется сразу)
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="space-y-2.5">
-                              {[
-                                { k: 'Хост SSH', v: sshHost, id: 'ssh-host', copyable: true },
-                                { k: 'Порт SSH', v: '22', id: 'ssh-port', copyable: true },
-                                { k: 'Пользователь', v: sftpUsername, id: 'ssh-user', copyable: !!sftpUsername },
-                              ].map((row) => (
-                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
-                                    <div className="font-mono text-sm truncate">{row.v || '—'}</div>
+                            {s && s.ok !== false ? (
+                              <div className="space-y-3">
+                                {[
+                                  { k: 'Хост / IP', v: sftpData.host, id: 'sftp-host', copyable: true },
+                                  { k: 'Порт', v: String(sftpData.port), id: 'sftp-port', copyable: true },
+                                  { k: 'Пользователь', v: sftpData.username, id: 'sftp-user', copyable: !!sftpData.username },
+                                ].map((row) => (
+                                  <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
+                                      <div className="font-mono text-sm truncate text-slate-900">{row.v || '—'}</div>
+                                    </div>
+                                    {row.copyable && row.v ? (
+                                      <button
+                                        onClick={() => copyToClipboard(row.v, row.k)}
+                                        className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
+                                        title={`Скопировать ${row.k}`}
+                                      >
+                                        {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                      </button>
+                                    ) : null}
                                   </div>
-                                  {row.copyable && row.v ? (
-                                    <button onClick={() => copyToClipboard(row.v, row.k)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 shrink-0">
-                                      {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              ))}
+                                ))}
 
-                              {hasPassword ? (
-                                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-sky-50 via-white to-sky-50 border-2 border-sky-200 px-3.5 py-2.5">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-sky-700 font-bold">Пароль SSH</div>
-                                    <div className="font-mono text-sm tracking-wider text-slate-900 break-all">{sftpPassword}</div>
+                                {sftpHasPassword ? (
+                                  <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-50 via-white to-emerald-50 border-2 border-emerald-200 px-3.5 py-2.5">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Пароль SFTP (постоянный доступ)</div>
+                                      <div className="font-mono text-sm tracking-[0.05em] text-slate-900 break-all">{sftpData.password}</div>
+                                    </div>
+                                    <button onClick={() => copyToClipboard(String(sftpData.password), 'Пароль SFTP')} className="shrink-0 rounded-lg border border-emerald-200 p-1.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                                      {copiedValue === 'Пароль SFTP' ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
+                                    </button>
                                   </div>
-                                  <button onClick={() => copyToClipboard(String(sftpPassword), 'SSH Пароль')} className="shrink-0 rounded-lg border border-sky-200 p-1.5 text-sky-700 hover:bg-sky-50 hover:text-sky-800 transition">
-                                    {copiedValue === 'SSH Пароль' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                ) : (
+                                  <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-3.5 py-3 flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
+                                    <div className="flex items-start gap-2 min-w-0">
+                                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"/>
+                                      <div className="min-w-0">
+                                        <div className="text-xs font-bold text-amber-800">SFTP пароль ещё не сгенерирован</div>
+                                        <div className="text-[11px] text-amber-700/90">Нажми «Сгенерировать / сбросить оба пароля» вверху ↑ (создаст сразу и SFTP, и SSH пользователей).</div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => resetSftpPasswordWebSite(ws.id)}
+                                      className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow hover:shadow-md hover:from-amber-600 hover:to-orange-600 transition"
+                                    >
+                                      <KeyRound className="h-3.5 w-3.5"/> Сгенерировать
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Путь (Root Folder)</div>
+                                    <div className="font-mono text-sm text-slate-900">{sftpData.rootPath || '/public_html'}</div>
+                                  </div>
+                                  <button onClick={() => copyToClipboard(sftpData.rootPath || '/public_html', 'Root Path')} className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
+                                    {copiedValue === 'Root Path' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
                                   </button>
                                 </div>
-                              ) : (
-                                <button
-                                  onClick={() => resetSftpPasswordWebSite(ws.id)}
-                                  className="flex w-full flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 px-3.5 py-3 text-left hover:bg-sky-100 transition"
-                                >
-                                  <div className="flex items-start gap-2 min-w-0">
-                                    <AlertCircle className="h-5 w-5 text-sky-600 shrink-0 mt-0.5"/>
-                                    <div className="min-w-0">
-                                      <div className="text-xs font-bold text-sky-800">SSH Пароль</div>
-                                      <div className="text-[11px] text-sky-700/90">Сгенерируется вместе с SFTP паролем (один пароль для двух протоколов).</div>
-                                    </div>
-                                  </div>
-                                  <span className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-sky-700 transition">
-                                    <KeyRound className="h-3 w-3"/> Сгенерировать
-                                  </span>
-                                </button>
-                              )}
-                            </div>
-                            <div className="mt-3 rounded-xl bg-slate-950 text-amber-100 font-mono text-[12px] p-3 overflow-x-auto">
-                              <div className="text-slate-500 mb-1"># Быстрый вход (вставить в терминал):</div>
-                              ssh {sftpUsername || 'USER'}@{sshHost || 'HOST'} -p 22
-                            </div>
-                          </div>
 
-                          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
-                            <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-500"/> Переменные окружения (env)</h4>
-                            <p className="text-xs text-slate-500 mb-3">Используйте `process.env.NAME` в Node.js / EJS.</p>
-                            <div className="space-y-2.5">
-                              {[
-                                { k: 'PORT', v: String(hostPort), id: 'env-port' },
-                                { k: 'NODE_ENV', v: 'production', id: 'env-env' },
-                                { k: 'SITE_ID', v: id, id: 'env-siteid' },
-                                { k: 'SITE_DOMAIN', v: ws?.domain || '', id: 'env-domain' },
-                                { k: 'PUBLIC_PATH', v: `/var/lib/wexa/sites/${id}/public`, id: 'env-public' },
-                                { k: 'SITE_ROOT', v: `/var/lib/wexa/sites/${id}`, id: 'env-root' },
-                              ].map((row) => (
-                                <div key={row.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-                                  <div className="font-mono text-xs font-semibold text-slate-600">{row.k}=</div>
-                                  <div className="flex items-center gap-2 flex-1 justify-end">
-                                    <div className="font-mono text-xs text-slate-900 truncate">{row.v || '""'}</div>
-                                    <button onClick={() => copyToClipboard(`${row.k}=${row.v || ''}`, row.k)} className="rounded p-1 text-slate-400 hover:text-indigo-600 shrink-0">
-                                      {copiedValue === row.k ? <Check className="h-3.5 w-3.5 text-emerald-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                                {sftpUrl && (
+                                  <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-600/90 text-white px-3.5 py-2.5 mt-2">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-[10px] uppercase tracking-wider text-indigo-100 font-bold">Ссылка для подключения (один клик)</div>
+                                      <a href={sftpUrl} className="block font-mono text-xs truncate text-white hover:text-yellow-100">{sftpUrl}</a>
+                                    </div>
+                                    <button
+                                      onClick={() => copyToClipboard(sftpUrl, 'SFTP URL')}
+                                      className="rounded-lg bg-white/20 p-1.5 text-white hover:bg-white/30 transition shrink-0"
+                                    >
+                                      {copiedValue === 'SFTP URL' ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
                                     </button>
                                   </div>
+                                )}
+                                <div className="rounded-xl bg-slate-950 text-indigo-100 font-mono text-[12px] p-3 overflow-x-auto mt-1">
+                                  <div className="text-slate-500 mb-1"># Быстрый вход (WinSCP / CLI):</div>
+                                  {sftpData.cli}
                                 </div>
-                              ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-4 py-6 text-slate-500">
+                                <Loader className="h-5 w-5 animate-spin text-indigo-500"/>
+                                Загрузка SFTP-данных...
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ======== CARD 2: SSH TERMINAL (PuTTY) ======== */}
+                          <div className="space-y-5">
+                            <div className="rounded-2xl border-2 border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-5">
+                              <div className="flex items-center justify-between gap-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                                    <TerminalIcon className="h-5 w-5"/>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-slate-900">2️⃣ SSH Terminal (PuTTY / bash)</h4>
+                                    <p className="text-xs text-slate-500">PuTTY · KiTTY · Termius · cmd ssh · bash</p>
+                                    <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-[10px] font-bold">
+                                      <Check className="h-3 w-3"/>
+                                      ДЛЯ PUTTY — именно эти данные!
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              {sshData || (s && s.ok !== false) ? (
+                                <div className="space-y-2.5">
+                                  {[
+                                    { k: 'Хост SSH', v: sshData?.host || ws?.node?.ip || s?.host, id: 'ssh-host', copyable: true },
+                                    { k: 'Порт SSH', v: String(sshData?.port || ws?.sshPort || s?.port || 22), id: 'ssh-port', copyable: true },
+                                    { k: 'Пользователь SSH', v: sshData?.username || fallbackSshUser, id: 'ssh-user', copyable: !!(sshData?.username || fallbackSshUser) },
+                                    { k: 'Домашняя директория (HOME)', v: sshData?.homeDir || `/var/lib/wexa/sites/${id}`, id: 'ssh-home', copyable: true },
+                                  ].map((row) => (
+                                    <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3.5 py-2.5">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{row.k}</div>
+                                        <div className="font-mono text-sm truncate">{row.v || '—'}</div>
+                                      </div>
+                                      {row.copyable && row.v ? (
+                                        <button onClick={() => copyToClipboard(row.v, row.k)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 shrink-0">
+                                          {copiedValue === row.k ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ))}
+
+                                  {sshHasPassword ? (
+                                    <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-50 via-white to-teal-50 border-2 border-emerald-200 px-3.5 py-2.5">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Пароль SSH (shell bash)</div>
+                                        <div className="font-mono text-sm tracking-wider text-slate-900 break-all">{sshData!.password}</div>
+                                      </div>
+                                      <button onClick={() => copyToClipboard(String(sshData!.password), 'Пароль SSH')} className="shrink-0 rounded-lg border border-emerald-200 p-1.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                                        {copiedValue === 'Пароль SSH' ? <Check className="h-4 w-4 text-emerald-600"/> : <Copy className="h-4 w-4"/>}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => resetSftpPasswordWebSite(ws.id)}
+                                      className="flex w-full flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 px-3.5 py-3 text-left hover:bg-emerald-100 transition"
+                                    >
+                                      <div className="flex items-start gap-2 min-w-0">
+                                        <AlertCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5"/>
+                                        <div className="min-w-0">
+                                          <div className="text-xs font-bold text-emerald-800">SSH пароль ещё не сгенерирован</div>
+                                          <div className="text-[11px] text-emerald-700/90">Нажми кнопку справа → создастся отдельный пользователь `{fallbackSshUser}` с shell /bin/bash, HOME = корень сайта.</div>
+                                        </div>
+                                      </div>
+                                      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-700 transition">
+                                        <KeyRound className="h-3 w-3"/> Сгенерировать
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-4 py-6 text-slate-500">
+                                  <Loader className="h-5 w-5 animate-spin text-emerald-500"/>
+                                  Загрузка SSH-данных...
+                                </div>
+                              )}
+                              <div className="mt-3 rounded-xl bg-slate-950 text-emerald-100 font-mono text-[12px] p-3 overflow-x-auto">
+                                <div className="text-slate-500 mb-1"># PuTTY / Bash — вставь в терминал / команду:</div>
+                                {sshData?.cli || `ssh ${fallbackSshUser}@${ws?.node?.ip || s?.host || 'HOST'} -p ${sshData?.port || 22}`}
+                              </div>
+                              <div className="mt-2 text-[11px] text-slate-500 leading-relaxed rounded-lg bg-white/60 border border-slate-200 px-2.5 py-2">
+                                <p className="font-semibold text-slate-700">Что можно делать в SSH shell:</p>
+                                <ul className="list-disc list-inside mt-0.5 space-y-0.5">
+                                  <li><code className="rounded bg-slate-100 px-1">pm2 status</code>, <code className="rounded bg-slate-100 px-1">pm2 logs</code>, <code className="rounded bg-slate-100 px-1">pm2 restart [name]</code> — sudoers NOPASSWD</li>
+                                  <li><code className="rounded bg-slate-100 px-1">npm install</code>, <code className="rounded bg-slate-100 px-1">node -v</code>, <code className="rounded bg-slate-100 px-1">npm run build</code></li>
+                                  <li><code className="rounded bg-slate-100 px-1">nginx -t</code>, <code className="rounded bg-slate-100 px-1">sudo systemctl reload nginx</code> — sudoers NOPASSWD</li>
+                                  <li><code className="rounded bg-slate-100 px-1">ls -la ./public_html</code> — сразу в корне сайта после входа</li>
+                                </ul>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+                              <h4 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-500"/> Переменные окружения (env)</h4>
+                              <p className="text-xs text-slate-500 mb-3">Используйте `process.env.NAME` в Node.js / EJS.</p>
+                              <div className="space-y-2.5">
+                                {[
+                                  { k: 'PORT', v: String(hostPort), id: 'env-port' },
+                                  { k: 'NODE_ENV', v: 'production', id: 'env-env' },
+                                  { k: 'SITE_ID', v: id, id: 'env-siteid' },
+                                  { k: 'SITE_DOMAIN', v: ws?.domain || '', id: 'env-domain' },
+                                  { k: 'PUBLIC_PATH', v: `/var/lib/wexa/sites/${id}/public`, id: 'env-public' },
+                                  { k: 'SITE_ROOT', v: `/var/lib/wexa/sites/${id}`, id: 'env-root' },
+                                ].map((row) => (
+                                  <div key={row.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                                    <div className="font-mono text-xs font-semibold text-slate-600">{row.k}=</div>
+                                    <div className="flex items-center gap-2 flex-1 justify-end">
+                                      <div className="font-mono text-xs text-slate-900 truncate">{row.v || '""'}</div>
+                                      <button onClick={() => copyToClipboard(`${row.k}=${row.v || ''}`, row.k)} className="rounded p-1 text-slate-400 hover:text-indigo-600 shrink-0">
+                                        {copiedValue === row.k ? <Check className="h-3.5 w-3.5 text-emerald-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>

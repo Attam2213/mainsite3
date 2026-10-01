@@ -24,6 +24,10 @@ class WebSite extends Model {
   declare sftpPassword: string | null;
   declare sftpPort: number | null;
   declare sftpChroot: string | null;
+  declare sshUsername: string | null;
+  declare sshPassword: string | null;
+  declare sshPasswordHash: string | null;
+  declare sshPort: number | null;
   declare nginxConfPath: string | null;
   declare sslCertPath: string | null;
   declare sslExpiresAt: string | null;
@@ -69,6 +73,10 @@ WebSite.init(
     sftpPassword: { type: DataTypes.STRING, allowNull: true },
     sftpPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 22 },
     sftpChroot: { type: DataTypes.STRING, allowNull: true },
+    sshUsername: { type: DataTypes.STRING, allowNull: true, unique: true },
+    sshPassword: { type: DataTypes.STRING(128), allowNull: true },
+    sshPasswordHash: { type: DataTypes.STRING, allowNull: true },
+    sshPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 22 },
     nginxConfPath: { type: DataTypes.STRING, allowNull: true },
     sslCertPath: { type: DataTypes.STRING, allowNull: true },
     sslExpiresAt: { type: DataTypes.DATEONLY, allowNull: true },
