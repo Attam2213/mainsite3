@@ -1,4 +1,4 @@
-﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -551,8 +551,11 @@ const GameServerConfigurator = ({
 
   const PeriodSelector = () => (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-4">Период оплаты</label>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="mb-4">
+        <label className="block text-base font-extrabold text-gray-900 mb-1">Период оплаты</label>
+        <p className="text-sm text-gray-500">Выберите срок — чем дольше, тем больше скидка до 15%.</p>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {VALID_PERIODS.map(p => {
           const active = periodMonths === p;
           return (
@@ -560,13 +563,13 @@ const GameServerConfigurator = ({
               key={p}
               type="button"
               onClick={(e) => { e.preventDefault(); setPeriodMonthsStable(p); }}
-              className={`flex items-center justify-center py-3 px-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center py-4 px-4 rounded-2xl border-2 font-bold transition-all ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-700 shadow-inner ring-4 ring-indigo-100 scale-[1.02]'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
               }`}
             >
-              {periodLabel(p)}
+              <span className="text-base">{periodLabel(p)}</span>
               {discountBadge(p)}
             </button>
           );
@@ -753,10 +756,23 @@ const GameServerConfigurator = ({
 
   const WebsitePlanCards = () => (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-4">Тариф хостинга сайтов</label>
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <label className="block text-base font-extrabold text-gray-900 mb-1.5">Тариф хостинга сайтов</label>
+          <p className="text-sm text-gray-500">Выберите подходящий тариф — потом можно сменить в любой момент.</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+          <Sparkles size={16} className="text-emerald-600 flex-shrink-0" />
+          <div className="text-[11px] text-emerald-800 font-semibold leading-tight">
+            <div className="font-bold">30 дней гарантии</div>
+            <div>Никаких скрытых платежей</div>
+          </div>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-3 gap-6">
         {websitePlans.map(p => {
           const active = selectedWebsitePlan === p.id;
+          const popular = p.id === 'business';
           const accent = p.id === 'landing'
             ? { border: 'border-sky-500', bg: 'bg-sky-50', text: 'text-sky-700', grad: 'from-sky-500 to-cyan-500' }
             : p.id === 'business'
@@ -768,36 +784,40 @@ const GameServerConfigurator = ({
               key={p.id}
               type="button"
               onClick={(e) => { e.preventDefault(); setSelectedWebsitePlanStable(p.id); }}
-              className={`text-left p-5 rounded-2xl border-2 transition-all relative bg-white hover:shadow-lg ${
-                active ? `${accent.border} ring-4 ${accent.bg}/60 shadow-inner` : 'border-gray-200 hover:border-gray-300'
+              className={`text-left p-6 md:p-7 rounded-3xl border-2 transition-all relative bg-white hover:shadow-xl ${
+                popular ? '-translate-y-2 shadow-2xl' : ''
+              } ${
+                active ? `${accent.border} ring-4 ${accent.bg}/60 shadow-inner scale-[1.015]` : 'border-gray-200 hover:border-gray-300 hover:-translate-y-0.5'
               }`}
             >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${accent.grad} text-white flex items-center justify-center mb-4 shadow-md`}>
-                <Icon size={22} />
+              {popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black tracking-wider uppercase shadow-lg">
+                  ⭐ Популярный
+                </div>
+              )}
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${accent.grad} text-white flex items-center justify-center mb-5 shadow-xl`}>
+                <Icon size={26} />
               </div>
-              <div className="flex items-baseline justify-between mb-2">
-                <h5 className="text-xl font-extrabold text-gray-900">{p.label}</h5>
-                {p.id === 'business' && (
-                  <span className="text-[10px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full">
-                    ПОПУЛЯРНЫЙ
-                  </span>
-                )}
+              <div className="flex items-baseline justify-between mb-2.5">
+                <h5 className="text-2xl font-black text-gray-900">{p.label}</h5>
               </div>
-              <div className={`text-3xl font-black ${accent.text} mb-2`}>
-                {p.priceMonthly} <span className="text-sm font-semibold text-gray-500">₽/мес</span>
+              <div className={`text-4xl font-black ${accent.text} mb-3`}>
+                {p.priceMonthly} <span className="text-base font-semibold text-gray-500">₽/мес</span>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed mb-3">{p.description}</p>
-              <ul className="space-y-1.5 mb-1">
+              <p className="text-sm text-gray-600 leading-relaxed mb-4">{p.description}</p>
+              <ul className="space-y-2 mb-1.5">
                 {p.features.slice(0, 4).map((f, i) => (
-                  <li key={i} className="text-[11px] text-gray-600 flex items-start gap-1.5">
-                    <CheckCircle size={12} className="text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span>{f}</span>
+                  <li key={i} className="text-[12.5px] text-gray-700 flex items-start gap-2">
+                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <CheckCircle size={12} />
+                    </div>
+                    <span className="leading-snug">{f}</span>
                   </li>
                 ))}
               </ul>
               {active && (
-                <div className={`absolute top-3 right-3 w-7 h-7 rounded-full ${accent.border.replace('border-', 'bg-')} text-white flex items-center justify-center shadow`}>
-                  <CheckCircle size={16} />
+                <div className={`absolute top-4 right-4 w-8 h-8 rounded-full ${accent.border.replace('border-', 'bg-')} text-white flex items-center justify-center shadow-lg ring-4 ring-white`}>
+                  <CheckCircle size={18} />
                 </div>
               )}
             </button>
@@ -809,8 +829,11 @@ const GameServerConfigurator = ({
 
   const WebsiteDomainField = () => (
     <div>
-      <label className="block text-sm font-bold text-gray-700 mb-3">Домен вашего сайта</label>
-      <div className="flex items-stretch gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-1 mb-3">
+      <div className="mb-4">
+        <label className="block text-base font-extrabold text-gray-900 mb-1">Домен вашего сайта</label>
+        <p className="text-sm text-gray-500">Бесплатный поддомен wexa.su сразу после заказа · Свой домен — привяжите потом.</p>
+      </div>
+      <div className="flex items-stretch gap-2 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-violet-50/40 p-1.5 mb-4">
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); setWebsiteDomainModeStable('subdomain'); }}
@@ -1159,34 +1182,34 @@ const GameServerConfigurator = ({
             <p className="mt-4 text-xl text-gray-500">Выберите услугу и параметры — цена рассчитается автоматически.</p>
           </div>
         )}
-        <div className={`max-w-5xl mx-auto ${compact ? '' : 'bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100'}`}>
-          <div className="grid lg:grid-cols-5 rounded-3xl overflow-hidden bg-white shadow-2xl border border-gray-100">
-            <div className="lg:col-span-3 p-6 md:p-10 space-y-6">
+        <div className={`max-w-7xl mx-auto ${compact ? '' : 'bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-gray-100'}`}>
+          <div className="grid lg:grid-cols-12 rounded-3xl overflow-hidden bg-white shadow-2xl border border-gray-100">
+            <div className="lg:col-span-8 p-8 md:p-12 space-y-8 relative">
               {configuratorMode === 'both' && (
                 <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('game'); }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
                       actualTab === 'game'
                         ? 'bg-white shadow text-indigo-700 border border-indigo-100'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    <Gamepad2 size={18} />
-                    Игровые серверы
+                    <Gamepad2 size={20} />
+                    <span className="text-base">Игровые серверы</span>
                   </button>
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); setConfiguratorTabStable('website'); }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold transition-all ${
                       actualTab === 'website'
                         ? 'bg-white shadow text-indigo-700 border border-indigo-100'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    <Globe size={18} />
-                    Сайты
+                    <Globe size={20} />
+                    <span className="text-base">Сайты</span>
                   </button>
                 </div>
               )}
@@ -1194,13 +1217,13 @@ const GameServerConfigurator = ({
               <div
                 aria-hidden={actualTab !== 'game'}
                 style={{display: actualTab === 'game' ? undefined : 'none'}}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-8"
               >
                 <CompactGameSelector />
                 <CompactLocationSelector />
                 <PeriodSelector />
                 {showNameField && <NameField />}
-                <div className="flex flex-col gap-6 pt-2">
+                <div className="flex flex-col gap-8 pt-2">
                   <Sliders />
                   <McVersionSelector />
                   <Cs16BuildSelector />
@@ -1209,24 +1232,66 @@ const GameServerConfigurator = ({
               <div
                 aria-hidden={actualTab !== 'website'}
                 style={{display: actualTab === 'website' ? undefined : 'none'}}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-9 relative"
               >
+                {/* floating left decor website configurator (2nd screen circled left) */}
+                <div className="hidden xl:block absolute -left-10 top-16 pointer-events-none z-0">
+                  <div className="w-56 rounded-2xl bg-gradient-to-br from-sky-50 to-white border border-sky-100 p-4 shadow-xl rotate-[-6deg] animate-[floatLeft_8s_ease-in-out_infinite]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 text-white flex items-center justify-center"><Globe size={17} /></div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-sky-600 font-bold">Subdomain</div>
+                        <div className="text-xs font-bold text-gray-800 font-mono">cafe.💜.wexa.su</div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-sky-100 bg-white overflow-hidden">
+                      <div className="h-1.5 bg-gradient-to-r from-sky-400 via-indigo-400 to-violet-400" />
+                      <div className="p-2 text-[10px] text-emerald-600 font-bold flex items-center gap-1.5"><CheckCircle size={12} /> SSL Auto · 2m Deploy</div>
+                    </div>
+                  </div>
+                </div>
+                {/* floating right decor website configurator (2nd + 4th screen circled right) */}
+                <div className="hidden xl:block absolute -right-10 top-28 pointer-events-none z-0">
+                  <div className="w-56 rounded-2xl bg-gradient-to-br from-fuchsia-50 to-white border border-fuchsia-100 p-4 shadow-xl rotate-[5deg] animate-[floatRight_9s_ease-in-out_infinite]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center"><Terminal size={17} /></div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-fuchsia-600 font-bold">Business</div>
+                        <div className="text-xs font-bold text-gray-800">Node.js · PM2 · 299₽</div>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="h-1.5 rounded-full bg-fuchsia-100 overflow-hidden"><div className="w-5/6 h-full bg-gradient-to-r from-fuchsia-400 to-pink-400" /></div>
+                      <div className="flex justify-between text-[10px] font-semibold text-gray-500">
+                        <span>Нагрузка CPU</span><span className="text-fuchsia-600">17% ✅</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[9px] font-bold">
+                      <div className="rounded-md bg-white border border-indigo-100 py-1 text-indigo-600">Redis</div>
+                      <div className="rounded-md bg-white border border-indigo-100 py-1 text-indigo-600">SQLite</div>
+                      <div className="rounded-md bg-white border border-indigo-100 py-1 text-indigo-600">EJS</div>
+                    </div>
+                  </div>
+                </div>
+
                 <WebsitePlanCards />
+                <div className="h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
                 <PeriodSelector />
+                <div className="h-px bg-gradient-to-r from-transparent via-fuchsia-200 to-transparent" />
                 <WebsiteDomainField />
-                <div className="flex items-start gap-3 p-4 bg-sky-50 border border-sky-200 rounded-2xl">
-                  <Rocket size={20} className="text-sky-600 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl">
+                  <Rocket size={22} className="text-sky-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm font-bold text-sky-800 mb-1">Быстрый старт</div>
-                    <p className="text-xs text-sky-700/90 leading-relaxed">
-                      После оплаты сайт развернётся за ~2 минуты: <b>Business</b> — готовый шаблон на Express + EJS с&nbsp;админкой, <b>Landing</b> — чистый HTML.
-                      Загружайте свои файлы через SFTP или файловый менеджер в ЛК.
+                    <div className="text-sm font-bold text-sky-900 mb-1.5">🚀 Быстрый старт за ~2 минуты</div>
+                    <p className="text-xs text-sky-800/90 leading-relaxed">
+                      После оплаты сайт развернётся автоматически: <b>Business / Premium</b> — готовый шаблон на Express + EJS с&nbsp;админкой, <b>Landing</b> — чистый HTML/CSS/JS.
+                      Загружайте свои файлы через SFTP или файловый менеджер в ЛК. SSL, PM2, бэкапы — уже настроены.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-4">
               <div
                 aria-hidden={actualTab !== 'game'}
                 style={{display: actualTab === 'game' ? undefined : 'none'}}

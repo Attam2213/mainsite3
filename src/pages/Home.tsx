@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -13,7 +13,7 @@ import {
   ArrowRight, Gamepad2, Zap, ChevronDown, X,
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
-  Headphones, MapPin, Mail, Star,
+  Headphones, MapPin, Mail, Star, Server, Database, Code2, Layers,
 } from 'lucide-react';
 
 const Home = () => {
@@ -100,6 +100,13 @@ const Home = () => {
         description="Хостинг игровых серверов Wexa.su. Minecraft, CS2, CS 1.6. Быстрые NVMe ноды, защита от DDoS, SFTP, панель управления. Мгновенный запуск за 60 секунд. Сайты — Landing, Node.js."
       />
       <div className="bg-white overflow-hidden font-sans">
+        <style>{`
+          @keyframes floatLeft { 0%, 100% { transform: translate(0, 0) rotate(-4deg); } 50% { transform: translate(0, -10px) rotate(-2deg); } }
+          @keyframes floatRight { 0%, 100% { transform: translate(0, 0) rotate(5deg); } 50% { transform: translate(0, -12px) rotate(3deg); } }
+          @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+          @keyframes pulseGlow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+          .rotate-y-180 { transform: rotateY(180deg); }
+        `}</style>
 
         {/* HERO */}
         <section id="hero" className="relative min-h-screen flex items-center justify-center pt-24 pb-32 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white">
@@ -110,6 +117,123 @@ const Home = () => {
             <div className="absolute top-1/4 left-1/4 w-2 h-2 rounded-full bg-indigo-400 animate-pulse opacity-60" />
             <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse opacity-60" style={{ animationDelay: '0.7s' }} />
             <div className="absolute bottom-1/3 left-1/3 w-1 h-1 rounded-full bg-pink-400 animate-pulse opacity-60" style={{ animationDelay: '1.4s' }} />
+            <div className="absolute top-0 left-0 w-[34rem] h-[34rem] bg-indigo-500/20 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/4" />
+            <div className="absolute bottom-0 right-0 w-[38rem] h-[38rem] bg-fuchsia-500/20 rounded-full blur-3xl translate-x-1/3 translate-y-1/4" />
+          </div>
+
+          {/* LEFT decorative floating stack (screen 3 circled left) */}
+          <div className="hidden xl:block absolute left-[calc((100%-90rem)/2)] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+            <div className="relative">
+              <div className="absolute -top-14 -left-6 px-3 py-1.5 rounded-full bg-emerald-400/15 border border-emerald-300/25 text-emerald-200 text-xs font-bold backdrop-blur-sm flex items-center gap-1.5 animate-[float_6s_ease-in-out_infinite]">
+                <Check size={14} className="text-emerald-300" /> Онлайн · 500+
+              </div>
+              <div className="w-64 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-4 shadow-2xl rotate-[-4deg] animate-[floatLeft_7s_ease-in-out_infinite]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/30"><Server size={18} /></div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-indigo-300 font-bold">minecraft · MSK</div>
+                    <div className="text-sm font-bold text-white">mc.wexa.pw</div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-400">Слоты</span><span className="text-white font-semibold">28 / 40</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div className="w-[70%] h-full bg-gradient-to-r from-indigo-400 to-purple-400" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-2 text-center">
+                    <div className="rounded-lg bg-white/5 py-1.5">
+                      <div className="text-[10px] text-gray-400">Tps</div>
+                      <div className="text-xs font-bold text-emerald-300">19.98</div>
+                    </div>
+                    <div className="rounded-lg bg-white/5 py-1.5">
+                      <div className="text-[10px] text-gray-400">Пинг</div>
+                      <div className="text-xs font-bold text-white">12 мс</div>
+                    </div>
+                    <div className="rounded-lg bg-white/5 py-1.5">
+                      <div className="text-[10px] text-gray-400">CPU</div>
+                      <div className="text-xs font-bold text-indigo-300">23%</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="w-60 mt-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-3 shadow-2xl rotate-[3deg] ml-6 animate-[floatLeft_9s_ease-in-out_infinite]" style={{ animationDelay: '0.5s' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center"><Shield size={16} /></div>
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-white">DDoS защита</div>
+                    <div className="text-[10px] text-emerald-300 font-semibold">Активна · L3/L4</div>
+                  </div>
+                </div>
+                <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div className="w-[92%] h-full bg-gradient-to-r from-emerald-400 to-teal-400" />
+                </div>
+                <div className="mt-1 text-right text-[10px] text-gray-400">1.0 Тбит/с · 99.99% SLA</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT decorative floating stack (screen 3 circled right) */}
+          <div className="hidden xl:block absolute right-[calc((100%-90rem)/2)] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+            <div className="relative">
+              <div className="absolute -top-12 right-0 px-3 py-1.5 rounded-full bg-pink-400/15 border border-pink-300/25 text-pink-200 text-xs font-bold backdrop-blur-sm flex items-center gap-1.5 animate-[float_6s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}>
+                <Sparkles size={14} className="text-pink-300" /> Шаблон за 1 клик
+              </div>
+              <div className="w-64 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-4 shadow-2xl rotate-[5deg] animate-[floatRight_8s_ease-in-out_infinite]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30"><Globe size={18} /></div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-purple-300 font-bold">nodejs · business</div>
+                    <div className="text-sm font-bold text-white">cafe-ulybka.wexa.su</div>
+                  </div>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-white/10 bg-gradient-to-br from-amber-50/5 to-orange-50/5 h-28">
+                  <div className="h-8 bg-white/5 flex items-center gap-1.5 px-2 border-b border-white/10">
+                    <div className="w-2 h-2 rounded-full bg-red-400/70" />
+                    <div className="w-2 h-2 rounded-full bg-amber-400/70" />
+                    <div className="w-2 h-2 rounded-full bg-emerald-400/70" />
+                    <div className="ml-2 flex-1 h-4 rounded-md bg-white/5 text-[9px] text-gray-400 px-2 flex items-center">🔒 cafe-ulybka.wexa.su</div>
+                  </div>
+                  <div className="p-3 space-y-1.5">
+                    <div className="flex gap-1.5">
+                      <div className="w-3/5 h-3 rounded bg-pink-400/20" />
+                      <div className="w-2/5 h-3 rounded bg-indigo-400/20" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 mt-2">
+                      <div className="aspect-square rounded bg-white/5" />
+                      <div className="aspect-square rounded bg-white/5" />
+                      <div className="aspect-square rounded bg-white/5" />
+                    </div>
+                    <div className="h-2 rounded bg-white/5 w-4/5" />
+                    <div className="h-2 rounded bg-white/5 w-3/5" />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-1.5 text-emerald-300 font-semibold"><ShieldCheck size={12} /> SSL · Valid</div>
+                  <div className="flex items-center gap-1.5 text-gray-400"><Clock size={12} /> Вчера 21:04</div>
+                </div>
+              </div>
+              <div className="w-60 mt-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-3 shadow-2xl rotate-[-5deg] mr-5 animate-[floatRight_10s_ease-in-out_infinite]" style={{ animationDelay: '0.7s' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center"><Database size={16} /></div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Node.js 22 · PM2</div>
+                    <div className="text-[10px] text-sky-300 font-semibold">Статус · online</div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-400 mb-0.5"><span>Память</span><span>118 / 256 MB</span></div>
+                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden"><div className="w-[46%] h-full bg-gradient-to-r from-sky-400 to-indigo-400" /></div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-400 mb-0.5"><span>Посещений / сут</span><span>3 207</span></div>
+                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden"><div className="w-[68%] h-full bg-gradient-to-r from-purple-400 to-pink-400" /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
@@ -180,14 +304,53 @@ const Home = () => {
         </section>
 
         {/* SERVICES 2-UP CARDS */}
-        <section id="services" className="py-24 bg-white">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="services" className="py-24 bg-white relative overflow-hidden">
+          <div className="absolute top-20 left-0 w-[26rem] h-[26rem] bg-indigo-200/40 rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-16 right-0 w-[26rem] h-[26rem] bg-fuchsia-200/40 rounded-full blur-3xl translate-x-1/2 pointer-events-none" />
+
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center max-w-3xl mx-auto mb-16">
               <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Наши услуги</h2>
               <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl">Всё, что нужно вашему проекту</p>
               <p className="mt-4 text-xl text-gray-500">
-                Две основные услуги — игровые серверы и&nbsp;сайты под заказ. Всё в&nbsp;одном личном кабинете, один баланс и&nbsp;единая поддержка.
+                Две основные услуги — игровые серверы и&nbsp;сайты. Всё в&nbsp;одном личном кабинете, один баланс и&nbsp;единая поддержка.
               </p>
+            </div>
+
+            {/* LEFT vertical label + stack for SERVICES (screen 1 circled left) */}
+            <div className="hidden 2xl:block absolute left-[max(1rem,calc((100%-88rem)/2))] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+              <div className="flex flex-col items-center gap-5">
+                <div className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-center shadow-sm">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center mb-1.5"><Gamepad2 size={20} /></div>
+                  <div className="text-[11px] font-bold text-indigo-700">GAME NODES</div>
+                  <div className="text-[9px] text-indigo-500 font-semibold uppercase tracking-wider">6 locations</div>
+                </div>
+                <div className="writing-vertical text-[10px] font-black uppercase tracking-[0.35em] text-indigo-300" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                  Minecraft · CS 1.6 · CS2 · NVMe · DDoS
+                </div>
+                <div className="px-3 py-2 rounded-xl bg-sky-50 border border-sky-100 text-center shadow-sm">
+                  <div className="w-11 h-11 mx-auto rounded-xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white flex items-center justify-center mb-1"><Zap size={18} /></div>
+                  <div className="text-[10px] font-bold text-sky-700">INSTANT · 60s</div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT vertical label + stack for SERVICES (screen 1 circled right) */}
+            <div className="hidden 2xl:block absolute right-[max(1rem,calc((100%-88rem)/2))] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+              <div className="flex flex-col items-center gap-5">
+                <div className="px-3 py-2 rounded-xl bg-fuchsia-50 border border-fuchsia-100 text-center shadow-sm">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white flex items-center justify-center mb-1.5"><Layers size={20} /></div>
+                  <div className="text-[11px] font-bold text-fuchsia-700">WEB HOSTING</div>
+                  <div className="text-[9px] text-fuchsia-500 font-semibold uppercase tracking-wider">3 plans</div>
+                </div>
+                <div className="writing-vertical text-[10px] font-black uppercase tracking-[0.35em] text-fuchsia-300" style={{ writingMode: 'vertical-rl' }}>
+                  Landing · Node.js · EJS · SSL · PM2
+                </div>
+                <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-center shadow-sm">
+                  <div className="w-11 h-11 mx-auto rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center mb-1"><Code2 size={18} /></div>
+                  <div className="text-[10px] font-bold text-emerald-700">1-CLICK CMS</div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
