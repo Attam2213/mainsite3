@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -178,7 +178,7 @@ const Home = () => {
           <div className="hidden xl:block absolute right-[calc((100%-90rem)/2)] top-1/2 -translate-y-1/2 z-10 pointer-events-none">
             <div className="relative">
               <div className="absolute -top-12 right-0 px-3 py-1.5 rounded-full bg-pink-400/15 border border-pink-300/25 text-pink-200 text-xs font-bold backdrop-blur-sm flex items-center gap-1.5 animate-[float_6s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}>
-                <Sparkles size={14} className="text-pink-300" /> Шаблон за 1 клик
+                <Sparkles size={14} className="text-pink-300" /> Запуск сайта за 1 минуту
               </div>
               <div className="w-64 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-4 shadow-2xl rotate-[5deg] animate-[floatRight_8s_ease-in-out_infinite]">
                 <div className="flex items-center gap-2 mb-3">
@@ -240,7 +240,7 @@ const Home = () => {
             <div className="max-w-6xl mx-auto">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10 backdrop-blur-sm mb-8">
                 <Sparkles size={16} className="text-yellow-400" />
-                <span className="text-sm font-medium text-gray-200">НОВИНКА&nbsp;•&nbsp;Готовые шаблоны сайтов за&nbsp;1&nbsp;клик</span>
+                <span className="text-sm font-medium text-gray-200">Первый сервис в России с поддержкой ИИ агентов</span>
               </div>
 
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-8 leading-[1.05]">

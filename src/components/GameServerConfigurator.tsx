@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -210,7 +210,7 @@ const GameServerConfigurator = ({
   const forceTab = configuratorMode === 'game-only' ? 'game' : configuratorMode === 'website-only' ? 'website' : null;
   const [selectedGame, setSelectedGame] = useState(initialGame ?? SUPPORTED_GAMES[0].id);
   const [selectedLocation, setSelectedLocation] = useState(initialLocation ?? LOCATIONS[0].id);
-  const [slots, setSlots] = useState(SUPPORTED_GAMES.find(g => g.id === (initialGame ?? SUPPORTED_GAMES[0].id))!.defaultSlots);
+  const [slots, setSlots] = useState(Math.max(10, SUPPORTED_GAMES.find(g => g.id === (initialGame ?? SUPPORTED_GAMES[0].id))!.defaultSlots));
   const [periodMonths, setPeriodMonths] = useState(1);
   const [name, setName] = useState('');
   const [mcVersion, setMcVersion] = useState('LATEST');
@@ -362,7 +362,7 @@ const GameServerConfigurator = ({
   useEffect(() => {
     const game = SUPPORTED_GAMES.find(g => g.id === selectedGame);
     if (game) {
-      setSlots(game.defaultSlots);
+      setSlots(Math.max(10, game.defaultSlots));
     }
     if (selectedGame === 'minecraft') {
       if (!mcVersion || !['LATEST', 'SNAPSHOT'].includes(mcVersion) && !/^\d+\.\d+/.test(mcVersion)) {
@@ -595,21 +595,21 @@ const GameServerConfigurator = ({
   const Sliders = () => (
     <div>
       <div className="flex justify-between items-baseline mb-4">
-        <label className="block text-sm font-bold text-gray-700">Слоты (игроки)</label>
+        <label className="block text-sm font-bold text-gray-700">Слоты (игроки) <span className="text-xs text-slate-400 font-medium">· минимально 10</span></label>
         <span className="text-2xl font-black text-indigo-600">
           {slots} <span className="text-sm font-semibold text-gray-500">сл.</span>
         </span>
       </div>
       <input
         type="range"
-        min={2}
+        min={10}
         max={game.maxSlots}
         value={slots}
-        onChange={e => setSlots(Number(e.target.value))}
+        onChange={e => setSlots(Math.max(10, Number(e.target.value)))}
         className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-indigo-600"
       />
       <div className="flex justify-between text-xs text-gray-400 mt-2 font-medium">
-        <span>2</span>
+        <span>10</span>
         <span>{game.maxSlots}</span>
       </div>
     </div>
