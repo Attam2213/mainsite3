@@ -22,7 +22,7 @@ export const WEB_PLANS: Record<WebPlanId, WebPlan> = {
   landing: {
     id: 'landing',
     label: 'Лендинг',
-    priceMonthly: 149,
+    priceMonthly: 400,
     description: 'Статический сайт-лендинг / визитка без бэкенда. HTML/CSS/JS форма обратной связи через JS.',
     features: [
       '~1 000 посещений/сутки',
@@ -40,7 +40,7 @@ export const WEB_PLANS: Record<WebPlanId, WebPlan> = {
   business: {
     id: 'business',
     label: 'Бизнес',
-    priceMonthly: 299,
+    priceMonthly: 750,
     description: 'Node.js Express + EJS. Встроенная админ-панель и динамические страницы.',
     features: [
       '~5 000 посещений/сутки',
@@ -60,7 +60,7 @@ export const WEB_PLANS: Record<WebPlanId, WebPlan> = {
   premium: {
     id: 'premium',
     label: 'Премиум',
-    priceMonthly: 599,
+    priceMonthly: 1200,
     description: 'Максимальные лимиты, Redis + SQLite + бесплатная инструкция домена в подарок (админ покупает по запросу).',
     features: [
       '~20 000 посещений/сутки',

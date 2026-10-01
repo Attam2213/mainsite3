@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -224,7 +224,7 @@ const startServer = async () => {
           "domainType" VARCHAR(16) DEFAULT 'custom',
           "subdomainName" VARCHAR(64) UNIQUE,
           plan VARCHAR(16) NOT NULL DEFAULT 'landing',
-          "priceMonthly" INTEGER NOT NULL DEFAULT 149,
+          "priceMonthly" INTEGER NOT NULL DEFAULT 400,
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
           "paidUntil" DATE,
           "pm2ProcessName" VARCHAR(128),
@@ -267,7 +267,7 @@ const startServer = async () => {
           "domainType" TEXT DEFAULT 'custom',
           "subdomainName" TEXT UNIQUE,
           plan TEXT NOT NULL DEFAULT 'landing',
-          "priceMonthly" INTEGER NOT NULL DEFAULT 149,
+          "priceMonthly" INTEGER NOT NULL DEFAULT 400,
           status TEXT NOT NULL DEFAULT 'pending',
           "paidUntil" TEXT,
           "pm2ProcessName" TEXT,
@@ -310,7 +310,7 @@ const startServer = async () => {
           domainType VARCHAR(16) DEFAULT 'custom',
           subdomainName VARCHAR(64) UNIQUE,
           plan VARCHAR(16) NOT NULL DEFAULT 'landing',
-          priceMonthly INTEGER NOT NULL DEFAULT 149,
+          priceMonthly INTEGER NOT NULL DEFAULT 400,
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
           paidUntil DATE,
           pm2ProcessName VARCHAR(128),

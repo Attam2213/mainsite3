@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -398,17 +398,17 @@ const GameServerConfigurator = ({
           setWebsitePlans(data.plans);
         } else {
           setWebsitePlans([
-            { id: 'landing', label: 'Landing', priceMonthly: 149, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
-            { id: 'business', label: 'Business', priceMonthly: 299, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
-            { id: 'premium', label: 'Premium', priceMonthly: 599, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
+            { id: 'landing', label: 'Landing', priceMonthly: 400, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
+            { id: 'business', label: 'Business', priceMonthly: 750, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
+            { id: 'premium', label: 'Premium', priceMonthly: 1200, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
           ] as WebsitePlan[]);
         }
       })
       .catch(() => {
         setWebsitePlans([
-          { id: 'landing', label: 'Landing', priceMonthly: 149, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
-          { id: 'business', label: 'Business', priceMonthly: 299, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
-          { id: 'premium', label: 'Premium', priceMonthly: 599, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
+          { id: 'landing', label: 'Landing', priceMonthly: 400, description: 'Статичный лендинг. HTML/CSS/JS без бэкенда.', features: ['1 сайт HTML/CSS/JS', 'SSL-сертификат', 'SFTP доступ', 'Бэкапы раз в неделю'], coreTemplate: 'static', backupEnabled: false },
+          { id: 'business', label: 'Business', priceMonthly: 750, description: 'Node.js + Express/EJS. Сайт с админ-панелью и формой.', features: ['Node.js 20 LTS', 'PM2 автоперезапуск', 'SSL Let\'s Encrypt', 'SFTP доступ', 'Бэкапы 7 дней'], coreTemplate: 'nodejs', backupEnabled: true },
+          { id: 'premium', label: 'Premium', priceMonthly: 1200, description: 'Максимальные лимиты, поддержка 24/7, домен в подарок.', features: ['Node.js / Static', 'Повышенные лимиты RAM/CPU', 'Поддержка 24/7', 'Домен в подарок', 'Бэкапы каждый день'], coreTemplate: 'nodejs', backupEnabled: true },
         ] as WebsitePlan[]);
       });
   }, []);
@@ -431,7 +431,7 @@ const GameServerConfigurator = ({
   const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
   const totalPrice = Math.ceil(monthlyPrice * periodMonths * (1 - discount));
 
-  const websiteMonthlyPrice = websitePlan?.priceMonthly ?? 299;
+  const websiteMonthlyPrice = websitePlan?.priceMonthly ?? 750;
   const websiteTotalPrice = Math.ceil(websiteMonthlyPrice * periodMonths * (1 - discount));
 
   const submitOrder = async () => {

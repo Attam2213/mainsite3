@@ -60,7 +60,7 @@ WebSite.init(
       allowNull: false,
       defaultValue: 'landing',
     },
-    priceMonthly: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 149 },
+    priceMonthly: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 400 },
     status: {
       type: DataTypes.ENUM('pending', 'provisioning', 'active', 'suspended', 'deleting', 'deleted'),
       defaultValue: 'pending',

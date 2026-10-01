@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -3510,9 +3510,9 @@ const AdminDashboard = () => {
                           deleted: { label: 'Удалён', cls: 'bg-gray-100 text-gray-500' },
                         };
                         const planMap: Record<string, { label: string; cls: string }> = {
-                          landing: { label: 'Landing 149₽', cls: 'bg-sky-100 text-sky-700' },
-                          business: { label: 'Business 299₽', cls: 'bg-violet-100 text-violet-700' },
-                          premium: { label: 'Premium 599₽', cls: 'bg-amber-100 text-amber-800' },
+                          landing: { label: 'Landing 400₽', cls: 'bg-sky-100 text-sky-700' },
+                          business: { label: 'Business 750₽', cls: 'bg-violet-100 text-violet-700' },
+                          premium: { label: 'Premium 1200₽', cls: 'bg-amber-100 text-amber-800' },
                         };
                         const s = statusMap[ws.status] || { label: ws.status, cls: 'bg-gray-100 text-gray-700' };
                         const p = planMap[ws.plan] || { label: ws.plan, cls: 'bg-gray-100 text-gray-700' };
