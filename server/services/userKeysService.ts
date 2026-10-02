@@ -1,5 +1,5 @@
 import User from '../models/User';
-import { makeNonce, packEncrypted, unpackDecrypted } from './encryption';
+import { makeNonce, packEncrypted, unpackDecrypted } from '../utils/encryption';
 
 export interface UserKeys {
   openai: string | null;
