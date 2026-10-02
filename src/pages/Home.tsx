@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
 import GameServerConfigurator, {
   FEATURES, STEPS,
@@ -14,7 +14,7 @@ import {
   Shield, HardDrive, Upload, Check, Globe,
   Sparkles, Rocket, ShieldCheck, Clock, Award,
   Headphones, MapPin, Mail, Star, Server, Database, Layers,
-  Users, Bot, Brain, Heart, Cpu, Network,
+  Users, Brain, Cpu, Network,
 } from 'lucide-react';
 
 const Home = () => {
@@ -491,29 +491,29 @@ const Home = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
                       <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-indigo-100/80">
                         <div className="flex items-center gap-2.5 mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center"><Bot size={18} /></div>
-                          <div className="text-sm font-black text-indigo-700 uppercase tracking-wide">1. Шаблоны</div>
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center"><Brain size={18} /></div>
+                          <div className="text-sm font-black text-indigo-700 uppercase tracking-wide">1. MD&nbsp;Toolkit</div>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed">
-                          <b>Предустановленные ИИ-агенты</b> в&nbsp;один клик: <code>CrewAI • LangChain • AutoGen • RAG-поддержка</code>. Заливаешь свои данные (FAQ, товары, документацию)&nbsp;— готовый бот за&nbsp;60&nbsp;секунд на&nbsp;нашем GPU-кластере.
+                          Разработчику сайта <b>выдаём готовый .md-шаблон</b> задания + готовые сниппеты промптов под <b>любой ИИ-агент</b> (ChatGPT, Claude, Gemini, OSS&nbsp;LLM). Описываешь свой проект в&nbsp;MD&nbsp;→ скормил любому ИИ&nbsp;→ он&nbsp;сразу понимает структуру папок, Nginx, PM2, SFTP и&nbsp;<b>выдаёт готовый код под наш хостинг</b> без лишней ручной доработки.
                         </p>
                       </div>
                       <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-purple-100/80">
                         <div className="flex items-center gap-2.5 mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center"><Heart size={18} /></div>
-                          <div className="text-sm font-black text-purple-700 uppercase tracking-wide">2. Поддержка</div>
+                          <div className="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center"><Sparkles size={18} /></div>
+                          <div className="text-sm font-black text-purple-700 uppercase tracking-wide">2. SFTP-ready</div>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed">
-                          <b>AI-менеджер в&nbsp;ЛК 24/7</b>: автоматически исправляет ошибки Nginx/PM2, подбирает оптимальный server.properties для Minecraft, мониторит CPU/RAM/Disc и&nbsp;пишет тебе в&nbsp;чём проблема, пока ты&nbsp;спишь.
+                          Любой твой ИИ-агент <b>без проблем подключается</b> к&nbsp;твоему слоту сайта: <code>SFTP Chroot • SSH ключи • PM2</code> уже настроены per-user. Агент пишет код, заливает через SFTP, перезапускает <code>pm2 restart</code> и&nbsp;проверяет health&nbsp;— <b>всё уже готово на&nbsp;стороне хостинга</b>, не&nbsp;настраивай сервер вручную.
                         </p>
                       </div>
                       <div className="bg-white/90 backdrop-blur rounded-2xl p-5 border border-fuchsia-100/80">
                         <div className="flex items-center gap-2.5 mb-3">
                           <div className="w-10 h-10 rounded-xl bg-fuchsia-500 text-white flex items-center justify-center"><Code2 size={18} /></div>
-                          <div className="text-sm font-black text-fuchsia-700 uppercase tracking-wide">3. SFTP + Dev</div>
+                          <div className="text-sm font-black text-fuchsia-700 uppercase tracking-wide">3. СВОЙ агент (скоро)</div>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed">
-                          Поддерживаем <b>любые кастомные агенты</b>: SFTP + PM2-менеджер + GPU-quota, чтобы разворачивать свои AI-моделки с&nbsp;vector DB (SQLite уже встроен в&nbsp;Premium). API ключи OpenAI/A Claude — твои, данные не&nbsp;уходят третьим.
+                          Разрабатываем <b>собственный Wexa AI-ассистент прямо в&nbsp;ЛК</b>: введи описание сайта (MD или обычным текстом) + выбери тариф&nbsp;— агент сгенерирует код <b>и&nbsp;сразу задеплоит на&nbsp;твой слот</b> в&nbsp;один клик. Используем твои API-ключи LLM (OpenAI/Claude/Gemini)&nbsp;— <b>мы&nbsp;не&nbsp;платим за&nbsp;токены</b>, хост только оркестрирует.
                         </p>
                       </div>
                     </div>
