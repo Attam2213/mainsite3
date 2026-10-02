@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -53,6 +53,17 @@ import {
   Database,
   Bot,
   Sparkles,
+  Brain,
+  BarChart2,
+  DollarSign,
+  Eye,
+  UserCog,
+  Save,
+  ExternalLink,
+  HelpCircle,
+  Activity,
+  RefreshCw,
+  Award,
   Terminal as TerminalIcon,
 } from 'lucide-react';
 
@@ -247,7 +258,7 @@ const ClientDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers' | 'websites' | 'balance'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'billing' | 'leads' | 'requests' | 'game_servers' | 'websites' | 'balance' | 'settings' | 'ai' | 'ai_report'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
 
@@ -626,6 +637,171 @@ const ClientDashboard = () => {
       alert('Ошибка сети');
     }
   };
+
+  // ===== AI: API keys =====
+  const [aiKeysOpenAI, setAiKeysOpenAI] = useState('');
+  const [aiKeysAnthropic, setAiKeysAnthropic] = useState('');
+  const [aiKeysGemini, setAiKeysGemini] = useState('');
+  const [aiKeysSaving, setAiKeysSaving] = useState(false);
+  const [aiKeysStatus, setAiKeysStatus] = useState<{ openAI: boolean; anthropic: boolean; gemini: boolean }>({ openAI: false, anthropic: false, gemini: false });
+
+  const loadAIKeysStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/ai/keys/status', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const j = await res.json();
+        setAiKeysStatus(j?.status || { openAI: false, anthropic: false, gemini: false });
+      }
+    } catch (e) { console.warn(e); }
+  };
+
+  const saveAIKeys = async () => {
+    try {
+      setAiKeysSaving(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/ai/keys/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          openAI: aiKeysOpenAI || '',
+          anthropic: aiKeysAnthropic || '',
+          gemini: aiKeysGemini || '',
+        }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setAiKeysStatus(j?.status || aiKeysStatus);
+        setAiKeysOpenAI(''); setAiKeysAnthropic(''); setAiKeysGemini('');
+        alert('Ключи сохранены (AES-256 зашифрованы на сервере). Старые значения в полях очищены в целях безопасности.');
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(j.message || 'Не удалось сохранить ключи');
+      }
+    } catch (e) { alert('Ошибка сохранения'); }
+    finally { setAiKeysSaving(false); }
+  };
+
+  // ===== AI: Generate website =====
+  const [aiFormPlan, setAiFormPlan] = useState<'landing' | 'business' | 'premium'>('landing');
+  const [aiFormSubdomain, setAiFormSubdomain] = useState('');
+  const [aiFormBusinessName, setAiFormBusinessName] = useState('');
+  const [aiFormDescription, setAiFormDescription] = useState('');
+  const [aiFormSections, setAiFormSections] = useState('Главная, О нас, Услуги, Прайс, Контакты');
+  const [aiFormContacts, setAiFormContacts] = useState('');
+  const [aiFormColors, setAiFormColors] = useState('индиго + розовый (стиль Wexa)');
+  const [aiFormLoading, setAiFormLoading] = useState(false);
+  const [aiEstimate, setAiEstimate] = useState<any>(null);
+  const [aiResultPayload, setAiResultPayload] = useState<any>(null);
+  const [aiResultSite, setAiResultSite] = useState<any>(null);
+
+  const estimateAI = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/ai/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          description: aiFormDescription,
+          businessName: aiFormBusinessName,
+          sections: aiFormSections,
+          contacts: aiFormContacts,
+          colors: aiFormColors,
+        }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setAiEstimate(j);
+      }
+    } catch (e) { console.warn(e); }
+  };
+
+  const generateAIWebsite = async () => {
+    if (!aiFormDescription.trim()) {
+      alert('Опишите сайт: что он должен делать?');
+      return;
+    }
+    try {
+      setAiFormLoading(true);
+      setAiResultPayload(null);
+      setAiResultSite(null);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/ai/generate/website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          plan: aiFormPlan,
+          subdomain: aiFormSubdomain || null,
+          customDomain: null,
+          description: aiFormDescription,
+          businessName: aiFormBusinessName,
+          sections: aiFormSections,
+          contacts: aiFormContacts,
+          colors: aiFormColors,
+          language: 'ru',
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j?.ok) {
+        setAiResultPayload(j.payload);
+        setAiResultSite(j.webSite);
+        try { await refreshBalance(); await fetchData(); } catch {}
+        alert(`Готово! Сайт создан: ${j.webSite?.subdomain || j.webSite?.id}. Заработок на марже: ${j.billing?.profitRUB ? j.billing.profitRUB + ' ₽' : '0 ₽ (использован ваш личный ключ)'}`);
+      } else if (res.status === 402) {
+        showInsufficientFundsAlert(j, j?.message || 'Недостаточно средств на балансе');
+      } else {
+        alert(j?.message || 'Ошибка генерации');
+      }
+    } catch (e) { alert('Ошибка сети'); }
+    finally { setAiFormLoading(false); }
+  };
+
+  const downloadAIPayloadZip = () => {
+    if (!aiResultPayload?.files) return;
+    const lines: string[] = [];
+    lines.push(`# Wexa AI-generated website (plan ${aiResultPayload.plan}). Download each file manually OR upload via SFTP.\n`);
+    for (const f of aiResultPayload.files) {
+      lines.push('\n' + '='.repeat(80));
+      lines.push(`# FILE: ${f.path}`);
+      lines.push('='.repeat(80));
+      lines.push(f.content || '');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `wexa-ai-${aiResultPayload.plan}-${Date.now()}.txt`;
+    a.click();
+  };
+
+  // ===== AI: Admin report =====
+  const [aiAdminStats, setAiAdminStats] = useState<any>(null);
+  const [aiAdminTx, setAiAdminTx] = useState<any[]>([]);
+  const [aiAdminLoading, setAiAdminLoading] = useState(false);
+  const loadAIAdminStats = async () => {
+    try {
+      setAiAdminLoading(true);
+      const token = localStorage.getItem('token');
+      const [s, t] = await Promise.all([
+        fetch('/api/ai/admin/stats', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+        fetch('/api/ai/admin/transactions?limit=50', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+      ]);
+      setAiAdminStats(s);
+      setAiAdminTx(t?.rows || []);
+    } finally { setAiAdminLoading(false); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'settings' || activeTab === 'ai') {
+      loadAIKeysStatus();
+      if (activeTab === 'ai' && aiFormDescription.trim()) {
+        // noop — user clicks estimate button explicitly to avoid auto-fetch
+      }
+    }
+    if (activeTab === 'ai_report') {
+      loadAIAdminStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const fetchPlayersList = async (serverId: string) => {
     try {
@@ -3435,6 +3611,44 @@ const ClientDashboard = () => {
                     <MessageSquare className="mr-3 h-5 w-5" />
                     Поддержка
                   </button>
+                  <button
+                    onClick={withScrollSave(() => setActiveTab('ai'))}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'ai' 
+                        ? 'bg-gradient-to-r from-violet-50 via-purple-50 to-pink-50 text-purple-700 border border-purple-100'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Brain className="mr-3 h-5 w-5" />
+                    🤖 AI-Сайт
+                    {!aiKeysStatus.openAI && !aiKeysStatus.anthropic && !aiKeysStatus.gemini && (
+                      <span className="ml-auto inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">с баланса</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={withScrollSave(() => setActiveTab('settings'))}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                      activeTab === 'settings' 
+                        ? 'bg-indigo-50 text-indigo-700' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Settings className="mr-3 h-5 w-5" />
+                    Настройки
+                  </button>
+                  {(user?.role === 'admin') && (
+                    <button
+                      onClick={withScrollSave(() => setActiveTab('ai_report'))}
+                      className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg mb-1 ${
+                        activeTab === 'ai_report' 
+                          ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border border-emerald-100'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <BarChart2 className="mr-3 h-5 w-5" />
+                      📊 AI отчёт (admin)
+                    </button>
+                  )}
                 </nav>
               </div>
 
@@ -3456,6 +3670,432 @@ const ClientDashboard = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* ============= SETTINGS PANEL ============= */}
+          <div aria-hidden={activeTab !== 'settings'} style={{display: activeTab === 'settings' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+            <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-6 md:p-8 text-white shadow-lg">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="mb-2 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-indigo-100"><Settings className="mr-2 h-4 w-4" /> Настройки профиля</div>
+                  <h2 className="text-2xl font-bold sm:text-3xl">Персональные данные и API-ключи</h2>
+                  <p className="mt-1 text-sm text-indigo-100 sm:text-base">
+                    Тут можно сменить пароль, имя, Telegram ID и добавить свои API-ключи ИИ, чтобы не платить за токены с баланса Wexa.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
+                <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2"><UserCog className="h-5 w-5 text-indigo-600" /> Данные профиля</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Имя</label>
+                    <input
+                      type="text"
+                      defaultValue={user?.name || ''}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Email (неизменяемый)</label>
+                    <input type="email" disabled defaultValue={user?.email || ''} className="w-full rounded-xl border border-slate-100 bg-slate-50 px-4 py-2.5 text-gray-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Telegram ID (для уведомлений)</label>
+                    <input
+                      type="text"
+                      defaultValue={user?.telegram_id || ''}
+                      placeholder="@username или числовой ID"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none"
+                    />
+                  </div>
+                  <button className="inline-flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                    <Save className="mr-2 h-4 w-4" /> Сохранить профиль
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 border border-purple-100 p-6 shadow-sm">
+                <h3 className="text-xl font-black text-gray-900 mb-2 flex items-center gap-2"><KeyRound className="h-5 w-5 text-purple-700" /> 🔑 API-ключи ИИ (необязательно)</h3>
+                <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                  Если добавите свой ключ — генерация AI-сайтов <b>не будет списывать рубли с вашего баланса Wexa</b>. Вместо этого ваш провайдер (OpenAI / Anthropic / Google) выставит счёт напрямую вам. Если поля пустые — используется <b>наш общий ключ</b>, и с вашего баланса спишется сумма по тарифам маржи ≈5–25 ₽ за сайт.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-gray-700">OpenAI (GPT-4o-mini / GPT-4o)</span>
+                      {aiKeysStatus.openAI && <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800"><CheckCircle className="h-3 w-3 mr-1" /> сохранён</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={aiKeysOpenAI}
+                      onChange={(e) => setAiKeysOpenAI(e.target.value)}
+                      placeholder="sk-..."
+                      autoComplete="off"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Оставьте пустым, чтобы НЕ менять существующий ключ. Очистить = удалить (введите пробел и сохраните).</p>
+                  </div>
+                  <div>
+                    <label className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-gray-700">Anthropic (Claude Sonnet / Haiku)</span>
+                      {aiKeysStatus.anthropic && <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800"><CheckCircle className="h-3 w-3 mr-1" /> сохранён</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={aiKeysAnthropic}
+                      onChange={(e) => setAiKeysAnthropic(e.target.value)}
+                      placeholder="sk-ant-..."
+                      autoComplete="off"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-gray-700">Google Gemini (Gemini 1.5 Flash / Pro)</span>
+                      {aiKeysStatus.gemini && <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800"><CheckCircle className="h-3 w-3 mr-1" /> сохранён</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={aiKeysGemini}
+                      onChange={(e) => setAiKeysGemini(e.target.value)}
+                      placeholder="AIza..."
+                      autoComplete="off"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none font-mono text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={saveAIKeys}
+                      disabled={aiKeysSaving}
+                      className="inline-flex items-center rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white hover:opacity-95 transition disabled:opacity-60 shadow-lg shadow-purple-500/20"
+                    >
+                      {aiKeysSaving ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Сохранить ключи (AES-256 зашифрованы на сервере)
+                    </button>
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"><ExternalLink className="h-3 w-3" /> Взять ключ OpenAI</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ============= AI WEBSITE BUILDER TAB ============= */}
+          <div aria-hidden={activeTab !== 'ai'} style={{display: activeTab === 'ai' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+            <div className="rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700">
+              <div className="absolute -top-24 -right-24 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-28 -left-20 w-72 h-72 bg-fuchsia-400/15 rounded-full blur-3xl" />
+              <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="mb-3 inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-bold tracking-wider uppercase text-purple-100"><Sparkles className="mr-2 h-4 w-4 text-amber-300" /> Wexa AI · Генератор сайтов</div>
+                  <h2 className="text-2xl sm:text-4xl font-black leading-tight">🤖 Создайте сайт <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-200 via-pink-200 to-fuchsia-200">за 1 минуту</span> — без программиста</h2>
+                  <p className="mt-2 text-indigo-100 sm:text-lg max-w-3xl">
+                    Опишите, что вам нужно. ИИ сгенерирует HTML/CSS/JS (Landing) или готовый Node.js Express + EJS (Business/Premium) с формой обратной связи, деструктурирует на файлы, <b>сразу же создаст хостинг-сайт</b> и отправит вам результат.
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/15 border border-white/10 backdrop-blur text-sm font-semibold">
+                    <Brain className="h-5 w-5" />
+                    {(aiKeysStatus.openAI || aiKeysStatus.anthropic || aiKeysStatus.gemini) ? <>🟢 Используется ВАШ ключ</> : <>🟡 Используется НАШ ключ · <b>с баланса спишется ≈ 5–25 ₽</b></>}
+                  </div>
+                  {!(aiKeysStatus.openAI || aiKeysStatus.anthropic || aiKeysStatus.gemini) && (
+                    <button
+                      onClick={() => setActiveTab('settings')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-white/90 text-indigo-800 hover:bg-white transition"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" /> Добавить мой ключ (бесплатная генерация) →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-5">
+              <div className="lg:col-span-3 flex flex-col gap-6">
+                <div className="rounded-3xl bg-white border border-slate-100 p-6 shadow-sm space-y-4">
+                  <h3 className="text-xl font-black text-gray-900">1. Параметры сайта</h3>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Тариф хостинга</label>
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+                      {(['landing','business','premium'] as const).map(p => {
+                        const pLabel = p === 'landing' ? 'Landing · 399 ₽/мес' : p === 'business' ? 'Business · 799 ₽/мес' : 'Premium · 1299 ₽/мес';
+                        return (
+                          <button key={p} type="button" onClick={() => setAiFormPlan(p)} className={`rounded-2xl px-4 py-3 border-2 text-left transition ${aiFormPlan === p ? 'border-indigo-600 bg-indigo-50 shadow ring-2 ring-indigo-100' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                            <div className="text-sm font-black text-gray-900">{pLabel}</div>
+                            <div className="text-xs text-gray-500 mt-1">{p === 'landing' ? 'Статический HTML/CSS' : p === 'business' ? 'Node.js + Express + EJS' : 'Node.js + SQLite + Redis + приоритет'}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Название бренда (необязательно)</label>
+                      <input
+                        type="text"
+                        value={aiFormBusinessName}
+                        onChange={(e) => setAiFormBusinessName(e.target.value)}
+                        placeholder="ООО «Ромашка» / Cafe Ulybka / СТО №1"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Поддомен на wexa.su (необязательно)</label>
+                      <div className="flex">
+                        <input
+                          type="text"
+                          value={aiFormSubdomain}
+                          onChange={(e) => setAiFormSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))}
+                          placeholder="cafe-ulibka"
+                          className="w-full rounded-l-xl border border-r-0 border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none font-mono lowercase"
+                        />
+                        <div className="inline-flex items-center px-3 py-2.5 rounded-r-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-500">.wexa.su</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Описание сайта · ЧТО ДЕЛАТЬ <span className="text-rose-600">*</span></label>
+                    <textarea
+                      rows={5}
+                      value={aiFormDescription}
+                      onChange={(e) => setAiFormDescription(e.target.value)}
+                      placeholder={`Например: «Сайт для стоматологической клиники в Москве. Услуги: терапия, ортодонтия, имплантация, детская стоматология. Цены от 3 000 ₽. Акция: первичная консультация бесплатно. Адрес: Москва, ул. Тверская, д. 1. Телефон: +7 (495) 000-00-00. Нужен яркий дизайн цвета мятный + белый, 6 секций.`}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none leading-relaxed"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Разделы (через запятую)</label>
+                      <input
+                        type="text"
+                        value={aiFormSections}
+                        onChange={(e) => setAiFormSections(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Цвета / стиль дизайна</label>
+                      <input
+                        type="text"
+                        value={aiFormColors}
+                        onChange={(e) => setAiFormColors(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Контакты, адреса, телефоны, соцсети, реквизиты</label>
+                      <textarea
+                        rows={2}
+                        value={aiFormContacts}
+                        onChange={(e) => setAiFormContacts(e.target.value)}
+                        placeholder="+7 XXX XXX-XX-XX · город, улица, дом · Telegram @... · VK.com/... · ИНН 0000000000"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-gray-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3 items-center pt-1">
+                    <button
+                      onClick={estimateAI}
+                      className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <DollarSign className="mr-2 h-4 w-4" /> Предварительный расчёт
+                    </button>
+                    <button
+                      onClick={generateAIWebsite}
+                      disabled={aiFormLoading || !aiFormDescription.trim()}
+                      className="inline-flex items-center rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/30 hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {aiFormLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                      {aiFormLoading ? 'ИИ пишет код · 1–3 минуты...' : '✨ Сгенерировать сайт и задеплоить →'}
+                    </button>
+                    {!aiFormLoading && aiEstimate && (
+                      <div className="text-sm font-mono bg-slate-900 text-white rounded-xl px-4 py-2">
+                        {aiEstimate.hasOwnKey ? <>🟢 Бесплатно (ВАШ ключ)</> : <>💰 ≈ {Number(aiEstimate.finalUserBilledRUB || 0).toFixed(2)} ₽ с баланса</>} · модель {aiEstimate.model || 'n/a'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 flex flex-col gap-6">
+                <div className="rounded-3xl bg-gradient-to-br from-slate-50 to-white border border-slate-100 p-6 shadow-sm">
+                  <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2"><Eye className="h-5 w-5 text-indigo-600" /> Предпросчёт / результат</h3>
+                  {!aiEstimate && !aiResultPayload && (
+                    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-6 text-center">
+                      <Bot className="mx-auto mb-2 h-10 w-10 text-indigo-500" />
+                      <p className="text-sm text-gray-600">Нажмите «Предварительный расчёт» чтобы узнать сколько токенов уйдёт и какая сумма будет списана. Или сразу «Сгенерировать сайт».</p>
+                    </div>
+                  )}
+                  {aiEstimate && !aiResultPayload && (
+                    <div className="space-y-3">
+                      <div className="rounded-2xl p-4 bg-white border border-slate-100">
+                        <div className="text-xs font-bold uppercase text-slate-500 mb-2">Расчёт</div>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex justify-between"><span className="text-gray-600">Провайдер / Модель:</span><b className="text-gray-900">{aiEstimate.provider} · {aiEstimate.model}</b></div>
+                          <div className="flex justify-between"><span className="text-gray-600">Входные токены ≈:</span><b className="text-gray-900 font-mono">{aiEstimate.estimate?.inputTokens?.toLocaleString?.() || '?'}</b></div>
+                          <div className="flex justify-between"><span className="text-gray-600">Выходные токены ≈:</span><b className="text-gray-900 font-mono">{aiEstimate.estimate?.outputTokensEstimated?.toLocaleString?.() || '?'}</b></div>
+                          <div className="flex justify-between"><span className="text-gray-600">Наша себестоимость:</span><b className="text-emerald-700 font-mono">{Number(aiEstimate.estimate?.ourCostRUB || 0).toFixed(4)} ₽</b></div>
+                          <div className="flex justify-between"><span className="text-gray-600">Маржа ({Math.round(((aiEstimate.estimate?.markupMultiplier || 1)-1)*100)}%):</span><b className="text-purple-700 font-mono">+ {Number(aiEstimate.estimate?.profitRUB || 0).toFixed(2)} ₽</b></div>
+                          <hr className="border-slate-100" />
+                          <div className="flex justify-between"><span className="font-bold text-gray-800">Итого с вас:</span>{aiEstimate.hasOwnKey ? <b className="text-emerald-600">0 ₽ · ваш ключ</b> : <b className="text-rose-700 font-mono">{Number(aiEstimate.finalUserBilledRUB || 0).toFixed(2)} ₽</b>}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 leading-relaxed">
+                        ℹ️ Если у вас <b>недостаточно баланса</b> — откройте вкладку «Баланс» и пополните. Или вставьте свой API-ключ в «Настройки» — генерация будет за счёт вашего провайдера LLM.
+                      </div>
+                    </div>
+                  )}
+                  {aiResultPayload && (
+                    <div className="space-y-4">
+                      <div className="rounded-2xl p-4 bg-emerald-50 border-2 border-emerald-100">
+                        <div className="flex items-center gap-2 text-emerald-800 font-black"><CheckCircle className="h-5 w-5" /> Сайт сгенерирован! {aiResultSite?.id && <>· ID {aiResultSite.id.slice(0,8)}</>}</div>
+                        <div className="mt-2 text-sm text-emerald-800/90">
+                          {aiResultSite?.subdomain && <a className="underline font-bold" target="_blank" rel="noreferrer" href={`https://${aiResultSite.subdomain}.wexa.su`}>🌐 https://{aiResultSite.subdomain}.wexa.su →</a>}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl p-4 bg-white border border-slate-100 text-sm">
+                        <div className="text-xs font-bold uppercase text-slate-500 mb-2">Файлы ({aiResultPayload.files?.length || 0})</div>
+                        <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-auto pr-1">
+                          {(aiResultPayload.files || []).map((f: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between rounded-lg px-3 py-1.5 bg-slate-50 border border-slate-100">
+                              <div className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-indigo-600" /><span className="font-mono text-xs truncate">{f.path}</span></div>
+                              <span className="text-[10px] text-slate-500 font-mono">{(f.content || '').length} b</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={downloadAIPayloadZip}
+                          className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                        >
+                          <Download className="mr-2 h-4 w-4" /> Скачать все файлы .txt
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('websites')}
+                          className="inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                        >
+                          <Globe className="mr-2 h-4 w-4" /> Перейти к сайту в ЛК →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl p-5 bg-gradient-to-br from-amber-50 to-rose-50 border-2 border-amber-200 shadow-sm">
+                  <h4 className="text-sm font-black text-amber-900 mb-2 flex items-center gap-2"><HelpCircle className="h-4 w-4" /> FAQ · Phase 1 MVP</h4>
+                  <ul className="space-y-1.5 text-xs text-amber-900/90 leading-relaxed">
+                    <li>✅ <b>Phase 1 готово:</b> ИИ генерирует файлы и создаёт Website-аккаунт в ЛК.</li>
+                    <li>📥 <b>Заливка файлов на ноду:</b> Phase 2 (скоро) будет автоматическая. Сейчас: скачайте архив и залейте через SFTP (доступ в «Сайты → SFTP»).</li>
+                    <li>🔁 <b>Не понравился результат?</b> Генерируйте повторно (оплата снова за токены).</li>
+                    <li>🔐 <b>Безопасность:</b> Ключи AES-256-GCM зашифрованы per-user nonce, хранятся только на сервере, никогда не возвращаются в API.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ============= AI ADMIN REPORT TAB ============= */}
+          <div aria-hidden={activeTab !== 'ai_report'} style={{display: activeTab === 'ai_report' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+            <div className="rounded-3xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 text-white p-6 md:p-8 shadow-lg relative overflow-hidden">
+              <div className="absolute -top-32 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+              <div className="relative z-10">
+                <div className="mb-2 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-bold tracking-wider uppercase text-emerald-100"><BarChart2 className="mr-2 h-4 w-4" /> Admin only · AI-маркетинг</div>
+                <h2 className="text-3xl sm:text-4xl font-black">📊 Заработок на AI-марже</h2>
+                <p className="mt-1 text-emerald-100 text-base sm:text-lg max-w-2xl">
+                  Сколько пользователи заплатили нам за токены, сколько заплатили мы провайдеру LLM, какая чистая прибыль. Все значения в рублях.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-4">
+              <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-6">
+                <div className="text-xs font-bold uppercase text-slate-500 mb-1">Всего счетов (истории)</div>
+                <div className="text-3xl font-black text-gray-900">{aiAdminStats?.total?.[0]?.count || 0}</div>
+              </div>
+              <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-6">
+                <div className="text-xs font-bold uppercase text-slate-500 mb-1">С пользователей получили</div>
+                <div className="text-3xl font-black text-emerald-600">₽ {Number(aiAdminStats?.total?.[0]?.totalBilled || 0).toFixed(2)}</div>
+              </div>
+              <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-6">
+                <div className="text-xs font-bold uppercase text-slate-500 mb-1">Заплатили LLM-провайдерам</div>
+                <div className="text-3xl font-black text-rose-600">₽ {Number(aiAdminStats?.total?.[0]?.totalCost || 0).toFixed(2)}</div>
+              </div>
+              <div className="rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-lg shadow-purple-500/20 p-6">
+                <div className="text-xs font-bold uppercase text-purple-100 mb-1">💎 Чистая прибыль (маржа)</div>
+                <div className="text-3xl font-black">₽ {Number(aiAdminStats?.total?.[0]?.totalProfit || 0).toFixed(2)}</div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Activity className="h-5 w-5 text-emerald-600" /> Последние {aiAdminTx.length} операций</h3>
+                <button
+                  onClick={loadAIAdminStats}
+                  disabled={aiAdminLoading}
+                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-60"
+                >
+                  {aiAdminLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Обновить
+                </button>
+              </div>
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Дата</th>
+                      <th className="px-4 py-3 text-left">Пользователь</th>
+                      <th className="px-4 py-3 text-left">Провайдер</th>
+                      <th className="px-4 py-3 text-left">Tokens</th>
+                      <th className="px-4 py-3 text-right">Списано с юзера</th>
+                      <th className="px-4 py-3 text-right">Наши затраты</th>
+                      <th className="px-4 py-3 text-right">Прибыль</th>
+                      <th className="px-4 py-3 text-left">Сайт</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {aiAdminTx.length === 0 ? (
+                      <tr><td className="px-4 py-12 text-center text-slate-500" colSpan={8}>Пока нет AI-транзакций. Как только пользователи сгенерируют хотя бы 1 сайт — появится статистика.</td></tr>
+                    ) : aiAdminTx.map((t: any) => (
+                      <tr key={t.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">{new Date(t.createdAt).toLocaleString('ru-RU')}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{t.user?.name || 'n/a'}</div>
+                          <div className="text-xs text-slate-500">{t.user?.email}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${t.provider === 'openai' ? 'bg-emerald-100 text-emerald-800' : t.provider === 'anthropic' ? 'bg-orange-100 text-orange-800' : 'bg-sky-100 text-sky-800'}`}>{t.usedOwnKey ? `${t.provider} (свой ключ)` : t.provider}</span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{(t.inputTokens || 0).toLocaleString()} ↓ / {(t.outputTokens || 0).toLocaleString()} ↑</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">₽ {Number(t.userBilledRUB || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-rose-600">₽ {Number(t.ourCostRUB || 0).toFixed(4)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-black text-purple-700">₽ {Number(t.profitRUB || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          {t.websiteId ? <span className="text-xs text-indigo-600 font-mono">{t.websiteId.slice(0,8)}…</span> : <span className="text-xs text-slate-400">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {aiAdminStats?.topUsers?.length > 0 && (
+              <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-6">
+                <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2"><Award className="h-5 w-5 text-amber-500" /> TOP-10 клиентов по прибыли</h3>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  {aiAdminStats.topUsers.map((u: any) => (
+                    <div key={u.userId} className="rounded-2xl border border-slate-100 bg-gradient-to-br from-amber-50 to-white p-4">
+                      <div className="text-sm font-bold text-gray-900 truncate">{u.user?.name || u.userId?.slice(0,8)}</div>
+                      <div className="text-xs text-slate-500 truncate">{u.user?.email}</div>
+                      <div className="mt-2 text-lg font-black text-purple-700">₽ {Number(u.userProfit || 0).toFixed(2)}</div>
+                      <div className="text-xs text-slate-500">{Number(u.userCount || 0)} генераций</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

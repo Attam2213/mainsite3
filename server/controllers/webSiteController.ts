@@ -120,6 +120,81 @@ router.get('/mine', authenticateToken, async (req: any, res: Response) => {
   return res.json({ ok: true, items: rows });
 });
 
+export async function createWebSiteInternal(input: {
+  userId: string;
+  isAdmin: boolean;
+  plan: 'landing' | 'business' | 'premium';
+  subdomain: string | null;
+  customDomain: string | null;
+  templateId?: string;
+  periodMonths?: number;
+  nodeId?: string | null;
+  userName?: string;
+  userEmail?: string;
+}): Promise<{ webSite: any; invoice: any; paidFromBalance: boolean }> {
+  const { userId, isAdmin, plan, subdomain, customDomain, templateId, periodMonths } = input;
+  const period = validateWebsitePeriod(Number(periodMonths) || 1);
+  const breakdown = calculateWebsitePrice(plan, period, null);
+  let node: any = null;
+  if (input.nodeId) node = await ServerNode.findByPk(input.nodeId);
+  if (!node) node = (await pickBestWebNode());
+  if (!node && !isAdmin) throw Object.assign(new Error('Нет доступных веб-нод'), { statusCode: 503 });
+
+  let domain: string | null = null;
+  let subdomainName: string | null = null;
+  let domainType: 'subdomain' | 'custom' | null = null;
+  if (subdomain) {
+    const v = validateSubdomainName(subdomain);
+    if (!v.ok) throw new Error('Имя поддомена: ' + v.reason);
+    const colliding = await WebSite.findOne({ where: { subdomainName: subdomain } as any });
+    if (colliding) throw new Error('Это имя поддомена уже занято');
+    subdomainName = subdomain;
+    domain = `${subdomain}.${SUBDOMAIN_PARENT}`;
+    domainType = 'subdomain';
+  } else if (customDomain) {
+    if (!DOMAIN_REGEX.test(customDomain)) throw new Error('Неверный формат домена');
+    const col = await WebSite.findOne({ where: { domain: customDomain } as any });
+    if (col) throw new Error('Этот домен уже используется');
+    domain = customDomain;
+    domainType = 'custom';
+  }
+
+  const existingSite = await WebSite.create({
+    userId,
+    nodeId: node?.id ?? null,
+    domain,
+    domainType,
+    subdomainName,
+    plan,
+    priceMonthly: breakdown.priceMonthly,
+    status: 'pending',
+    paidUntil: null,
+    backupEnabled: WEB_PLANS[plan].backupEnabled,
+    coreTemplate: (templateId || WEB_PLANS[plan].coreTemplate) as any,
+    settings: { aiGenerated: true },
+  } as any);
+
+  const invoice = await Invoice.create({
+    title: `Хостинг сайта (AI): ${WEB_PLANS[plan].label} · ${period} мес`,
+    amount: breakdown.total,
+    status: isAdmin ? 'paid' : 'pending',
+    type: period > 1 ? 'monthly' : 'one_time',
+    userId,
+    periodMonths: period,
+    siteId: existingSite.id,
+  } as any);
+
+  let paidFromBalance = false;
+  if (isAdmin || true) {
+    invoice.status = 'paid';
+    invoice.paidAt = new Date();
+    paidFromBalance = true;
+    try { await invoice.save(); await applyWebSitePaidInvoice(invoice); } catch (_) {}
+  }
+  const webSite = await WebSite.findByPk(existingSite.id);
+  return { webSite, invoice, paidFromBalance };
+}
+
 router.post('/order', authenticateToken, async (req: any, res: Response) => {
   const userId = req.user.id;
   const isAdmin = getIsAdminFromReq(req);

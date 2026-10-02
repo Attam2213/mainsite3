@@ -11,6 +11,10 @@ class User extends Model {
   declare telegram_id: string;
   declare avatar: string;
   declare balance: number;
+  declare aiOpenAIEnc: string | null;
+  declare aiAnthropicEnc: string | null;
+  declare aiGeminiEnc: string | null;
+  declare aiKeyNonce: string | null;
 }
 
 User.init(
@@ -54,6 +58,22 @@ User.init(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0.0,
+    },
+    aiOpenAIEnc: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    aiAnthropicEnc: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    aiGeminiEnc: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    aiKeyNonce: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
     },
   },
   {

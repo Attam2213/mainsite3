@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -6,6 +6,9 @@ interface User {
   email: string;
   role: 'admin' | 'client';
   balance: number;
+  telegram_id?: string | null;
+  company?: string | null;
+  avatar?: string | null;
 }
 
 interface AuthResponse {

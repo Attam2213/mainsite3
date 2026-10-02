@@ -14,6 +14,7 @@ import GameServer from './GameServer';
 import WebSite from './WebSite';
 import WebSiteBackup from './WebSiteBackup';
 import WalletTransaction from './WalletTransaction';
+import AITransaction from './AITransaction';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -75,6 +76,11 @@ WebSiteBackup.belongsTo(WebSite, { foreignKey: 'webSiteId', as: 'webSite' });
 User.hasMany(WalletTransaction, { foreignKey: 'userId', as: 'walletTransactions' });
 WalletTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// AI Transactions
+User.hasMany(AITransaction, { foreignKey: 'userId', as: 'aiTransactions' });
+AITransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+AITransaction.belongsTo(WebSite, { foreignKey: 'websiteId', as: 'webSite', constraints: false });
+
 export {
   User,
   Service,
@@ -91,5 +97,6 @@ export {
   GameServer,
   WebSite,
   WebSiteBackup,
-  WalletTransaction
+  WalletTransaction,
+  AITransaction,
 };
