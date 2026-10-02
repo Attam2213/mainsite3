@@ -62,7 +62,7 @@ ${input.plan === 'landing' ? `Landing plan = ТОЛЬКО статика:
 - data/ (empty папка, код создаёт app.db при первом запуске)`}
 
 ## ФОРМАТ ОТВЕТА — ЕДИНСТВЕННЫЙ JSON! НИКАКОГО ТЕКСТА ВНЕ JSON:
-Верни РОВНО ОДИН JSON объект такого типа, без тройных кавычек ```, без markdown:
+Верни РОВНО ОДИН JSON объект такого типа, без тройных кавычек ${'```'}, без markdown:
 {
   "plan": "${input.plan}",
   "meta": { "title": "Название в <title> страницы", "description": "meta description", "domainSuggested": "кратко.slug.wexa.su" },
