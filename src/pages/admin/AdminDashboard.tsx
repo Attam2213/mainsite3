@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -1510,16 +1510,24 @@ const AdminDashboard = () => {
                       )}
                       {hostingNodes.map((node) => {
                         const gsCount = gameServers.filter(g => g.nodeId === node.id).length;
+                        const sitesCount = Number(node.usedWebSites || 0);
                         const total = Math.max(0, Number(node.totalRam) || 0);
-                        const used = typeof node.usedRam === 'number' ? node.usedRam : gsCount * 2048;
+                        const usedRamNum = Number(node.usedRam) || 0;
+                        const estFromServers = gsCount > 0 ? gsCount * 2048 : 0;
+                        const estFromSites = sitesCount > 0 ? sitesCount * 48 : 0;
+                        const used = usedRamNum > 0 ? usedRamNum : Math.max(estFromServers, estFromSites);
                         const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+                        const nodeType = node.type || 'game';
+                        const labelPieces: string[] = [];
+                        if (nodeType === 'game' || nodeType === 'both') labelPieces.push(`${gsCount} серверов`);
+                        if (nodeType === 'web' || nodeType === 'both') labelPieces.push(`${sitesCount} сайтов`);
                         return (
                           <div key={node.id}>
                             <div className="flex items-center justify-between mb-1">
                               <div>
                                 <div className="text-sm font-medium text-gray-900">{node.name}</div>
                                 <div className="text-xs text-gray-500">
-                                  {node.ip} · {gsCount} серверов · статус {node.status}
+                                  {node.ip} · {labelPieces.length ? labelPieces.join(' · ') : '—'} · статус {node.status}
                                 </div>
                               </div>
                               <div className="text-right text-xs font-semibold text-gray-700">
@@ -2940,7 +2948,7 @@ const AdminDashboard = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSH Port</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RAM</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сайты</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ресурсы</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Цена/слот</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
@@ -2956,6 +2964,7 @@ const AdminDashboard = () => {
                       };
                       const usedSites = Number(node.usedWebSites || 0);
                       const capSites = Number(node.capacityWebSites || 0);
+                      const gsOnNode = gameServers.filter(g => g.nodeId === node.id).length;
                       return (
                       <tr key={node.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{node.name}</td>
@@ -2968,11 +2977,11 @@ const AdminDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.sshPort}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{node.totalRam} MB</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {(type === 'web' || type === 'both') ? (
+                          {(type === 'web') ? (
                             <>
                               <span className="font-semibold text-slate-700">{usedSites}</span>
                               <span className="mx-1 text-slate-400">/</span>
-                              <span className="text-slate-500">{capSites || 50}</span>
+                              <span className="text-slate-500">{capSites || 50} сайтов</span>
                               <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
                                 <div
                                   className="h-full bg-sky-500"
@@ -2980,8 +2989,41 @@ const AdminDashboard = () => {
                                 />
                               </div>
                             </>
+                          ) : type === 'game' ? (
+                            <>
+                              <span className="font-semibold text-indigo-700">{gsOnNode}</span>
+                              <span className="mx-1 text-slate-500">игровых серверов</span>
+                              {gsOnNode > 0 && node.totalRam > 0 && (
+                                <>
+                                  <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className={`h-full ${gsOnNode * 2048 >= 0.9 * (node.totalRam || 1) ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                                      style={{ width: `${Math.min(100, Math.round((gsOnNode * 2048 / Math.max(1, node.totalRam || 1)) * 100))}%` }}
+                                    />
+                                  </div>
+                                  <div className="mt-0.5 text-[10px] text-slate-400">≈ {(gsOnNode * 2).toFixed(1)}/{((node.totalRam || 0) / 1024).toFixed(1)} ГБ</div>
+                                </>
+                              )}
+                            </>
                           ) : (
-                            <span className="text-slate-400 text-xs">—</span>
+                            <div className="space-y-2">
+                              <div>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Сайты: </span>
+                                <span className="font-semibold text-sky-700">{usedSites}</span>
+                                <span className="mx-1 text-slate-400">/</span>
+                                <span className="text-slate-500">{capSites || 50}</span>
+                                <div className="mt-1 h-1 w-24 overflow-hidden rounded-full bg-slate-100">
+                                  <div className="h-full bg-sky-500" style={{ width: `${capSites ? Math.min(100, (usedSites / capSites) * 100) : 0}%` }} />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Серверов: </span>
+                                <span className="font-semibold text-indigo-700">{gsOnNode}</span>
+                                <div className="mt-1 h-1 w-24 overflow-hidden rounded-full bg-slate-100">
+                                  <div className="h-full bg-indigo-500" style={{ width: `${node.totalRam ? Math.min(100, (gsOnNode * 2048 / node.totalRam) * 100) : 0}%` }} />
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
