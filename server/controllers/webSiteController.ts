@@ -102,7 +102,7 @@ router.get('/check-subdomain', async (req: Request, res: Response) => {
   const name = String(req.query.name || '').trim().toLowerCase();
   const v = validateSubdomainName(name);
   if (!v.ok) return res.json({ ok: true, available: false, reason: v.reason, parent: SUBDOMAIN_PARENT, full: null });
-  const colliding = await WebSite.findOne({ where: { subdomainName: name } as any });
+  const colliding = await WebSite.findOne({ where: { subdomainName: name, status: { [Op.ne]: 'deleted' as any } } as any });
   if (colliding) return res.json({ ok: true, available: false, reason: 'Имя уже занято', parent: SUBDOMAIN_PARENT, full: null });
   return res.json({ ok: true, available: true, parent: SUBDOMAIN_PARENT, full: `${name}.${SUBDOMAIN_PARENT}` });
 });
@@ -146,14 +146,14 @@ export async function createWebSiteInternal(input: {
   if (subdomain) {
     const v = validateSubdomainName(subdomain);
     if (!v.ok) throw new Error('Имя поддомена: ' + v.reason);
-    const colliding = await WebSite.findOne({ where: { subdomainName: subdomain } as any });
+    const colliding = await WebSite.findOne({ where: { subdomainName: subdomain, status: { [Op.ne]: 'deleted' as any } } as any });
     if (colliding) throw new Error('Это имя поддомена уже занято');
     subdomainName = subdomain;
     domain = `${subdomain}.${SUBDOMAIN_PARENT}`;
     domainType = 'subdomain';
   } else if (customDomain) {
     if (!DOMAIN_REGEX.test(customDomain)) throw new Error('Неверный формат домена');
-    const col = await WebSite.findOne({ where: { domain: customDomain } as any });
+    const col = await WebSite.findOne({ where: { domain: customDomain, status: { [Op.ne]: 'deleted' as any } } as any });
     if (col) throw new Error('Этот домен уже используется');
     domain = customDomain;
     domainType = 'custom';
@@ -220,7 +220,7 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
       const name = String(body.subdomainName || '').trim().toLowerCase();
       const v = validateSubdomainName(name);
       if (!v.ok) return res.status(400).json({ message: `Имя поддомена: ${v.reason}` });
-      const colliding = await WebSite.findOne({ where: { subdomainName: name } as any });
+      const colliding = await WebSite.findOne({ where: { subdomainName: name, status: { [Op.ne]: 'deleted' as any } } as any });
       if (colliding) return res.status(409).json({ message: 'Это имя поддомена уже занято' });
       subdomainName = name;
       domain = `${name}.${SUBDOMAIN_PARENT}`;
@@ -229,7 +229,7 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
       if (body.domain && String(body.domain).trim()) {
         const d = String(body.domain).trim().toLowerCase();
         if (!DOMAIN_REGEX.test(d)) return res.status(400).json({ message: 'Неверный формат домена' });
-        const col = await WebSite.findOne({ where: { domain: d } as any });
+        const col = await WebSite.findOne({ where: { domain: d, status: { [Op.ne]: 'deleted' as any } } as any });
         if (col) return res.status(409).json({ message: 'Этот домен уже используется' });
         domain = d;
         domainType = 'custom';
@@ -755,7 +755,7 @@ router.post('/admin/sites/:id/delete', authenticateToken, isAdmin, async (req: a
       (node as any).usedWebSites = Math.max(0, used - 1);
       await (node as any).save();
     }
-    await site.update({ status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, nginxConfPath: null });
+    await site.update({ status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, sftpPassword: null, sftpPasswordPlainOnce: null, nginxConfPath: null, sslCertPath: null, sslExpiresAt: null, gitRepoUrl: null, subdomainName: null, domain: null, domainType: null, sshUsername: null, sshPassword: null, sshPasswordHash: null, nodeId: null, settings: {} } as any);
     return res.json({ ok: true });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });

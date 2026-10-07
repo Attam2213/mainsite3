@@ -79,7 +79,7 @@ nginx -t && systemctl reload nginx || true
             } catch (e) { console.error('Delete unpaid website resources error:', s.id, e); }
             try {
                 await s.update({
-                    status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, nginxConfPath: null,
+                    status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, sftpPassword: null, sftpPasswordPlainOnce: null, nginxConfPath: null, sslCertPath: null, sslExpiresAt: null, gitRepoUrl: null, subdomainName: null, domain: null, domainType: null, sshUsername: null, sshPassword: null, sshPasswordHash: null, nodeId: null, settings: {} as any,
                 });
             } catch (_) { try { await s.destroy(); } catch (_e) {} }
             console.log(`[webSite] DELETED (unpaid >3d) id=${s.id}, domain=${(s as any).domain || '-'}.`);
@@ -197,7 +197,7 @@ nginx -t && systemctl reload nginx || true
             } catch (e) { console.error('Delete website resources error:', s.id, e); }
             try {
                 await s.update({
-                    status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, nginxConfPath: null,
+                    status: 'deleted', pm2ProcessName: null, sftpUsername: null, sftpPasswordHash: null, sftpChroot: null, sftpPassword: null, sftpPasswordPlainOnce: null, nginxConfPath: null, sslCertPath: null, sslExpiresAt: null, gitRepoUrl: null, subdomainName: null, domain: null, domainType: null, sshUsername: null, sshPassword: null, sshPasswordHash: null, nodeId: null, settings: {} as any,
                 });
             } catch (_) { try { await s.destroy(); } catch (_e) {} }
             console.log(`[webSite] DELETED id=${s.id}.`);
