@@ -36,7 +36,7 @@ GameServer.init(
     game: { type: DataTypes.STRING, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false },
     port: { type: DataTypes.INTEGER, allowNull: true },
-    ram: { type: DataTypes.INTEGER, defaultValue: 1024 },
+    ram: { type: DataTypes.INTEGER, defaultValue: 512 },
     slots: { type: DataTypes.INTEGER, defaultValue: 10 },
     core: { type: DataTypes.STRING, defaultValue: 'paper' },
     mcVersion: { type: DataTypes.STRING, defaultValue: 'LATEST' },

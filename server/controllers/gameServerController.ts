@@ -181,7 +181,7 @@ const shellQuote = (s: string | number): string => {
 };
 
 const buildMinecraftDockerArgs = (server: any, port: number, containerName: string): string => {
-    const ram = Number(server?.ram) || 1024;
+    const ram = Math.max(384, Number(server?.ram) || 512);
     const slots = Number(server?.slots) || 20;
     const version = validateMcVersion(server?.mcVersion);
     const core = validateMcCore(server?.core);
@@ -723,6 +723,11 @@ export const createGameServer = async (req: Request, res: Response) => {
         const rawMcCustomJarName = (req.body as any).mcCustomJarName;
         const rawCs16Build = (req.body as any).cs16Build;
         const safeSlots = Math.max(10, Number(slots) || 10);
+        const defaultRamByGame =
+            game === 'minecraft' ? Math.max(512, Math.ceil(safeSlots * 48)) :
+            game === 'cs2' ? 2048 :
+            256;
+        const resolvedRam = Number.isFinite(Number(ram)) && Number(ram) >= 256 ? Number(ram) : defaultRamByGame;
 
         const safeMcVersion = validateMcVersion(rawMcVersion);
         const safeMcCore = validateMcCore(rawMcCore);
@@ -765,15 +770,15 @@ export const createGameServer = async (req: Request, res: Response) => {
         let dockerCmd = '';
         if (game === 'minecraft') {
             dockerCmd = `docker run ${buildMinecraftDockerArgs({
-                ram: ram || 1024, slots: safeSlots,
+                ram: resolvedRam, slots: safeSlots,
                 mcVersion: safeMcVersion, core: safeMcCore,
                 mcCustomJarUrl: safeMcCustomJarUrl, mcCustomJarName: safeMcCustomJarName,
             }, port, containerName)}`;
         } else if (game === 'cs2') {
-            dockerCmd = `docker run -d -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${safeSlots}`;
+            dockerCmd = `docker run -d -m 2048m -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${safeSlots}`;
         } else if (game === 'cs16') {
             const built = buildCs16DockerArgs({
-                ram: ram || 1024,
+                ram: resolvedRam,
                 slots: safeSlots,
                 userId,
                 id: 'tmp_' + userId,
@@ -806,7 +811,7 @@ export const createGameServer = async (req: Request, res: Response) => {
 
         const now = new Date();
         const paidUntil = addMonths(now, 1);
-        const monthlyPrice = calculateMonthlyPrice(ram || 1024, safeSlots, getSlotPriceForNodeGame(node as any, game));
+        const monthlyPrice = calculateMonthlyPrice(resolvedRam, safeSlots, getSlotPriceForNodeGame(node as any, game));
 
         const server = await GameServer.create({
             userId,
@@ -814,7 +819,7 @@ export const createGameServer = async (req: Request, res: Response) => {
             game,
             name,
             port,
-            ram: ram || 1024,
+            ram: resolvedRam,
             slots: safeSlots,
             core: game === 'minecraft' ? safeMcCore : undefined,
             mcVersion: game === 'minecraft' ? safeMcVersion : undefined,
@@ -984,8 +989,12 @@ export const orderGameServer = async (req: Request, res: Response) => {
         }
 
         const now = new Date();
-        const safeRam = Number(ram) || 1024;
         const safeSlots = Math.max(10, Number(slots) || 10);
+        const defaultRamByGame =
+            game === 'minecraft' ? Math.max(512, Math.ceil(safeSlots * 48)) :
+            game === 'cs2' ? 2048 :
+            256;
+        const safeRam = Number.isFinite(Number(ram)) && Number(ram) >= 256 ? Number(ram) : defaultRamByGame;
         if (Number.isFinite(Number(slots)) && Number(slots) < 10) {
             res.status(400).json({ message: 'Минимальное количество слотов для любого игрового сервера: 10 штук.' });
             return;

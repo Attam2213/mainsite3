@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -1509,11 +1509,22 @@ const AdminDashboard = () => {
                         <div className="py-6 text-center text-gray-500 text-sm">Ноды не добавлены</div>
                       )}
                       {hostingNodes.map((node) => {
-                        const gsCount = gameServers.filter(g => g.nodeId === node.id).length;
+                        const gsOnNodeList = gameServers.filter(g => g.nodeId === node.id);
+                        const gsCount = gsOnNodeList.length;
                         const sitesCount = Number(node.usedWebSites || 0);
                         const total = Math.max(0, Number(node.totalRam) || 0);
                         const usedRamNum = Number(node.usedRam) || 0;
-                        const estFromServers = gsCount > 0 ? gsCount * 2048 : 0;
+                        const estFromServers = gsCount > 0
+                          ? gsOnNodeList.reduce((acc, gs) => {
+                              const r = Number((gs as any).ram) || 0;
+                              if (r > 0) return acc + r;
+                              return acc + (
+                                (gs.game || 'minecraft') === 'cs2' ? 2048 :
+                                (gs.game || 'minecraft') === 'cs16' ? 256 :
+                                512
+                              );
+                            }, 0)
+                          : 0;
                         const estFromSites = sitesCount > 0 ? sitesCount * 48 : 0;
                         const used = usedRamNum > 0 ? usedRamNum : Math.max(estFromServers, estFromSites);
                         const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
@@ -2964,7 +2975,18 @@ const AdminDashboard = () => {
                       };
                       const usedSites = Number(node.usedWebSites || 0);
                       const capSites = Number(node.capacityWebSites || 0);
-                      const gsOnNode = gameServers.filter(g => g.nodeId === node.id).length;
+                      const gsOnNodeList = gameServers.filter(g => g.nodeId === node.id);
+                      const gsOnNode = gsOnNodeList.length;
+                      const gsTotalRam = gsOnNodeList.reduce((acc, gs) => {
+                        const r = Number((gs as any).ram) || 0;
+                        if (r > 0) return acc + r;
+                        return acc + (
+                          (gs.game || 'minecraft') === 'cs2' ? 2048 :
+                          (gs.game || 'minecraft') === 'cs16' ? 256 :
+                          512
+                        );
+                      }, 0);
+                      const totalRam = Math.max(1, Number(node.totalRam) || 1);
                       return (
                       <tr key={node.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{node.name}</td>
@@ -2997,11 +3019,11 @@ const AdminDashboard = () => {
                                 <>
                                   <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
                                     <div
-                                      className={`h-full ${gsOnNode * 2048 >= 0.9 * (node.totalRam || 1) ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                                      style={{ width: `${Math.min(100, Math.round((gsOnNode * 2048 / Math.max(1, node.totalRam || 1)) * 100))}%` }}
+                                      className={`h-full ${gsTotalRam >= 0.9 * totalRam ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                                      style={{ width: `${Math.min(100, Math.round((gsTotalRam / totalRam) * 100))}%` }}
                                     />
                                   </div>
-                                  <div className="mt-0.5 text-[10px] text-slate-400">≈ {(gsOnNode * 2).toFixed(1)}/{((node.totalRam || 0) / 1024).toFixed(1)} ГБ</div>
+                                  <div className="mt-0.5 text-[10px] text-slate-400">≈ {(gsTotalRam / 1024).toFixed(1)}/{(totalRam / 1024).toFixed(1)} ГБ</div>
                                 </>
                               )}
                             </>
@@ -3020,7 +3042,7 @@ const AdminDashboard = () => {
                                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Серверов: </span>
                                 <span className="font-semibold text-indigo-700">{gsOnNode}</span>
                                 <div className="mt-1 h-1 w-24 overflow-hidden rounded-full bg-slate-100">
-                                  <div className="h-full bg-indigo-500" style={{ width: `${node.totalRam ? Math.min(100, (gsOnNode * 2048 / node.totalRam) * 100) : 0}%` }} />
+                                  <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (gsTotalRam / totalRam) * 100)}%` }} />
                                 </div>
                               </div>
                             </div>
