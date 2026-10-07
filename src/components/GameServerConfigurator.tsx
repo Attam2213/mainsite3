@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -1385,14 +1385,14 @@ const GameServerConfigurator = ({
                 style={{display: actualTab === 'game' ? undefined : 'none'}}
                 className="flex flex-col gap-8"
               >
-                <CompactGameSelector />
-                <CompactLocationSelector />
-                <PeriodSelector />
-                {showNameField && <NameField />}
+                {CompactGameSelector()}
+                {CompactLocationSelector()}
+                {PeriodSelector()}
+                {showNameField && NameField()}
                 <div className="flex flex-col gap-8 pt-2">
-                  <Sliders />
-                  <McVersionSelector />
-                  <Cs16BuildSelector />
+                  {Sliders()}
+                  {McVersionSelector()}
+                  {Cs16BuildSelector()}
                 </div>
               </div>
               <div
@@ -1400,11 +1400,11 @@ const GameServerConfigurator = ({
                 style={{display: actualTab === 'website' ? undefined : 'none'}}
                 className="flex flex-col gap-9 relative"
               >
-                <WebsitePlanCards />
+                {WebsitePlanCards()}
                 <div className="h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
-                <PeriodSelector />
+                {PeriodSelector()}
                 <div className="h-px bg-gradient-to-r from-transparent via-fuchsia-200 to-transparent" />
-                <WebsiteDomainField />
+                {WebsiteDomainField()}
                 <div className="flex items-start gap-3 p-5 bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl">
                   <Rocket size={22} className="text-sky-600 flex-shrink-0 mt-0.5" />
                   <div>
@@ -1422,13 +1422,13 @@ const GameServerConfigurator = ({
                 aria-hidden={actualTab !== 'game'}
                 style={{display: actualTab === 'game' ? undefined : 'none'}}
               >
-                <PricePanel />
+                {PricePanel()}
               </div>
               <div
                 aria-hidden={actualTab !== 'website'}
                 style={{display: actualTab === 'website' ? undefined : 'none'}}
               >
-                <WebsitePricePanel />
+                {WebsitePricePanel()}
               </div>
             </div>
           </div>
@@ -1447,11 +1447,11 @@ const GameServerConfigurator = ({
     <>
       {!compact && (
         <>
-          <GamesHeroSection />
-          <LocationsHeroSection />
+          {GamesHeroSection()}
+          {LocationsHeroSection()}
         </>
       )}
-      <ConfiguratorPanel />
+      {ConfiguratorPanel()}
     </>
   );
 };
