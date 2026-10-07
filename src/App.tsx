@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import React from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './pages/Home';
@@ -66,6 +66,22 @@ const App = () => {
           />
           <Route
             path="/client"
+            element={
+              <ProtectedRoute allowedRoles={['client', 'admin']}>
+                <ClientDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/client/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['client', 'admin']}>
+                <ClientDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/client/invoices"
             element={
               <ProtectedRoute allowedRoles={['client', 'admin']}>
                 <ClientDashboard />

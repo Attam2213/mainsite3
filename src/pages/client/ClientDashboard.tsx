@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -1327,7 +1327,18 @@ const ClientDashboard = () => {
   // Detect return from Platega success page & refresh balance + reload data
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('success') === 'true' || params.get('topup') === 'ok') {
+    const success = params.get('success') === 'true';
+    const topupOk = params.get('topup') === 'ok';
+    const wantWallet = params.get('wallet') === '1';
+    const invoiceId = params.get('invoiceId');
+    const path = String(location.pathname || '').replace(/\/+$/, '');
+
+    let initialTab: typeof activeTab | null = null;
+    if (wantWallet) initialTab = 'balance';
+    if (path === '/client/invoices' || (success && invoiceId)) initialTab = 'billing';
+    if (initialTab && initialTab !== activeTab) setActiveTab(initialTab);
+
+    if (success || topupOk) {
       (async () => {
         try {
           await refreshBalance();
@@ -1335,15 +1346,36 @@ const ClientDashboard = () => {
           loadTransactions();
         } catch (e) { console.error(e); }
       })();
+      const message = topupOk
+        ? 'Баланс успешно пополнен!'
+        : invoiceId
+          ? `Оплата по счёту #${invoiceId.slice(0, 8)}… прошла успешно! Услуга будет активирована в течение минуты.`
+          : 'Оплата прошла успешно!';
+      showToast('success', message);
       // clear query params without reload
       const url = new URL(window.location.href);
       url.searchParams.delete('success');
       url.searchParams.delete('topup');
       url.searchParams.delete('order_id');
+      url.searchParams.delete('invoiceId');
+      url.searchParams.delete('wallet');
       window.history.replaceState({}, '', url.toString());
+    } else if (wantWallet || path === '/client/invoices') {
+      (async () => {
+        try {
+          await refreshBalance();
+          await fetchData();
+          if (wantWallet) loadTransactions();
+        } catch {}
+      })();
+      if (wantWallet) {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('wallet');
+        window.history.replaceState({}, '', u.toString());
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+  }, [location.search, location.pathname]);
 
   const fetchMessages = async (orderId: string) => {
     try {
