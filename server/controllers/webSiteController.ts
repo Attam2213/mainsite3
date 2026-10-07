@@ -29,7 +29,7 @@ const SUBDOMAIN_PARENT = process.env.WEBSITE_SUBDOMAIN_PARENT || 'wexa.su';
 const SUBDOMAIN_REGEX = /^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/;
 // Unicode-aware custom domain regex (supports IDN: кириллица .рф, .сайт, arabic, chinese etc + punycode xn--)
 const CUSTOM_DOMAIN_LABEL_RE = /^[\p{L}\p{N}]+(-[\p{L}\p{N}]+)*$/iu;
-const PUNYCODE_LABEL_RE = /^xn--[a-z0-9]+$/i;
+const PUNYCODE_LABEL_RE = /^xn--[a-z0-9][a-z0-9-]*[a-z0-9]$|^xn--[a-z0-9]+$/i;
 
 const normalizeCustomDomain = (raw: string): string => {
   const r = String(raw || '').trim().toLowerCase();

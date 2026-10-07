@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -583,7 +583,7 @@ const ClientDashboard = () => {
         if (data?.invoice?.id && data?.invoice?.status !== 'paid') {
           handlePayInvoice(data.invoice.id);
         } else if (!data?.invoice && !data?.gameServer) {
-          alert('Сервер создан, но счет не был сформирован автоматически');
+          showToast('info', 'ℹ Сервер создан, но счёт не был сформирован автоматически');
         }
       } else if (res.status === 402) {
         const errorData = await res.json().catch(() => ({}));
@@ -591,11 +591,11 @@ const ClientDashboard = () => {
       } else {
         const errorData = await res.json().catch(() => ({}));
         console.error('Order error response:', errorData);
-        alert(`Ошибка: ${errorData.message || 'Не удалось создать сервер'}`);
+        showToast('error', `❌ Ошибка: ${errorData.message || 'Не удалось создать сервер'}`);
       }
     } catch (e) {
       console.error('Order network error:', e);
-      alert('Ошибка сети или сервера');
+      showToast('error', '❌ Ошибка сети или сервера');
     }
   };
 
@@ -630,11 +630,11 @@ const ClientDashboard = () => {
         showInsufficientFundsAlert(errorData, 'Недостаточно средств для создания сайта');
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.message || 'Не удалось создать сайт');
+        showToast('error', `❌ ${err.message || 'Не удалось создать сайт'}`);
       }
     } catch (e) {
       console.error('Website order error:', e);
-      alert('Ошибка сети');
+      showToast('error', '❌ Ошибка сети');
     }
   };
 
