@@ -1082,7 +1082,21 @@ const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domai
 `
     : '';
 
-  const proxyCommon = `
+  const proxyCommon = sslOK
+    ? `
+  location / {
+    proxy_pass http://127.0.0.1:${port};
+    proxy_http_version 1.1;
+    proxy_set_header Host \\$host;
+    proxy_set_header X-Real-IP \\$remote_addr;
+    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \\$scheme;
+    proxy_set_header Upgrade \\$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 120s;
+  }`
+    : `
   location ~* \\.(?:js|css|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
     root ${siteDir}/public;
     expires 7d;
@@ -1103,8 +1117,7 @@ const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domai
   const conf = `${server80Redirect}server {
 ${sslOK ? serverSslLines : '  listen 80;'}
   server_name ${domain};
-  root ${hasProxy ? `${siteDir}/public` : siteDir};
-  index index.html index.htm;
+${hasProxy && sslOK ? '' : `  root ${hasProxy ? `${siteDir}/public` : siteDir};\n  index index.html index.htm;`}
   access_log /var/log/nginx/wexa-site-${shortId}-access.log;
   error_log /var/log/nginx/wexa-site-${shortId}-error.log;
 ${hasProxy ? proxyCommon : ''}
