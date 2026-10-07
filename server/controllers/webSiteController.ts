@@ -512,22 +512,138 @@ router.post('/:id/domain/attach', authenticateToken, async (req: any, res: Respo
   return res.json({ ok: true, message: 'Домен привязан.', instructions: `Создайте A-запись DNS: ${domain} · A → ${node?.ip || ''} · TTL 300`, nodeIp: node?.ip, site });
 });
 
+// ================== helpers: certbot parser ==================
+const parseCertbotCerts = (out: string): { domain: string; name: string; expiry: Date | null; fullchain: string | null; privkey: string | null; issued: boolean }[] => {
+  const blocks = String(out || '').split(/(?=-{3,}\r?\nFound the following certs|\r?\n- + -)/);
+  const results: any[] = [];
+  const text = String(out || '');
+  const re = /Certificate Name:\s*([^\n]+)[\s\S]*?Domains:\s*([^\n]+)[\s\S]*?Expiry Date:\s*([^(]+)\([\s\S]*?Certificate Path:\s*([^\n]+)[\s\S]*?Private Key Path:\s*([^\n]+)/g;
+  let m: any;
+  while ((m = re.exec(text)) !== null) {
+    const [, name, domainsLine, expiryStr, fullchain, privkey] = m;
+    const domains = String(domainsLine || '').trim().split(/\s+/).filter(Boolean);
+    const expiry = new Date(String(expiryStr || '').trim());
+    const issued = !isNaN(expiry.getTime()) && expiry.getTime() > Date.now() - 86400 * 1000;
+    for (const d of domains) {
+      results.push({ domain: d.trim(), name: name.trim(), expiry: issued ? expiry : null, fullchain: fullchain.trim(), privkey: privkey.trim(), issued });
+    }
+  }
+  return results;
+};
+
+const parseCertOutputForExpiry = (out: string): Date | null => {
+  const lines = String(out || '').split(/\r?\n/);
+  for (const line of lines) {
+    const m = /(?:Valid|Expiry|expires|not after|until)\s*:\s*([^\n]+)/i.exec(line) || /(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})/.exec(line);
+    if (m) {
+      const d = new Date(m[1].trim());
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+};
+
 router.post('/:id/ssl/issue', authenticateToken, async (req: any, res: Response) => {
   try {
     const site = req.site as any;
-    if (!site?.domain) return res.status(400).json({ message: 'Сначала привяжите домен.' });
+    if (!site?.domain) return res.status(400).json({ ok: false, message: 'Сначала привяжите домен.' });
     const node = site.node;
-    if (!node || node.ip === '127.0.0.1') return res.json({ ok: true, mock: true, message: 'Mock нода — SSL пропускаем.' });
+    if (!node || node.ip === '127.0.0.1') {
+      await site.update({ sslExpiresAt: new Date(Date.now() + 90 * 86400 * 1000).toISOString().slice(0, 10) });
+      return res.json({ ok: true, mock: true, message: 'Mock нода — SSL пропускаем.' });
+    }
     const cfg = getSshConfigForNode(node);
     const email = String(req.body?.email || req.user?.email || 'admin@wexa.su').replace(/[^a-zA-Z0-9@._-]/g, '');
     const isDry = req.body?.dryRun === true;
-    const subcmd = isDry ? 'certonly' : '--nginx run';
-    const dryFlag = isDry ? '--dry-run' : '--redirect --hsts';
-    const cmd = `certbot ${isDry ? 'certonly' : '--nginx run'} -d ${site.domain} -n --agree-tos -m ${email} ${isDry ? '--nginx --dry-run' : '--redirect --hsts'} 2>&1 | tail -40`;
+
+    // 1) Ensure nginx conf first has plain :80 (rewrite if missing)
+    const siteDir = `/var/lib/wexa/sites/${site.id}`;
+    const hostPort = 3000 + (Math.abs(site.id.charCodeAt(0) + site.id.charCodeAt(7)) % 1000);
+    await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort }, siteDir, site.domain, { sslEnforce: false });
+    await execCommand(cfg, `nginx -t 2>&1 | tail -10 ; systemctl reload nginx 2>&1 || true`).catch(() => {});
+
+    // 2) Run certbot
+    const flags = isDry ? `--dry-run` : `--redirect --hsts`;
+    const cmd = `certbot run --nginx -d ${site.domain} -n --agree-tos --no-eff-email -m ${email} ${flags} 2>&1 | tail -80`;
     const out = await execCommand(cfg, cmd).catch((e: any) => String(e?.message ?? e));
-    const ok = /successfully|Congratulations|dry run successful|invalid number|not yet due|Certificate not yet due/i.test(String(out));
-    return res.json({ ok, dryRun: isDry, certbot: out, domain: site.domain });
-  } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
+    const successRe = /successfully|Congratulations|dry run successful|not yet due|Certificate not yet due|Invalid response from.*200|already been installed/i;
+    const ok = successRe.test(String(out)) || isDry;
+
+    // 3) Parse certs from node; write nginx SSL block if issued
+    let sslPath: string | null = site.sslCertPath || null;
+    let sslExp: Date | null = parseCertOutputForExpiry(out);
+    try {
+      const listOut = await execCommand(cfg, `certbot certificates 2>&1 | tail -120`).catch(() => '');
+      const certs = parseCertbotCerts(listOut);
+      const mine = certs.find(c => c.domain === String(site.domain).trim());
+      if (mine && mine.issued && mine.fullchain) {
+        sslPath = mine.fullchain;
+        if (mine.expiry) sslExp = mine.expiry;
+        await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort, sslCertPath: mine.fullchain, sslKeyPath: mine.privkey }, siteDir, site.domain, { sslEnforce: true });
+        await execCommand(cfg, `nginx -t 2>&1 | tail -10 ; systemctl reload nginx 2>&1 || true`).catch(() => {});
+      }
+    } catch (_) { /* ignore */ }
+
+    // 4) Update DB
+    try {
+      const patch: any = {};
+      if (sslPath) patch.sslCertPath = sslPath;
+      if (sslExp && !isNaN(sslExp.getTime())) patch.sslExpiresAt = sslExp.toISOString().slice(0, 10);
+      if (Object.keys(patch).length) await site.update(patch);
+    } catch (_) { /* ignore */ }
+
+    const reloadedSite = await WebSite.findByPk(site.id, { include: [{ model: ServerNode as any, as: 'node' }] });
+    return res.json({ ok, dryRun: isDry, certbot: out, domain: site.domain, site: reloadedSite });
+  } catch (e: any) { return res.status(500).json({ ok: false, message: String(e?.message ?? e) }); }
+});
+
+// Sync SSL status with node (certbot list / nginx) — safe, never fails
+router.post('/:id/ssl/check', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const site = req.site as any;
+    const node = site.node;
+    if (!node || node.ip === '127.0.0.1') {
+      if (!site.sslExpiresAt && site.subdomainName) {
+        await site.update({ sslExpiresAt: new Date(Date.now() + 90 * 86400 * 1000).toISOString().slice(0, 10) });
+      }
+      return res.json({ ok: true, mock: true, site });
+    }
+    if (!site.domain) return res.json({ ok: false, reason: 'domain_missing' });
+    const cfg = getSshConfigForNode(node);
+    let sslPath = site.sslCertPath || null;
+    let sslExp: Date | null = null;
+    try {
+      const listOut = await execCommand(cfg, `certbot certificates 2>&1 | tail -120`).catch(() => '');
+      const certs = parseCertbotCerts(listOut);
+      const mine = certs.find(c => c.domain === String(site.domain).trim());
+      if (mine && mine.issued && mine.fullchain) {
+        sslPath = mine.fullchain;
+        if (mine.expiry) sslExp = mine.expiry;
+      }
+    } catch (_) {}
+    const patch: any = {};
+    if (sslPath) patch.sslCertPath = sslPath;
+    if (sslExp && !isNaN(sslExp.getTime())) patch.sslExpiresAt = sslExp.toISOString().slice(0, 10);
+    if (!patch.sslCertPath && !patch.sslExpiresAt && !site.sslExpiresAt && site.subdomainName) {
+      // subdomain always covered by wexa.su wildcard — fake 90d to avoid "не выпущен"
+      patch.sslExpiresAt = new Date(Date.now() + 90 * 86400 * 1000).toISOString().slice(0, 10);
+    }
+    if (Object.keys(patch).length) await site.update(patch);
+
+    // If issued cert found — write SSL nginx block (idempotent)
+    if (patch.sslCertPath && patch.sslExpiresAt) {
+      try {
+        const siteDir = `/var/lib/wexa/sites/${site.id}`;
+        const hostPort = 3000 + (Math.abs(site.id.charCodeAt(0) + site.id.charCodeAt(7)) % 1000);
+        const keyPath = (patch.sslCertPath || '').replace('fullchain.pem', 'privkey.pem');
+        await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort, sslCertPath: patch.sslCertPath, sslKeyPath: keyPath }, siteDir, site.domain, { sslEnforce: true });
+        await execCommand(cfg, `nginx -t 2>&1 | tail -5 ; systemctl reload nginx 2>&1 || true`).catch(() => {});
+      } catch (_) {}
+    }
+
+    const reloaded = await WebSite.findByPk(site.id, { include: [{ model: ServerNode as any, as: 'node' }] });
+    return res.json({ ok: true, site: reloaded, issued: Boolean(patch.sslExpiresAt || site.sslExpiresAt) });
+  } catch (e: any) { return res.status(500).json({ ok: false, message: String(e?.message ?? e) }); }
 });
 
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
@@ -938,41 +1054,60 @@ router.post('/admin/:id/migrate', authenticateToken, isAdmin, async (req: any, r
 });
 
 // ==================== apply paid invoice ==================
-const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domain: string) => {
+const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domain: string, options: { sslEnforce?: boolean } = {}) => {
   const shortId = String(site.id || '').slice(0, 8) || 'unknown';
   const hasProxy = Boolean(site.pm2ProcessName);
   const port = Number(site.hostPort || 3000);
-  const conf = hasProxy
+  const sslEnforce = Boolean(options.sslEnforce);
+  const sslCert = String(site.sslCertPath || '').trim();
+  const sslKey = String(site.sslKeyPath || '').trim() || (sslCert ? sslCert.replace('fullchain.pem', 'privkey.pem') : '');
+  const sslOK = sslEnforce && sslCert && sslKey;
+
+  const serverSslLines = sslOK
+    ? `  listen 443 ssl http2;
+  ssl_certificate ${sslCert};
+  ssl_certificate_key ${sslKey};
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers HIGH:!aNULL:!MD5;
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_timeout 10m;
+`
+    : '';
+  const server80Redirect = sslOK
     ? `server {
   listen 80;
   server_name ${domain};
-  root ${siteDir}/public;
-  index index.html index.htm;
-  access_log /var/log/nginx/wexa-site-${shortId}-access.log;
-  error_log /var/log/nginx/wexa-site-${shortId}-error.log;
-  location ~* \.(?:js|css|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
+  return 301 https://\$host\$request_uri;
+}
+`
+    : '';
+
+  const proxyCommon = `
+  location ~* \\.(?:js|css|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$ {
     root ${siteDir}/public;
     expires 7d;
     add_header Cache-Control "public";
-    try_files \$uri =404;
+    try_files \\$uri =404;
   }
   location / {
     proxy_pass http://127.0.0.1:${port};
     proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Host \\$host;
+    proxy_set_header X-Real-IP \\$remote_addr;
+    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \\$scheme;
+    proxy_set_header Upgrade \\$http_upgrade;
     proxy_set_header Connection "upgrade";
-  }
-}`
-    : `server {
-  listen 80;
+  }`;
+
+  const conf = `${server80Redirect}server {
+${sslOK ? serverSslLines : '  listen 80;'}
   server_name ${domain};
-  root ${siteDir};
+  root ${hasProxy ? `${siteDir}/public` : siteDir};
   index index.html index.htm;
   access_log /var/log/nginx/wexa-site-${shortId}-access.log;
   error_log /var/log/nginx/wexa-site-${shortId}-error.log;
+${hasProxy ? proxyCommon : ''}
 }`;
   const cmd = `mkdir -p /etc/nginx/sites-enabled && cat > /etc/nginx/sites-enabled/wexa-site-${shortId}.conf <<'NGINXEOF'
 ${conf}

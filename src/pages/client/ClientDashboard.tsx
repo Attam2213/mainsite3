@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -1700,9 +1700,19 @@ const ClientDashboard = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       });
-      const text = await res.text();
-      alert(res.ok ? `SSL сертификат выпущен!\n\n${text.slice(0, 500)}` : `Ошибка выпуска SSL:\n${text.slice(0, 800)}`);
-    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        showToast('success', '✅ SSL-сертификат выпущен!');
+        // Also run SSL sync for good measure
+        try {
+          await fetch(`/api/sites/${siteId}/ssl/check`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` } });
+        } catch (_) {}
+        fetchData();
+      } else {
+          const detail = String(data?.message || data?.certbot || data || '').slice(0, 300);
+          showToast('error', `❌ Ошибка выпуска SSL: ${detail || 'неизвестная ошибка'}${data?.dryRun ? ' (dry-run)' : ''}`);
+        }
+    } catch (e) { showToast('error','❌ Ошибка соединения'); console.error(e); }
   };
 
   const uploadWebFile = async (siteId: string, toPath: string, file: File) => {
@@ -5934,13 +5944,32 @@ const ClientDashboard = () => {
                                 Прикрепить
                               </button>
                             </div>
-                            <button
-                              onClick={() => issueWebSsl(currentWebSite.id)}
-                              className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition"
-                            >
-                              <ShieldCheck className="h-4 w-4" />
-                              Выпустить SSL-сертификат (Let's Encrypt)
-                            </button>
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={() => issueWebSsl(currentWebSite.id)}
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                                Выпустить SSL-сертификат (Let's Encrypt)
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const token = localStorage.getItem('token');
+                                    const r = await fetch(`/api/sites/${currentWebSite.id}/ssl/check`, { method:'POST', headers:{Authorization: `Bearer ${token}`}});
+                                    if (r.ok) {
+                                      const d = await r.json().catch(()=>({}));
+                                      if (d?.site) setCurrentWebSite(d.site);
+                                      showToast(d?.issued ? 'success' : 'info', d?.issued ? '✅ Статус SSL синхронизирован: сертификат выпущен.' : 'ℹ️ Статус SSL обновлён.');
+                                      fetchData();
+                                    }
+                                  } catch (e) { console.error(e); showToast('error','❌ Ошибка синхронизации'); }
+                                }}
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5"/> Синхронизировать статус SSL
+                              </button>
+                            </div>
                             {currentWebSite.node?.ip && (
                               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                                 <b>DNS настройка:</b> добавьте A-запись домена на IP <span className="font-mono font-semibold">{currentWebSite.node.ip}</span> перед выпуском SSL.
