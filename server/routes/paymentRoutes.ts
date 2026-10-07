@@ -91,20 +91,15 @@ router.post('/create', authenticateToken, async (req: Request, res: Response) =>
           await applyPostPaidInvoice(invoice);
           return res.json({ paid: true, balanceAfter: Number(newBalance.toFixed(2)), paidWithBalance: true });
         } catch (wb: any) {
-          console.error('Balance-first charge failed:', wb?.message || wb);
+          console.error('Balance-first charge failed (fallback to Platega):', wb?.message || wb);
+          // Fall through to Platega payment creation below
         }
-      } else {
-        // Insufficient balance: return 402 with details (frontend shows banner)
-        return res.status(402).json({
-          message: 'Недостаточно средств на балансе',
-          needed: round2(amount - userBal),
-          balance: userBal,
-          totalAmount: amount,
-        });
       }
+      // If user has insufficient balance — do NOT return 402 here, fall through to Platega instead.
+      // Frontend will get the redirect URL and show card/SBP payment screen.
     }
 
-    // 2) FALLBACK: Platega redirect if balance charge didn't happen (or admin)
+    // 2) FALLBACK: Platega redirect (insufficient balance, admin order, or balance charge failed)
     const result = await plategaService.createPayment({
       paymentMethod,
       paymentDetails: {
@@ -118,6 +113,10 @@ router.post('/create', authenticateToken, async (req: Request, res: Response) =>
     });
 
     if (result.success && result.data) {
+      try {
+        (invoice as any).externalTransactionId = result.data.transactionId || null;
+        await invoice.save();
+      } catch {}
       res.json({ url: result.data.url });
     } else {
       res.status(500).json({ message: result.error || 'Failed to create payment' });
@@ -131,102 +130,124 @@ router.post('/create', authenticateToken, async (req: Request, res: Response) =>
 // Webhook
 router.post('/webhook', async (req: Request, res: Response) => {
   try {
-    console.log('Webhook received:', JSON.stringify(req.body));
+    const rawBody: Buffer | undefined = (req as any).rawBody;
+    const rawBodyStr = rawBody ? rawBody.toString('utf8') : JSON.stringify(req.body);
 
-    const { status, payload, transaction } = req.body as unknown as {
-      status?: string;
-      payload?: string;
-      transaction?: { payload?: string; status?: string };
-    };
-    
-    // Extract invoiceId from payload (sent during creation)
-    // If payload is not at top level, check if it's inside transaction
-    let invoiceId = payload;
-    if (!invoiceId && transaction && transaction.payload) {
-        invoiceId = transaction.payload;
+    // Verify HMAC signature if header present (header names: X-Signature / X-Sign)
+    const sigHeader =
+      req.header('X-Signature') ||
+      req.header('X-Sign') ||
+      req.header('x-signature') ||
+      req.header('x-sign');
+    if (sigHeader) {
+      const ok = plategaService.verifyWebhookSignature(rawBodyStr, sigHeader);
+      if (!ok) {
+        console.warn(`[Platega webhook] HMAC signature MISMATCH; payload=${rawBodyStr.slice(0, 200)}`);
+        return res.status(401).json({ success: false, error: 'invalid_signature' });
+      }
+      console.log('[Platega webhook] HMAC signature verified');
+    } else {
+      console.warn('[Platega webhook] No X-Signature/X-Sign header received — skipping signature verify.');
     }
 
-    // Check status
-    // Docs say: PENDING, CANCELED, CONFIRMED, CHARGEBACKED
-    let isPaid = false;
-    const currentStatus = status || (transaction && transaction.status);
-    
-    if (currentStatus === 'CONFIRMED' || currentStatus === 'paid' || currentStatus === 'success') {
-      isPaid = true;
-    }
+    console.log('Webhook received:', rawBodyStr);
 
-    if (isPaid && invoiceId) {
+    const body = req.body as any;
+    const transaction = body?.transaction || {};
+    const transactionId =
+      String(body?.transactionId || transaction?.id || transaction?.transactionId || '').trim() ||
+      null;
+    const invoiceId =
+      String(body?.payload || transaction?.payload || body?.invoiceId || '').trim() ||
+      null;
+    const currentStatus =
+      String(body?.status || transaction?.status || '').toUpperCase() || 'UNKNOWN';
+
+    const paidStates = new Set(['CONFIRMED', 'PAID', 'SUCCESS', 'COMPLETED', 'SUCCESSFUL']);
+    const isPaid = paidStates.has(currentStatus);
+
+    if (invoiceId) {
       const invoice = await Invoice.findByPk(invoiceId);
-      if (invoice && invoice.status !== 'paid') {
-        invoice.status = 'paid';
-        await invoice.save();
-        console.log(`Invoice ${invoiceId} marked as paid via webhook`);
+      if (invoice) {
+        try {
+          (invoice as any).externalTransactionId = transactionId || (invoice as any).externalTransactionId || null;
+          (invoice as any).externalPayload = rawBodyStr.slice(0, 10000);
+          await invoice.save();
+        } catch {}
 
-        // Deposit top-up (wallet)
-        const title = String(invoice.title || '');
-        if (invoice.type === 'one_time' && /пополнени|баланс|deposit|wallet/i.test(title)) {
-          try {
-            const amt = Number(invoice.amount) || 0;
-            if (amt > 0) {
-              const { newBalance } = await adjustBalance({
-                userId: invoice.userId,
-                amount: +Math.round(amt * 100) / 100,
-                type: 'deposit',
-                description: title || 'Пополнение через Platega',
-                invoiceId: invoice.id,
-                metadata: { source: 'platega_webhook' },
-              });
-              console.log(`Wallet deposited +${amt} for user ${invoice.userId} => new balance=${newBalance}`);
+        if (isPaid && invoice.status !== 'paid') {
+          invoice.status = 'paid';
+          await invoice.save();
+          console.log(`Invoice ${invoiceId} marked as paid via webhook`);
+
+          // Deposit top-up (wallet)
+          const title = String(invoice.title || '');
+          if (invoice.type === 'one_time' && /пополнени|баланс|deposit|wallet/i.test(title)) {
+            try {
+              const amt = Number(invoice.amount) || 0;
+              if (amt > 0) {
+                const { newBalance } = await adjustBalance({
+                  userId: invoice.userId,
+                  amount: +Math.round(amt * 100) / 100,
+                  type: 'deposit',
+                  description: title || 'Пополнение через Platega',
+                  invoiceId: invoice.id,
+                  metadata: { source: 'platega_webhook', txId: transactionId || null },
+                });
+                console.log(`Wallet deposited +${amt} for user ${invoice.userId} => new balance=${newBalance}`);
+              }
+            } catch (wb: any) {
+              console.error('Webhook wallet deposit error:', wb?.message || wb);
             }
-          } catch (wb: any) {
-            console.error('Webhook wallet deposit error:', wb?.message || wb);
           }
-        }
 
-        // Handle Subscription Logic
-        if (invoice.type === 'monthly' && invoice.projectId) {
+          // Handle Subscription Logic
+          if (invoice.type === 'monthly' && invoice.projectId) {
             const project = await Project.findByPk(invoice.projectId);
             if (project) {
-                // Determine start date
-                let startDate = new Date();
-                if (project.paidUntil && new Date(project.paidUntil) > startDate) {
-                    startDate = new Date(project.paidUntil);
-                }
-                
-                // Add months
-                const monthsToAdd = invoice.periodMonths || 1;
-                const newPaidUntil = new Date(startDate);
-                newPaidUntil.setMonth(newPaidUntil.getMonth() + monthsToAdd);
-                
-                project.paidUntil = newPaidUntil;
-                await project.save();
-                console.log(`Project ${project.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
-                
-                // Restart PM2 process
-                await startPM2Process(project);
+              let startDate = new Date();
+              const projectAny = project as any;
+              if (projectAny.paidUntil && new Date(projectAny.paidUntil) > startDate) {
+                startDate = new Date(projectAny.paidUntil);
+              }
+              const monthsToAdd = (invoice as any).periodMonths || 1;
+              const newPaidUntil = new Date(startDate);
+              newPaidUntil.setMonth(newPaidUntil.getMonth() + monthsToAdd);
+              projectAny.paidUntil = newPaidUntil;
+              await project.save();
+              console.log(`Project ${project.id} subscription extended by ${monthsToAdd} months until ${newPaidUntil}`);
+              await startPM2Process(project);
             }
-        }
+          }
 
-        if (invoice.type === 'monthly' && invoice.gameServerId) {
+          if ((invoice as any).type === 'monthly' && (invoice as any).gameServerId) {
             try {
-                await applyGameServerPaidInvoice(invoice);
+              await applyGameServerPaidInvoice(invoice);
             } catch (err) {
-                console.error('Error applying paid invoice to game server:', err);
+              console.error('Error applying paid invoice to game server:', err);
             }
+          }
+          if ((invoice as any).siteId) {
+            try { await applyWebSitePaidInvoice(invoice); } catch (e) { console.error('applyWebSitePaidInvoice webhook error', e); }
+          }
+        } else if (invoice.status === 'paid') {
+          console.log(`Invoice ${invoiceId} is already paid`);
+        } else {
+          console.log(`Webhook: invoice ${invoiceId} status=${currentStatus} isPaid=${isPaid} — skip`);
         }
-      } else if (invoice) {
-        console.log(`Invoice ${invoiceId} is already paid`);
       } else {
         console.log(`Invoice ${invoiceId} not found`);
       }
     } else {
-      console.log(`Webhook ignored: status=${currentStatus}, invoiceId=${invoiceId}`);
+      console.log(`Webhook ignored: no invoiceId in payload; status=${currentStatus}`);
     }
 
-    res.json({ success: true });
+    // Always 200 OK as per Platega requirements
+    res.status(200).json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    res.status(500).json({ message: 'Webhook error' });
+    // Still respond 200 OK to avoid retries storm, but mark failed
+    res.status(200).json({ success: false, error: 'server_error_logged' });
   }
 });
 

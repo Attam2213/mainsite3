@@ -14,6 +14,8 @@ class Invoice extends Model {
   declare gameServerId: string | null;
   declare siteId: string | null;
   declare periodMonths: number;
+  declare externalTransactionId?: string | null;
+  declare externalPayload?: string | null;
 }
 
 Invoice.init(
@@ -66,6 +68,14 @@ Invoice.init(
     periodMonths: {
       type: DataTypes.INTEGER,
       defaultValue: 1,
+    },
+    externalTransactionId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    externalPayload: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
   },
   {

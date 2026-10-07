@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as crypto from 'crypto';
 
 interface PaymentDetails {
   amount: number;
@@ -76,6 +77,24 @@ export class PlategaService {
     } catch (error: any) {
       console.error('Platega check status error:', error.response?.data || error.message);
       return null;
+    }
+  }
+
+  public verifyWebhookSignature(rawBody: string | Buffer, signatureHeader?: string | string[]): boolean {
+    if (!signatureHeader) return false;
+    const sig = Array.isArray(signatureHeader) ? signatureHeader[0] : String(signatureHeader);
+    if (!sig || !this.secret) return false;
+    try {
+      const bodyBuf = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
+      const expected = crypto
+        .createHmac('sha256', this.secret)
+        .update(bodyBuf)
+        .digest('hex')
+        .toLowerCase();
+      return expected === sig.trim().toLowerCase();
+    } catch (e) {
+      console.error('Platega verifyWebhookSignature error:', e);
+      return false;
     }
   }
 }

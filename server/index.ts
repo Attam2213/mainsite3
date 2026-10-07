@@ -56,7 +56,15 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf, encoding) => {
+    try {
+      if (buf?.length) {
+        req.rawBody = Buffer.isBuffer(buf) ? buf : Buffer.from(buf as any, encoding as BufferEncoding || 'utf8');
+      }
+    } catch {}
+  }
+}));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes

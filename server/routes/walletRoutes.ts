@@ -78,6 +78,10 @@ router.post('/deposit/create', authenticateToken, async (req: Request, res: Resp
       payload: invoice.id,
     });
     if (result.success && result.data) {
+      try {
+        (invoice as any).externalTransactionId = result.data.transactionId || null;
+        await invoice.save();
+      } catch {}
       res.json({ url: result.data.url, invoiceId: invoice.id, amount });
     } else {
       res.status(500).json({ message: result.error || 'Failed to create Platega payment' });
