@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -360,6 +360,9 @@ const ClientDashboard = () => {
   const [webLoadingAction, setWebLoadingAction] = useState<string | null>(null);
   const [webDomainInput, setWebDomainInput] = useState('');
   const [webFileUploadFile, setWebFileUploadFile] = useState<File | null>(null);
+  const [isTransferSiteOpen, setIsTransferSiteOpen] = useState(false);
+  const [transferSiteEmail, setTransferSiteEmail] = useState('');
+  const [transferSiteLoading, setTransferSiteLoading] = useState(false);
 
   // Delete / toast UX states
   const [toast, setToast] = useState<{ id: number; type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -1713,6 +1716,39 @@ const ClientDashboard = () => {
           showToast('error', `❌ Ошибка выпуска SSL: ${detail || 'неизвестная ошибка'}${data?.dryRun ? ' (dry-run)' : ''}`);
         }
     } catch (e) { showToast('error','❌ Ошибка соединения'); console.error(e); }
+  };
+
+  const transferWebSite = async (siteId: string) => {
+    const email = String(transferSiteEmail || '').trim();
+    if (!email) { showToast('error','Введите email получателя'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('error','Некорректный email'); return; }
+    if (!confirm(`Передать сайт пользователю ${email}?\n\nПроверка: сайт должен быть оплачен минимум на 6 дней вперёд.\nПосле передачи сайт исчезнет из вашего ЛК и появится у получателя.`)) return;
+    setTransferSiteLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/transfer`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        showToast('success', `✅ ${data.message || `Сайт передан пользователю ${email}`}`);
+        setIsTransferSiteOpen(false);
+        setTransferSiteEmail('');
+        setCurrentWebSite(null);
+        setIsWebSettingsOpen(false);
+        fetchData();
+      } else {
+        const detail = String(data?.message || 'Ошибка передачи');
+        const dp = data?.daysPaidAhead !== undefined && data?.daysRequired !== undefined
+          ? ` (оплачено ${data.daysPaidAhead} дн., нужно ≥ ${data.daysRequired})`
+          : '';
+        showToast('error', `❌ ${detail}${dp}`);
+      }
+    } catch (e) {
+      console.error(e); showToast('error','❌ Ошибка соединения');
+    } finally { setTransferSiteLoading(false); }
   };
 
   const uploadWebFile = async (siteId: string, toPath: string, file: File) => {
@@ -6123,7 +6159,64 @@ const ClientDashboard = () => {
                             >
                               <Sparkles className="h-4 w-4"/> AI-ассистент
                             </button>
+                            <button
+                              onClick={() => { setTransferSiteEmail(''); setIsTransferSiteOpen(true); }}
+                              className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 hover:shadow-sm transition"
+                            >
+                              <Users className="h-4 w-4"/> Передать сайт другому пользователю
+                            </button>
                           </div>
+
+                          {isTransferSiteOpen && (
+                            <div className="mt-4 rounded-2xl border-2 border-rose-200 bg-gradient-to-br from-rose-50 to-white p-5 shadow-inner">
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                  <h5 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Users className="h-4 w-4 text-rose-600"/> Передать сайт другому пользователю</h5>
+                                  <p className="text-xs text-slate-500 mt-1">Введите email пользователя, которому хотите передать сайт. Он должен быть уже зарегистрирован в Wexa.</p>
+                                </div>
+                                <button type="button" onClick={() => setIsTransferSiteOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 transition">
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800 mb-3 flex items-start gap-2">
+                                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                                <div>
+                                  <b>Обязательное условие:</b> сайт должен быть оплачен минимум на <b>6 календарных дней вперёд</b> от сегодняшнего дня. Сейчас оплачено до <b>{(currentWebSite as any).paidUntil || '—'}</b>.
+                                  После передачи:
+                                  <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                                    <li>Сайт исчезнет из вашего раздела «Сайты»</li>
+                                    <li>У получателя он появится автоматически в ЛК</li>
+                                    <li>SFTP/SSH пароли и домены остаются прежними (передаются вместе с сайтом)</li>
+                                  </ul>
+                                </div>
+                              </div>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email получателя (уже зарегистрированного в Wexa.su)</label>
+                              <input
+                                type="email"
+                                value={transferSiteEmail}
+                                onChange={(e) => setTransferSiteEmail(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && transferWebSite(currentWebSite.id)}
+                                placeholder="например: client@mail.ru"
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                              />
+                              <div className="flex gap-2 mt-3">
+                                <button
+                                  onClick={() => transferWebSite(currentWebSite.id)}
+                                  disabled={transferSiteLoading}
+                                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                  {transferSiteLoading ? (<><Loader className="h-4 w-4 animate-spin" /> Выполняется…</>) : (<><Send className="h-4 w-4"/> Передать сайт</>)}
+                                </button>
+                                <button
+                                  onClick={() => { setIsTransferSiteOpen(false); setTransferSiteEmail(''); }}
+                                  disabled={transferSiteLoading}
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

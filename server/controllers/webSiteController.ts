@@ -646,6 +646,112 @@ router.post('/:id/ssl/check', authenticateToken, async (req: any, res: Response)
   } catch (e: any) { return res.status(500).json({ ok: false, message: String(e?.message ?? e) }); }
 });
 
+// Transfer site ownership to another registered user by email
+// Validation: paidUntil must be >= today + 6 days (i.e. at least 6 full days paid forward)
+router.patch('/:id/transfer', authenticateToken, async (req: any, res: Response) => {
+  try {
+    const site = req.site as any;
+    const caller = req.user;
+    const isAdmin = getIsAdminFromReq(req);
+    if (!site.userId) return res.status(400).json({ message: 'У сайта нет владельца' });
+
+    // Ownership guard: owner OR admin can transfer
+    if (!isAdmin && String(caller.id) !== String(site.userId)) {
+      return res.status(403).json({ message: 'Вы не владелец сайта' });
+    }
+
+    // Normalize target email (case-insensitive)
+    const emailRaw = String(req.body?.email || '').trim();
+    if (!emailRaw) return res.status(400).json({ message: 'Введите email получателя' });
+    const email = emailRaw.toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Некорректный email' });
+    }
+    if (email === String(caller.email || '').toLowerCase()) {
+      return res.status(400).json({ message: 'Нельзя передать сайт самому себе' });
+    }
+
+    // Find target user
+    const target = await User.findOne({
+      where: { email } as any,
+      attributes: ['id', 'email', 'role', 'name'],
+    }) as any;
+    if (!target) return res.status(404).json({ message: 'Пользователь с таким email не зарегистрирован в системе' });
+    if (String(target.id) === String(site.userId)) {
+      return res.status(400).json({ message: 'Этот пользователь уже является владельцем сайта' });
+    }
+
+    // Paid-until guard: AT LEAST 6 days paid forward from today's midnight (not "more than 5 days"!)
+    const paidUntilRaw = site.paidUntil;
+    if (!paidUntilRaw) {
+      return res.status(400).json({ message: 'Сайт не оплачен — пополните баланс минимум на 6 дней вперёд' });
+    }
+    const paidUntil = new Date(String(paidUntilRaw) + 'T23:59:59Z');
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayUTC = new Date(Date.UTC(todayMidnight.getFullYear(), todayMidnight.getMonth(), todayMidnight.getDate()));
+    const MIN_DAYS = 6;
+    const diffMs = paidUntil.getTime() - todayUTC.getTime();
+    const paidDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffMs < MIN_DAYS * 24 * 60 * 60 * 1000 || paidDays < MIN_DAYS) {
+      return res.status(400).json({
+        message: `Сайт оплачен ещё на ${paidDays} дн. Для передачи нужно минимум ${MIN_DAYS} дней. Продлите тариф и попробуйте снова.`,
+        daysPaidAhead: paidDays,
+        daysRequired: MIN_DAYS,
+      });
+    }
+
+    const prevUserId = String(site.userId);
+    const prevUser = await User.findOne({ where: { id: prevUserId }, attributes: ['id', 'email', 'name'] } as any) as any;
+    await site.update({
+      userId: target.id,
+      updatedAt: new Date(),
+    });
+
+    // Audit log: wallet transaction entries (zero amount, type=adjust) for traceability
+    try {
+      const now = new Date();
+      const descriptionLoss = `Передача сайта ${site.id.slice(0, 8)} ${site.domain || site.subdomainName || ''} пользователю ${target.email}`;
+      const descriptionGain = `Получен сайт ${site.id.slice(0, 8)} ${site.domain || site.subdomainName || ''} от пользователя ${(prevUser?.email) || '(unknown)'}`;
+      await WalletTransaction.bulkCreate([
+        {
+          userId: prevUserId,
+          type: 'adjust',
+          amount: 0,
+          status: 'completed',
+          description: descriptionLoss,
+          relatedId: String(site.id),
+          createdAt: now,
+          updatedAt: now,
+        } as any,
+        {
+          userId: target.id,
+          type: 'adjust',
+          amount: 0,
+          status: 'completed',
+          description: descriptionGain,
+          relatedId: String(site.id),
+          createdAt: now,
+          updatedAt: now,
+        } as any,
+      ]).catch(() => {});
+    } catch (_) { /* audit optional */ }
+
+    // Also: SFTP/SSH home dirs/sudoers already match site.id (shortId prefix), not userId. No need to re-provision node.
+    const reloaded = await WebSite.findByPk(site.id, { include: [{ model: ServerNode as any, as: 'node' }] });
+    return res.json({
+      ok: true,
+      message: `Сайт передан пользователю ${target.email}. У него появится сайт в ЛК в разделе «Сайты».`,
+      transferredTo: { id: target.id, email: target.email, name: target.name || null },
+      transferredFrom: prevUser ? { id: prevUserId, email: prevUser.email, name: prevUser.name || null } : { id: prevUserId },
+      paidDaysAhead: paidDays,
+      site: reloaded,
+    });
+  } catch (e: any) {
+    return res.status(e.statusCode || 500).json({ ok: false, message: String(e?.message ?? e) });
+  }
+});
+
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
   const node = site.node;
