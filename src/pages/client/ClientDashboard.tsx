@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -1642,24 +1642,54 @@ const ClientDashboard = () => {
     } catch (e) { console.error(e); showToast('error', '❌ Ошибка соединения'); }
   };
 
+  const validateCustomDomainClient = (raw: string): { ok: boolean; reason?: string; normalizedPuny?: string } => {
+    const r = String(raw || '').trim().toLowerCase();
+    if (!r) return { ok: false, reason: 'Введите домен' };
+    const cleaned = r
+      .replace(/^[a-z]+:\/\/+/i, '').replace(/[:/?#@].*$/, '')
+      .replace(/^\.+/, '').replace(/\.+$/, '');
+    if (cleaned.length < 4) return { ok: false, reason: 'Минимум 4 символа' };
+    if (cleaned.includes('..')) return { ok: false, reason: 'Две точки подряд запрещены' };
+    const labels = cleaned.split('.');
+    if (labels.length < 2) return { ok: false, reason: 'Нужна доменная зона (.рф/.com/...)' };
+    if ((labels[labels.length - 1] || '').length < 2) return { ok: false, reason: 'Неверный формат зоны' };
+    for (const lbl of labels) {
+      if (!lbl) return { ok: false, reason: 'Неверный формат' };
+      if (lbl.length > 63) return { ok: false, reason: 'Часть домена >63 символов' };
+      if (lbl.startsWith('-') || lbl.endsWith('-')) return { ok: false, reason: 'Дефис по краям запрещён' };
+    }
+    let normalizedPuny: string | undefined;
+    try { normalizedPuny = new URL('http://' + cleaned).hostname.toLowerCase(); } catch {}
+    return { ok: true, normalizedPuny: normalizedPuny || cleaned };
+  };
+
   const attachWebDomain = async (siteId: string, domain: string) => {
     try {
       const token = localStorage.getItem('token');
+      const val = validateCustomDomainClient(domain);
+      if (!val.ok) {
+        showToast('error', `⚠ ${val.reason || 'Неверный формат домена'}`);
+        return;
+      }
+      const finalDomain = val.normalizedPuny || String(domain).trim().toLowerCase();
       const res = await fetch(`/api/sites/${siteId}/domain/attach`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ domain }),
+        body: JSON.stringify({ domain: finalDomain }),
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(`Домен ${domain} привязан!\n\n${data.instructions || ''}\nIP ноды: ${data.nodeIp || ''}`);
+        const instr = (data.instructions || '') ? ` ${data.instructions}` : '';
+        const ip = (data.nodeIp || '') ? ` IP ноды: ${data.nodeIp}` : '';
+        const display = (String(domain).trim() !== finalDomain) ? `${String(domain).trim()} (${finalDomain})` : finalDomain;
+        showToast('success', `✅ Домен ${display} привязан!${instr}${ip}`);
         fetchData();
-        setCurrentWebSite((s: any) => s && res.ok ? { ...s, domain } : s);
+        setCurrentWebSite((s: any) => s && res.ok ? { ...s, domain: finalDomain } : s);
       } else {
         const e = await res.json().catch(() => ({}));
-        alert(e.message || 'Ошибка привязки домена');
+        showToast('error', `❌ ${e.message || 'Ошибка привязки домена'}`);
       }
-    } catch (e) { alert('Ошибка соединения'); console.error(e); }
+    } catch (e) { console.error(e); showToast('error', '❌ Ошибка соединения'); }
   };
 
   const issueWebSsl = async (siteId: string) => {

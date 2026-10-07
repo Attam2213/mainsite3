@@ -27,7 +27,47 @@ const router = Router();
 const SALT_ROUNDS = 10;
 const SUBDOMAIN_PARENT = process.env.WEBSITE_SUBDOMAIN_PARENT || 'wexa.su';
 const SUBDOMAIN_REGEX = /^[a-z0-9][a-z0-9-]{0,40}[a-z0-9]$/;
-const DOMAIN_REGEX = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
+// Unicode-aware custom domain regex (supports IDN: кириллица .рф, .сайт, arabic, chinese etc + punycode xn--)
+const CUSTOM_DOMAIN_LABEL_RE = /^[\p{L}\p{N}]+(-[\p{L}\p{N}]+)*$/iu;
+const PUNYCODE_LABEL_RE = /^xn--[a-z0-9]+$/i;
+
+const normalizeCustomDomain = (raw: string): string => {
+  const r = String(raw || '').trim().toLowerCase();
+  // Strip protocol/ports/paths/user@ just in case
+  const cleaned = r
+    .replace(/^[a-z]+:\/\/+/i, '')
+    .replace(/[:/?#@].*$/, '')
+    .replace(/^\.+/, '')
+    .replace(/\.+$/, '');
+  try {
+    return require('url').domainToASCII(cleaned).toLowerCase();
+  } catch {
+    try {
+      return (new URL('http://' + cleaned)).hostname.toLowerCase();
+    } catch {
+      return cleaned;
+    }
+  }
+};
+
+const isValidCustomDomain = (raw: string): { ok: boolean; normalized?: string; reason?: string } => {
+  const normalized = normalizeCustomDomain(raw);
+  if (!normalized || normalized.length < 4 || normalized.length > 253) return { ok: false, reason: 'Неверный формат домена' };
+  if (normalized.includes('..')) return { ok: false, reason: 'Домен не может содержать две точки подряд' };
+  const labels = normalized.split('.');
+  if (labels.length < 2) return { ok: false, reason: 'Введите полное доменное имя (например site.ru или орлан-такси.рф)' };
+  const tld = labels[labels.length - 1];
+  if (tld.length < 2) return { ok: false, reason: 'Неверный формат доменной зоны' };
+  for (const label of labels) {
+    if (!label) return { ok: false, reason: 'Неверный формат домена (пустая метка)' };
+    if (label.length > 63) return { ok: false, reason: 'Метка домена не может быть длиннее 63 символов' };
+    if (label.startsWith('-') || label.endsWith('-')) return { ok: false, reason: 'Дефис не может стоять в начале или конце части домена' };
+    const isPuny = PUNYCODE_LABEL_RE.test(label);
+    if (isPuny) continue;
+    if (!CUSTOM_DOMAIN_LABEL_RE.test(label)) return { ok: false, reason: 'Неверный формат домена' };
+  }
+  return { ok: true, normalized };
+};
 const RESERVED_SUBDOMAINS = new Set([
   'www', 'mail', 'smtp', 'pop', 'pop3', 'imap', 'ftp', 'sftp', 'ssh',
   'cpanel', 'whm', 'plesk', 'ispmanager', 'ns1', 'ns2', 'ns3', 'ns',
@@ -152,10 +192,12 @@ export async function createWebSiteInternal(input: {
     domain = `${subdomain}.${SUBDOMAIN_PARENT}`;
     domainType = 'subdomain';
   } else if (customDomain) {
-    if (!DOMAIN_REGEX.test(customDomain)) throw new Error('Неверный формат домена');
-    const col = await WebSite.findOne({ where: { domain: customDomain, status: { [Op.ne]: 'deleted' as any } } as any });
+    const dom = isValidCustomDomain(customDomain);
+    if (!dom.ok || !dom.normalized) throw new Error(dom.reason || 'Неверный формат домена');
+    const finalDomain = dom.normalized;
+    const col = await WebSite.findOne({ where: { domain: finalDomain, status: { [Op.ne]: 'deleted' as any } } as any });
     if (col) throw new Error('Этот домен уже используется');
-    domain = customDomain;
+    domain = finalDomain;
     domainType = 'custom';
   }
 
@@ -227,11 +269,12 @@ router.post('/order', authenticateToken, async (req: any, res: Response) => {
       domainType = 'subdomain';
     } else {
       if (body.domain && String(body.domain).trim()) {
-        const d = String(body.domain).trim().toLowerCase();
-        if (!DOMAIN_REGEX.test(d)) return res.status(400).json({ message: 'Неверный формат домена' });
-        const col = await WebSite.findOne({ where: { domain: d, status: { [Op.ne]: 'deleted' as any } } as any });
+        const dom = isValidCustomDomain(body.domain);
+        if (!dom.ok || !dom.normalized) return res.status(400).json({ message: dom.reason || 'Неверный формат домена' });
+        const finalDomain = dom.normalized;
+        const col = await WebSite.findOne({ where: { domain: finalDomain, status: { [Op.ne]: 'deleted' as any } } as any });
         if (col) return res.status(409).json({ message: 'Этот домен уже используется' });
-        domain = d;
+        domain = finalDomain;
         domainType = 'custom';
       }
     }
@@ -412,11 +455,12 @@ router.patch('/:id/settings', async (req: any, res: Response) => {
       patch.domainType = 'subdomain';
       needNginxReload = true;
     } else if (body.domainType === 'custom' && body.domain !== undefined && String(body.domain).trim()) {
-      const domain = String(body.domain).trim().toLowerCase();
-      if (!DOMAIN_REGEX.test(domain)) return res.status(400).json({ message: 'Неверный формат домена' });
-      const colliding = await WebSite.findOne({ where: { domain, id: { [Op.ne]: site.id } } as any });
+      const dom = isValidCustomDomain(body.domain);
+      if (!dom.ok || !dom.normalized) return res.status(400).json({ message: dom.reason || 'Неверный формат домена' });
+      const finalDomain = dom.normalized;
+      const colliding = await WebSite.findOne({ where: { domain: finalDomain, id: { [Op.ne]: site.id } } as any });
       if (colliding) return res.status(409).json({ message: 'Этот домен уже используется другим сайтом' });
-      patch.domain = domain;
+      patch.domain = finalDomain;
       patch.domainType = 'custom';
       patch.subdomainName = null;
       needNginxReload = true;
@@ -448,8 +492,9 @@ router.patch('/:id/settings', async (req: any, res: Response) => {
 
 router.post('/:id/domain/attach', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
-  const domain = String(req.body?.domain || '').trim().toLowerCase();
-  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return res.status(400).json({ message: 'Неверный формат домена' });
+  const dom = isValidCustomDomain(req.body?.domain || '');
+  if (!dom.ok || !dom.normalized) return res.status(400).json({ message: dom.reason || 'Неверный формат домена' });
+  const domain = dom.normalized;
   const existing = await WebSite.findOne({ where: { domain, id: { [Op.ne]: site.id } } as any });
   if (existing) return res.status(409).json({ message: 'Этот домен уже используется другим сайтом' });
   const node = site.node;

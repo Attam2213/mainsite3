@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -225,6 +225,41 @@ const GameServerConfigurator = ({
   const [selectedWebsitePlan, setSelectedWebsitePlan] = useState<'landing' | 'business' | 'premium'>('business');
   const [websitePlans, setWebsitePlans] = useState<WebsitePlan[]>([]);
   const [websiteDomain, setWebsiteDomain] = useState('');
+  const customDomainValidate = (v: string): { ok: boolean; reason?: string; normalizedPuny?: string; displayUnicode?: string } => {
+    const raw = String(v || '').trim().toLowerCase();
+    if (!raw) return { ok: true };
+    const cleaned = raw.replace(/^[a-z]+:\/\/+/i, '').replace(/[:/?#@].*$/, '').replace(/^\.+/, '').replace(/\.+$/, '');
+    if (!cleaned || cleaned.length < 4) return { ok: false, reason: 'Введите полное доменное имя (например site.ru или орлан-такси.рф)' };
+    if (cleaned.includes('..')) return { ok: false, reason: 'Домен не может содержать две точки подряд' };
+    const labels = cleaned.split('.');
+    if (labels.length < 2) return { ok: false, reason: 'Нужна доменная зона (например «.рф» или «.com»)' };
+    const tld = labels[labels.length - 1];
+    if (tld.length < 2) return { ok: false, reason: 'Неверный формат доменной зоны' };
+    for (const label of labels) {
+      if (!label) return { ok: false, reason: 'Неверный формат домена (пустая часть)' };
+      if (label.length > 63) return { ok: false, reason: 'Часть домена не может быть длиннее 63 символов' };
+      if (label.startsWith('-') || label.endsWith('-')) return { ok: false, reason: 'Дефис не может стоять в начале или конце части домена' };
+    }
+    let normalizedPuny: string | undefined;
+    try {
+      normalizedPuny = (new URL('http://' + cleaned)).hostname;
+    } catch {}
+    try {
+      // @ts-ignore Node/browser has this
+      normalizedPuny = (typeof window !== 'undefined' && (window as any).URL)
+        // @ts-ignore
+        ? new URL('http://' + cleaned).hostname
+        : (new URL('http://' + cleaned)).hostname;
+      // domainToUnicode if available via Intl
+    } catch {}
+    let displayUnicode: string | undefined;
+    try {
+      // @ts-ignore
+      displayUnicode = (new Intl.DisplayNames(['ru'], { type: 'language' }) as any)?.of;
+    } catch {}
+    if (!normalizedPuny) normalizedPuny = cleaned;
+    return { ok: true, normalizedPuny, displayUnicode };
+  };
   const [websiteDomainMode, setWebsiteDomainMode] = useState<'subdomain' | 'custom'>('subdomain');
   const [websiteSubdomainName, setWebsiteSubdomainName] = useState('');
   const websiteSubdomainRef = useRef<HTMLInputElement>(null);
@@ -469,6 +504,21 @@ const GameServerConfigurator = ({
       alert('Введите имя поддомена (минимум 3 символа) и проверьте его доступность');
       return;
     }
+    const finalCustomDomainRaw = (websiteDomainMode === 'custom' ? websiteDomain.trim() : '') || undefined;
+    let finalCustomDomain: string | undefined;
+    if (websiteDomainMode === 'custom' && finalCustomDomainRaw) {
+      const v = customDomainValidate(finalCustomDomainRaw);
+      if (!v.ok) {
+        // Scroll into view gently
+        try {
+          const el = document.querySelector('input[placeholder*="mycompany.ru"]') as HTMLElement | null ||
+            document.querySelector('input[placeholder*="орлан-такси"]') as HTMLElement | null;
+          el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch {}
+        return;
+      }
+      finalCustomDomain = v.normalizedPuny || finalCustomDomainRaw.toLowerCase();
+    }
     setInternalLoading(true);
     try {
       await onWebsiteOrder({
@@ -476,7 +526,7 @@ const GameServerConfigurator = ({
         periodMonths,
         domainType: websiteDomainMode,
         subdomainName: finalSubdomainName,
-        domain: websiteDomainMode === 'custom' ? websiteDomain.trim() || undefined : undefined,
+        domain: finalCustomDomain,
       });
     } finally {
       setInternalLoading(false);
@@ -908,18 +958,37 @@ const GameServerConfigurator = ({
       )}
 
       {websiteDomainMode === 'custom' && (
-        <>
-          <input
-            type="text"
-            value={websiteDomain}
-            onChange={e => setWebsiteDomain(e.target.value)}
-            placeholder="например: mycompany.ru или ilves.com"
-            className="w-full px-4 py-3 rounded-xl border border-slate-100/80 focus:border-indigo-400/90 focus:ring-0 outline-none text-gray-900 font-medium"
-          />
-          <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
-            Купите домен у любого регистратора (reg.ru / webnames.ru / nic.ru). Затем в DNS добавьте A-запись <code className="rounded bg-slate-100 px-1.5 py-0.5">@ → 82.146.47.246</code> и подождите 5–60 минут. Привязать домен можно позже в ЛК.
-          </p>
-        </>
+        (() => {
+          const v = customDomainValidate(websiteDomain);
+          const puny = v.ok && v.normalizedPuny && /xn--/i.test(v.normalizedPuny) ? v.normalizedPuny : undefined;
+          return (
+            <>
+              <input
+                type="text"
+                value={websiteDomain}
+                onChange={e => setWebsiteDomain(e.target.value)}
+                placeholder="например: mycompany.ru или орлан-такси.рф"
+                className={`w-full px-4 py-3 rounded-xl border focus:ring-0 outline-none text-gray-900 font-medium transition-colors ${
+                  v.ok
+                    ? (websiteDomain ? 'border-emerald-300 bg-emerald-50/50 focus:border-emerald-500' : 'border-slate-100/80 focus:border-indigo-400/90 bg-white')
+                    : 'border-rose-300 bg-rose-50/60 focus:border-rose-500'
+                }`}
+              />
+              {!v.ok ? (
+                <p className="mt-1.5 text-[12px] font-semibold leading-snug text-rose-600">⚠ {v.reason}</p>
+              ) : puny ? (
+                <p className="mt-1.5 text-[11px] font-medium leading-snug text-emerald-700">
+                  ✓ Кириллический домен распознан. Будет сохранён как IDN: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{puny}</span>
+                </p>
+              ) : websiteDomain ? (
+                <p className="mt-1.5 text-[12px] font-semibold leading-snug text-emerald-600">✓ Формат корректный</p>
+              ) : null}
+              <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+                Купите домен у любого регистратора (reg.ru / webnames.ru / nic.ru). Затем в DNS добавьте A-запись <code className="rounded bg-slate-100 px-1.5 py-0.5">@ → 82.146.47.246</code> и подождите 5–60 минут. Привязать домен можно позже в ЛК.
+              </p>
+            </>
+          );
+        })()
       )}
     </div>
   );
