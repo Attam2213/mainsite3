@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -560,6 +560,43 @@ const ClientDashboard = () => {
     } catch (error) {
       console.error('Extend game server error:', error);
       alert('Ошибка соединения с сервером');
+    }
+  };
+
+  const handleExtendWebSite = async (siteId: string, months: number = 1) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/sites/${siteId}/subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ months })
+      });
+
+      if (res.ok) {
+        const invoice = await res.json();
+        if (invoice?.paidWithBalance || invoice?.status === 'paid') {
+          try { await refreshBalance(); } catch (e) {}
+          await fetchData();
+          showToast('success', 'Подписка на сайт успешно продлена');
+        } else if (invoice?.id) {
+          handlePayInvoice(invoice.id);
+        } else {
+          await fetchData();
+          showToast('info', 'Счёт создан — оплатите в разделе «Счета»');
+        }
+      } else if (res.status === 402) {
+        const err = await res.json().catch(() => ({}));
+        showInsufficientFundsAlert(err, 'Недостаточно средств для продления сайта');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast('error', err.message || 'Ошибка создания счёта');
+      }
+    } catch (error) {
+      console.error('Extend website error:', error);
+      showToast('error', 'Ошибка соединения с сервером');
     }
   };
 
@@ -3633,6 +3670,14 @@ const ClientDashboard = () => {
                                 Рестарт
                               </button>
                               <button
+                                onClick={() => handleExtendWebSite(ws.id, 1)}
+                                disabled={loading || ws.status === 'deleted'}
+                                className="inline-flex items-center rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                              >
+                                <CreditCard className="mr-1.5 h-4 w-4" />
+                                Продлить (1 мес)
+                              </button>
+                              <button
                                 onClick={() => openWebSettings(ws)}
                                 className="ml-auto inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300 group-hover:bg-indigo-50 group-hover:border-indigo-200 group-hover:text-indigo-700"
                               >
@@ -6022,13 +6067,28 @@ const ClientDashboard = () => {
                               ['Нода', currentWebSite.node?.name || currentWebSite.node?.ip || '—'],
                               ['IP ноды', currentWebSite.node?.ip || '—'],
                               ['Оплачено до', currentWebSite.paidUntil ? new Date(currentWebSite.paidUntil).toLocaleString('ru-RU') : '—'],
-                              ['Стоимость', `${(currentWebSite.priceMonthly && currentWebSite.priceMonthly > 0) ? currentWebSite.priceMonthly : ({ landing: 399, business: 799, premium: 1299 } as Record<string,number>)[String(currentWebSite.plan || 'landing')] ?? 399} ₽/мес`],
                             ].map(([k, v]) => (
                               <div key={k} className="flex items-center justify-between px-4 py-2.5 text-sm">
                                 <span className="text-slate-500">{k}</span>
                                 <span className="font-medium text-slate-900">{String(v)}</span>
                               </div>
                             ))}
+                            <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                              <span className="text-slate-500">Стоимость</span>
+                              <div className="flex items-center gap-3">
+                                <span className="font-extrabold text-slate-900 text-lg">
+                                  {(currentWebSite.priceMonthly && currentWebSite.priceMonthly > 0) ? currentWebSite.priceMonthly : ({ landing: 399, business: 799, premium: 1299 } as Record<string,number>)[String(currentWebSite.plan || 'landing')] ?? 399} ₽/мес
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleExtendWebSite(currentWebSite.id, 1)}
+                                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:shadow hover:from-indigo-700 hover:to-violet-700 transition"
+                                >
+                                  <Wallet className="h-3.5 w-3.5"/>
+                                  Продлить на 1 мес →
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -6158,6 +6218,13 @@ const ClientDashboard = () => {
                               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-800 hover:bg-white hover:border-fuchsia-200 hover:text-fuchsia-700 hover:shadow-sm transition"
                             >
                               <Sparkles className="h-4 w-4"/> AI-ассистент
+                            </button>
+                            <button
+                              onClick={() => handleExtendWebSite(currentWebSite.id, 1)}
+                              className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-3 py-2.5 text-xs font-bold text-indigo-700 hover:shadow-sm hover:border-indigo-300 transition"
+                            >
+                              <Wallet className="h-4 w-4"/>
+                              💳 Продлить тариф (1 мес · { (currentWebSite.priceMonthly && currentWebSite.priceMonthly > 0) ? currentWebSite.priceMonthly : ({ landing: 399, business: 799, premium: 1299 } as Record<string,number>)[String(currentWebSite.plan || 'landing')] ?? 399 } ₽)
                             </button>
                             <button
                               onClick={() => { setTransferSiteEmail(''); setIsTransferSiteOpen(true); }}

@@ -18,8 +18,11 @@ import {
   validateWebsitePeriod,
   calculateWebsitePrice,
   getPaidUntilDate,
+  PERIOD_DISCOUNTS,
   type WebsitePriceBreakdown,
 } from '../utils/websitesHelper';
+import { adjustBalance, round2 } from '../services/balanceService';
+import { startPM2Process, stopPM2Process } from '../services/sshService';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 
@@ -751,6 +754,105 @@ router.patch('/:id/transfer', authenticateToken, async (req: any, res: Response)
     return res.status(e.statusCode || 500).json({ ok: false, message: String(e?.message ?? e) });
   }
 });
+
+const formatWebsitePeriodSuffix = (n: number) => {
+  if (n === 1) return '1 мес.';
+  if (n === 3) return '3 мес.';
+  if (n === 6) return '6 мес.';
+  if (n === 12) return '12 мес.';
+  return `${n} мес.`;
+};
+
+const getWebsiteMonthlyPrice = (site: any): number => {
+  const priceMonthly = Number(site?.priceMonthly);
+  if (Number.isFinite(priceMonthly) && priceMonthly > 0) return priceMonthly;
+  const planKey = String(site?.plan || 'landing').toLowerCase();
+  const plan = WEB_PLANS.find(p => p.key === planKey);
+  return plan?.priceMonthly ?? 399;
+};
+
+export const createWebsiteSubscriptionInvoice = async (req: Request, res: Response) => {
+  try {
+    const { months } = req.body || {};
+    const periodRaw = Number(months) || 1;
+    const validPeriods = Object.keys(PERIOD_DISCOUNTS).map(n => Number(n));
+    const periodMonths = validPeriods.includes(periodRaw) ? periodRaw : Math.max(1, Math.min(12, periodRaw));
+    const discount = PERIOD_DISCOUNTS[periodMonths] ?? 0;
+
+    // @ts-ignore
+    const userId = req.user.id;
+    // @ts-ignore
+    const isAdmin = req.user.role === 'admin';
+
+    const site = (req as any).site as any;
+    if (!site) {
+      res.status(404).json({ message: 'Сайт не найден' });
+      return;
+    }
+    if (!isAdmin && site.userId !== userId) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const monthlyPrice = getWebsiteMonthlyPrice(site);
+    const amount = Math.max(0, Math.ceil(monthlyPrice * periodMonths * (1 - discount)));
+
+    if (!isAdmin) {
+      const u = await User.findByPk(site.userId, { attributes: ['id', 'balance'] });
+      const userBal = round2(u?.balance ?? 0);
+      if (userBal < amount - 0.001) {
+        res.status(402).json({
+          message: 'Недостаточно средств на балансе',
+          needed: round2(amount - userBal),
+          balance: userBal,
+          totalAmount: amount,
+        });
+        return;
+      }
+    }
+
+    const shortId = String(site.id || '').slice(0, 8);
+    const invoice = await Invoice.create({
+      title: `Продление сайта: ${site.domain || site.subdomainName || shortId} (${formatWebsitePeriodSuffix(periodMonths)}${discount > 0 ? `, -${Math.round(discount * 100)}%` : ''})`,
+      amount,
+      status: 'pending',
+      type: 'monthly',
+      dueDate: new Date(),
+      userId: site.userId,
+      siteId: site.id,
+      periodMonths,
+    } as any);
+
+    if (!isAdmin) {
+      try {
+        await adjustBalance({
+          userId: site.userId,
+          amount: -round2(amount),
+          type: 'withdraw',
+          description: invoice.title,
+          invoiceId: invoice.id,
+          relatedId: site.id,
+        });
+      } catch (wb: any) {
+        res.status(402).json({ message: wb.message || 'Недостаточно средств' });
+        return;
+      }
+      invoice.status = 'paid';
+      await invoice.save();
+      try { await applyWebSitePaidInvoice(invoice); } catch (e) { console.error(e); }
+      res.status(201).json({ ...invoice.toJSON(), paidWithBalance: true });
+      return;
+    }
+
+    // Admin: create invoice as pending, return 201
+    res.status(201).json(invoice);
+  } catch (error) {
+    console.error('Create website subscription invoice error:', error);
+    res.status(500).json({ message: 'Ошибка при создании счёта подписки' });
+  }
+};
+
+router.post('/:id/subscription', authenticateToken, createWebsiteSubscriptionInvoice);
 
 router.get('/:id/sftp-creds', authenticateToken, async (req: any, res: Response) => {
   const site = req.site as any;
