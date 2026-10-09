@@ -1343,11 +1343,21 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
     include: [{ model: ServerNode as any, as: 'node' }],
   }) as any;
   if (!site) throw new Error('applyWebSitePaidInvoice: site not found');
-  if (site.status === 'active' || site.status === 'provisioning') return;
+  const period = Number(invoice.periodMonths || 1);
+  const paidUntil = getPaidUntilDate(period, site.paidUntil ? new Date(site.paidUntil) : undefined);
+  const isActiveRenewal = site.status === 'active' || site.status === 'provisioning';
+  if (isActiveRenewal) {
+    await site.update({ paidUntil } as any);
+    try {
+      if (site.nodeId) {
+        const count = await WebSite.count({ where: { nodeId: site.nodeId, status: 'active' } });
+        await ServerNode.update({ usedWebSites: count }, { where: { id: site.nodeId } });
+      }
+    } catch (_) { /* ignore */ }
+    return;
+  }
   await site.update({ status: 'provisioning' });
   try {
-    const period = Number(invoice.periodMonths || 1);
-    const paidUntil = getPaidUntilDate(period, site.paidUntil ? new Date(site.paidUntil) : undefined);
     const node = site.node;
     const isMock = !node || node.ip === '127.0.0.1';
     const shortId = site.id.slice(0, 8);
