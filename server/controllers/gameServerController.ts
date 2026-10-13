@@ -206,9 +206,9 @@ const buildMinecraftDockerArgs = (server: any, port: number, containerName: stri
     const customJarName = validateJarName(server?.mcCustomJarName);
 
     const isCustom = core === 'custom';
-    // JVM heap size: min 1024M, use server ram but cap reasonably.
+    // JVM heap size: Paper 1.21+ needs at least 1536M to start reliably.
     // No docker -m limit: memory is shared (overcommit), JVM limits itself.
-    const jvmRam = Math.max(1024, Math.min(Number(ram) || 1024, 4096));
+    const jvmRam = Math.max(1536, Math.min(Number(ram) || 1536, 4096));
 
     const parts: string[] = [];
     parts.push(`-d`);
@@ -217,6 +217,8 @@ const buildMinecraftDockerArgs = (server: any, port: number, containerName: stri
     parts.push(`-p ${port}:25565/tcp`);
     parts.push(`-e MEMORY=${jvmRam}M`);
     parts.push(`-e EULA=TRUE`);
+    parts.push(`-e ONLINE_MODE=FALSE`);
+    parts.push(`-e ENABLE_RCON=TRUE`);
     parts.push(`-e MAX_PLAYERS=${slots}`);
     parts.push(`-e VERSION=${shellQuote(version)}`);
     parts.push(`-e TYPE=${shellQuote(isCustom ? 'CUSTOM' : core.toUpperCase())}`);
@@ -747,10 +749,10 @@ export const createGameServer = async (req: Request, res: Response) => {
         const rawCs16Build = (req.body as any).cs16Build;
         const safeSlots = Math.max(10, Number(slots) || 10);
         const defaultRamByGame =
-            game === 'minecraft' ? Math.max(1024, Math.ceil(safeSlots * 50)) :
+            game === 'minecraft' ? Math.max(1536, Math.ceil(safeSlots * 64)) :
             game === 'cs2' ? 2048 :
             256;
-        const minRamByGame = game === 'minecraft' ? 1024 : 256;
+        const minRamByGame = game === 'minecraft' ? 1536 : 256;
         const resolvedRam = Number.isFinite(Number(ram)) && Number(ram) >= minRamByGame ? Number(ram) : defaultRamByGame;
 
         const safeMcVersion = validateMcVersion(rawMcVersion);
