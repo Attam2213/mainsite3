@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -3450,39 +3450,39 @@ const ClientDashboard = () => {
                                   <button
                                     onClick={() => handleControlGameServer(gs.id, 'start')}
                                     disabled={!actionState.canStart}
-                                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                                    className="rounded-xl bg-emerald-600 px-2 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
                                   >
                                     Запустить
                                   </button>
                                   <button
                                     onClick={() => handleControlGameServer(gs.id, 'stop')}
                                     disabled={!actionState.canStop}
-                                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                                    className="rounded-xl bg-rose-600 px-2 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
                                   >
                                     Остановить
                                   </button>
                                   <button
                                     onClick={() => handleControlGameServer(gs.id, 'restart')}
                                     disabled={!actionState.canRestart}
-                                    className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                                    className="rounded-xl bg-sky-600 px-2 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
                                   >
                                     Перезапуск
                                   </button>
                                   <button
                                     onClick={() => handleExtendGameServer(gs.id, 1)}
-                                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                                    className="rounded-xl bg-indigo-600 px-2 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
                                   >
                                     Продлить
                                   </button>
                                   <button
                                     onClick={() => openServerPanel(gs, 'console')}
-                                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                    className="rounded-xl border border-gray-200 px-2 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                                   >
                                     Консоль
                                   </button>
                                   <button
                                     onClick={() => openServerPanel(gs, 'files')}
-                                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                    className="rounded-xl border border-gray-200 px-2 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                                   >
                                     Файлы
                                   </button>
