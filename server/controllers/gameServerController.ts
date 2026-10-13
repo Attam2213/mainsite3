@@ -217,6 +217,9 @@ const buildMinecraftDockerArgs = (server: any, port: number, containerName: stri
     parts.push(`-e MAX_PLAYERS=${slots}`);
     parts.push(`-e VERSION=${shellQuote(version)}`);
     parts.push(`-e TYPE=${shellQuote(isCustom ? 'CUSTOM' : core.toUpperCase())}`);
+    if (server?.rconPassword) {
+        parts.push(`-e RCON_PASSWORD=${shellQuote(String(server.rconPassword))}`);
+    }
     if (isCustom && customUrl) {
         parts.push(`-e DOWNLOAD_URL=${shellQuote(customUrl)}`);
     }
@@ -783,16 +786,18 @@ export const createGameServer = async (req: Request, res: Response) => {
 
         const port = await findFreePort(nodeId, basePort);
         const containerName = `gs_${userId.split('-')[0]}_${port}`;
-        
+        const rconPassword = 'rcon_' + crypto.randomBytes(6).toString('hex');
+
         let dockerCmd = '';
         if (game === 'minecraft') {
             dockerCmd = `docker run ${buildMinecraftDockerArgs({
                 ram: resolvedRam, slots: safeSlots,
                 mcVersion: safeMcVersion, core: safeMcCore,
                 mcCustomJarUrl: safeMcCustomJarUrl, mcCustomJarName: safeMcCustomJarName,
+                rconPassword,
             }, port, containerName)}`;
         } else if (game === 'cs2') {
-            dockerCmd = `docker run -d -m 2048m -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${safeSlots}`;
+            dockerCmd = `docker run -d -m 2048m -p ${port}:27015/udp -p ${port}:27015/tcp --name ${containerName} -e SRCDS_TOKEN=YOUR_TOKEN ${GAME_IMAGES['cs2']} +maxplayers ${safeSlots} +rcon_password ${shellQuote(rconPassword)}`;
         } else if (game === 'cs16') {
             const built = buildCs16DockerArgs({
                 ram: resolvedRam,
@@ -800,6 +805,7 @@ export const createGameServer = async (req: Request, res: Response) => {
                 userId,
                 id: 'tmp_' + userId,
                 cs16Build: safeCs16Build,
+                rconPassword,
             }, port, containerName);
             const parts: string[] = ['docker run'];
             if (built.hostVolumeArg) parts.push(built.hostVolumeArg);
@@ -845,6 +851,7 @@ export const createGameServer = async (req: Request, res: Response) => {
             cs16Build: game === 'cs16' ? safeCs16Build : undefined,
             status: 'running',
             containerId,
+            rconPassword,
             monthlyPrice,
             paidUntil
         });
@@ -1230,13 +1237,40 @@ export const sendCommand = async (req: Request, res: Response) => {
             console.log(`[Mock] Executing command ${command} in container ${server.containerId}...`);
             res.json({ output: `Executed command: ${command}\nResult: Success (Mock)` });
         } else {
-            const output = await execCommand(config, fullCmd);
+            const output = await execRconCommand(server, config, command);
             res.json({ output });
         }
     } catch (error) {
         console.error('Command error:', error);
         res.status(500).json({ message: 'Error sending command' });
     }
+};
+
+const execRconCommand = async (server: any, config: any, command: string): Promise<string> => {
+    const game = String(server.game || '');
+    const port = Number(server.port) || 0;
+    const ident = String(server.containerId || '').trim();
+    const rcon = String(server.rconPassword || '').trim();
+
+    if (game === 'minecraft') {
+        return execCommand(config, `docker exec -i ${ident} rcon-cli ${command}`);
+    }
+
+    if (!rcon) {
+        throw new Error('RCON пароль не задан для этого сервера');
+    }
+
+    if (game === 'cs16') {
+        const safeCmd = command.replace(/'/g, "'\\''");
+        return execCommand(config, `python3 /usr/local/bin/wexa-rcon.py --proto hlds --ip 127.0.0.1 --port ${port} --password '${rcon}' --command '${safeCmd}'`);
+    }
+
+    if (game === 'cs2') {
+        const safeCmd = command.replace(/'/g, "'\\''");
+        return execCommand(config, `python3 /usr/local/bin/wexa-rcon.py --proto source --ip 127.0.0.1 --port ${port} --password '${rcon}' --command '${safeCmd}'`);
+    }
+
+    throw new Error(`Игра ${game} не поддерживает RCON`);
 };
 
 const parseProperties = (content: string) => {
@@ -2356,8 +2390,10 @@ export const kickPlayer = async (req: Request, res: Response) => {
         let cmd = '';
         if (server.game === 'minecraft') {
             cmd = `kick ${name}${reason ? ` ${reason}` : ''}`;
+        } else if (server.game === 'cs16') {
+            cmd = reason ? `kick "${name}" "${reason}"` : `kick "${name}"`;
         } else {
-            cmd = `sm_kick "${name}"${reason ? ` "${reason}"` : ''}`;
+            cmd = reason ? `kick "${name}" "${reason}"` : `kick "${name}"`;
         }
 
         if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
@@ -2370,10 +2406,7 @@ export const kickPlayer = async (req: Request, res: Response) => {
             username: node.sshUser,
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
-        const fullCmd = server.game === 'minecraft'
-            ? `docker exec -i ${server.containerId} rcon-cli ${cmd}`
-            : `docker exec -i ${server.containerId} ${cmd}`;
-        const output = await execCommand(config, fullCmd);
+        const output = await execRconCommand(server, config, cmd);
         res.json({ ok: true, output });
     } catch (error) {
         console.error('Kick player error:', error);
@@ -2399,8 +2432,12 @@ export const banPlayer = async (req: Request, res: Response) => {
         let cmd = '';
         if (server.game === 'minecraft') {
             cmd = mins <= 0 ? `ban ${name}${reason ? ` ${reason}` : ''}` : `ban-ip ${name} ${mins}m${reason ? ` ${reason}` : ''}`;
+        } else if (server.game === 'cs16') {
+            const banMins = mins <= 0 ? 0 : mins;
+            cmd = `banid ${banMins} "${name}" kick; writeid`;
         } else {
-            cmd = mins <= 0 ? `banid 0 "${name}" kick` : `banid ${mins} "${name}" kick`;
+            const banMins = mins <= 0 ? 0 : mins;
+            cmd = `banid ${banMins} "${name}" kick`;
         }
 
         if (node.ip === '127.0.0.1' || node.ip === '1.1.1.1') {
@@ -2413,10 +2450,7 @@ export const banPlayer = async (req: Request, res: Response) => {
             username: node.sshUser,
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
-        const fullCmd = server.game === 'minecraft'
-            ? `docker exec -i ${server.containerId} rcon-cli ${cmd}`
-            : `docker exec -i ${server.containerId} ${cmd}`;
-        const output = await execCommand(config, fullCmd);
+        const output = await execRconCommand(server, config, cmd);
         res.json({ ok: true, output });
     } catch (error) {
         console.error('Ban player error:', error);
