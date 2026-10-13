@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import {
   ArrowRight, Gamepad2, MapPin, Shield, Zap, HardDrive,
   Settings, Users, CheckCircle, Lock, Clock,
@@ -104,7 +104,7 @@ export const CS16_BUILD_OPTIONS: Array<{ value: string; label: string; desc: str
   { value: 'jives_cstrike_legacy', label: 'Steam Legacy (build ~8684)', desc: 'jives/hlds:cstrike-legacy — старая сборка ~8684 ReHLDS/ReGameDLL, совместимость со старыми плагинами AMX.' },
   { value: 'steamcmd_latest', label: 'SteamCMD авто-обновления (чистая)', desc: 'ghcr.io/ich777/steamcmd:cstrike1.6 — чистая сборка из Steam 90, автообновления при старте. ⚠️ Первая установка 2-10 минут.' },
   { value: 'archont94_stable_2021', label: 'Stable 2021 (AMXModX + FastDL)', desc: 'archont94/counter-strike1.6 — стабильная сборка 2021, предустановлены Metamod + AMX Mod X, FastDL 80/tcp внутри образа.' },
-  { value: 'hlds_official', label: 'Classic HLDS Official', desc: 'hlds/server:latest — базовый официальный HLDS, без предустановленных плагинов. Для опытных админов.' },
+  { value: 'hlds_official', label: 'Steam + Non-Steam (dproto) — играют и пиратки и лицензия', desc: 'hlds/server:latest — Metamod + AMX Mod X + dproto. Поддерживает ВСЕ клиенты: Steam (лицензия), Non-Steam p47/p48 (пиратка), RevEmu, RevEmu2013, SteamClient2009. Рекомендуется по умолчанию.' },
 ];
 
 
@@ -217,7 +217,7 @@ const GameServerConfigurator = ({
   const [mcCore, setMcCore] = useState('paper');
   const [mcCustomJarUrl, setMcCustomJarUrl] = useState('');
   const [mcCustomJarName, setMcCustomJarName] = useState('');
-  const [cs16Build, setCs16Build] = useState('jives_cstrike_latest');
+  const [cs16Build, setCs16Build] = useState('hlds_official');
   const [internalNodes, setInternalNodes] = useState<PublicNode[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
   const [configuratorTab, setConfiguratorTab] = useState<'game' | 'website'>(forceTab ?? initialConfiguratorTab);
@@ -406,10 +406,10 @@ const GameServerConfigurator = ({
       if (!MINECRAFT_CORE_OPTIONS.some(o => o.value === mcCore)) {
         setMcCore('paper');
       }
-      setCs16Build('jives_cstrike_latest');
+      setCs16Build('hlds_official');
     } else if (selectedGame === 'cs16') {
       if (!CS16_BUILD_OPTIONS.some(o => o.value === cs16Build)) {
-        setCs16Build('jives_cstrike_latest');
+        setCs16Build('hlds_official');
       }
       setMcVersion('LATEST');
       setMcCore('paper');
@@ -420,7 +420,7 @@ const GameServerConfigurator = ({
       setMcCore('paper');
       setMcCustomJarUrl('');
       setMcCustomJarName('');
-      setCs16Build('jives_cstrike_latest');
+      setCs16Build('hlds_official');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGame]);

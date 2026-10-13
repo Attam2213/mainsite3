@@ -73,22 +73,22 @@ const CS16_BUILDS: Record<string, {
     },
     hlds_official: {
         image: 'hlds/server:latest',
-        label: 'Classic HLDS Official (базовый build, без предустановленных плагинов)',
+        label: 'Steam + Non-Steam (dproto) · AMXModX — ИГРАЮТ И ПИРАТКИ И ЛИЦЕНЗИЯ',
         mountPath: '/hlds',
         startup: ({ slots, map, rcon, port }) =>
             `-game cstrike -ip 0.0.0.0 -port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0`
     }
 };
 
-const DEFAULT_CS16_BUILD_KEY = 'jives_cstrike_latest';
+const DEFAULT_CS16_BUILD_KEY = 'hlds_official';
 const LEGACY_CS16_BUILD_KEY = 'archont94_stable_2021';
 
 const validateCs16Build = (key?: string): string => {
-    if (!key) return LEGACY_CS16_BUILD_KEY;
+    if (!key) return DEFAULT_CS16_BUILD_KEY;
     const k = String(key).trim().toLowerCase();
-    if (!k) return LEGACY_CS16_BUILD_KEY;
+    if (!k) return DEFAULT_CS16_BUILD_KEY;
     if (Object.prototype.hasOwnProperty.call(CS16_BUILDS, k)) return k;
-    return LEGACY_CS16_BUILD_KEY;
+    return DEFAULT_CS16_BUILD_KEY;
 };
 
 const buildCs16DockerArgs = (server: any, port: number, containerName: string): { runFlags: string; image: string; cmd: string; hostVolumeArg: string } => {
