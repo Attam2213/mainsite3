@@ -744,10 +744,11 @@ export const createGameServer = async (req: Request, res: Response) => {
         const rawCs16Build = (req.body as any).cs16Build;
         const safeSlots = Math.max(10, Number(slots) || 10);
         const defaultRamByGame =
-            game === 'minecraft' ? Math.max(512, Math.ceil(safeSlots * 48)) :
+            game === 'minecraft' ? Math.max(2048, Math.ceil(safeSlots * 100)) :
             game === 'cs2' ? 2048 :
             256;
-        const resolvedRam = Number.isFinite(Number(ram)) && Number(ram) >= 256 ? Number(ram) : defaultRamByGame;
+        const minRamByGame = game === 'minecraft' ? 1024 : 256;
+        const resolvedRam = Number.isFinite(Number(ram)) && Number(ram) >= minRamByGame ? Number(ram) : defaultRamByGame;
 
         const safeMcVersion = validateMcVersion(rawMcVersion);
         const safeMcCore = validateMcCore(rawMcCore);
