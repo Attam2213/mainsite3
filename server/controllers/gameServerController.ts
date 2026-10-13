@@ -36,6 +36,7 @@ const CS16_BUILDS: Record<string, {
     image: string;
     label: string;
     mountPath: string;
+    workdir: string;
     steamMountPath?: string;
     env?: Record<string, string | number>;
     extraPorts?: string[];
@@ -45,6 +46,7 @@ const CS16_BUILDS: Record<string, {
         image: 'jives/hlds:cstrike',
         label: 'Steam Latest (Post-25th Anniversary, build 9xxx, protocol 48)',
         mountPath: '/hlds',
+        workdir: '/opt/steam/hlds',
         startup: ({ slots, map, rcon, port }) =>
             `+ip 0.0.0.0 +port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0 +log on`
     },
@@ -52,6 +54,7 @@ const CS16_BUILDS: Record<string, {
         image: 'jives/hlds:cstrike-legacy',
         label: 'Steam Legacy (Pre-25th Anniversary, build ~8684, ReHLDS/ReGameDLL/old AMX plugins)',
         mountPath: '/hlds',
+        workdir: '/opt/steam/hlds',
         startup: ({ slots, map, rcon, port }) =>
             `+ip 0.0.0.0 +port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0 +log on`
     },
@@ -59,6 +62,7 @@ const CS16_BUILDS: Record<string, {
         image: 'ghcr.io/ich777/steamcmd:cstrike1.6',
         label: 'SteamCMD Fresh (Always latest official Valve build, auto-updates; долгая первая установка 2–10 мин)',
         mountPath: '/hlds',
+        workdir: '/serverdata/serverfiles',
         steamMountPath: '/serverdata/serverfiles',
         env: { GAME_ID: 90, GAME_NAME: 'cstrike', VALIDATE: 'true', UID: 1000, GID: 1000 },
         startup: () => '',
@@ -67,6 +71,7 @@ const CS16_BUILDS: Record<string, {
         image: 'archont94/counter-strike1.6:latest',
         label: 'Stable 2021 AMXModX (встроены Metamod + AMX Mod X + Fast DL 80/tcp, проверенный временем)',
         mountPath: '/hlds',
+        workdir: '/hlds',
         env: { SV_LAN: 0 },
         extraPorts: ['80'],
         startup: () => ''
@@ -75,6 +80,7 @@ const CS16_BUILDS: Record<string, {
         image: 'hlds/server:latest',
         label: 'Steam + Non-Steam (dproto) · AMXModX — ИГРАЮТ И ПИРАТКИ И ЛИЦЕНЗИЯ',
         mountPath: '/hlds',
+        workdir: '/opt/hlds',
         startup: ({ slots, map, rcon, port }) =>
             `-game cstrike -ip 0.0.0.0 -port ${port} +maxplayers ${slots} +map ${map} +rcon_password ${shellQuote(rcon)} +sv_lan 0`
     }
@@ -89,6 +95,17 @@ const validateCs16Build = (key?: string): string => {
     if (!k) return DEFAULT_CS16_BUILD_KEY;
     if (Object.prototype.hasOwnProperty.call(CS16_BUILDS, k)) return k;
     return DEFAULT_CS16_BUILD_KEY;
+};
+
+const getGameServerWorkdir = (server: any): string => {
+    const game = String(server?.game || '').toLowerCase();
+    if (game === 'minecraft') return '/data';
+    if (game === 'cs2') return '/home/steam/cs2-dedicated';
+    if (game === 'cs16') {
+        const buildKey = validateCs16Build(server?.cs16Build);
+        return CS16_BUILDS[buildKey]?.workdir || '/hlds';
+    }
+    return '/data';
 };
 
 const buildCs16DockerArgs = (server: any, port: number, containerName: string): { runFlags: string; image: string; cmd: string; hostVolumeArg: string } => {
@@ -1522,8 +1539,10 @@ export const getGameServerFiles = async (req: Request, res: Response) => {
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
 
+        const workdir = getGameServerWorkdir(server);
+        const safePath = (path || '').replace(/^\//, '');
         // ls -F to distinguish directories
-        const output = await execCommand(config, `docker exec -i ${server.containerId} ls -lF /data/${path}`);
+        const output = await execCommand(config, `docker exec -i ${server.containerId} ls -lF "${workdir}/${safePath}"`);
         
         const files = output.split('\n').slice(1).map(line => {
             const parts = line.split(/\s+/);
@@ -1579,8 +1598,10 @@ export const getGameServerFileContent = async (req: Request, res: Response) => {
             password: node.sshPassword ? decrypt(node.sshPassword) : undefined
         };
 
+        const workdir = getGameServerWorkdir(server);
+        const safePath = path.replace(/^\//, '');
         // Use cat to read file
-        const content = await execCommand(config, `docker exec -i ${server.containerId} cat /data/${path}`);
+        const content = await execCommand(config, `docker exec -i ${server.containerId} cat "${workdir}/${safePath}"`);
         res.json({ content });
 
     } catch (error) {
@@ -1615,9 +1636,11 @@ export const saveGameServerFileContent = async (req: Request, res: Response) => 
             return;
         }
 
+        const workdir = getGameServerWorkdir(server);
+        const safePath = path.replace(/^\//, '');
         // Write file using base64 to avoid escaping issues
         const base64Content = Buffer.from(content).toString('base64');
-        const cmd = `echo "${base64Content}" | base64 -d > /data/${path}`;
+        const cmd = `echo "${base64Content}" | base64 -d > "${workdir}/${safePath}"`;
         await execCommand(config, `docker exec -i ${server.containerId} sh -c '${cmd}'`);
         
         res.json({ message: 'File saved' });
@@ -1654,7 +1677,9 @@ export const deleteGameServerFile = async (req: Request, res: Response) => {
             return;
         }
 
-        await execCommand(config, `docker exec -i ${server.containerId} rm -rf /data/${path}`);
+        const workdir = getGameServerWorkdir(server);
+        const safePath = path.replace(/^\//, '');
+        await execCommand(config, `docker exec -i ${server.containerId} rm -rf "${workdir}/${safePath}"`);
         
         res.json({ message: 'File deleted' });
     } catch (error) {
@@ -1688,13 +1713,14 @@ export const uploadGameServerFileStream = async (req: Request, res: Response) =>
             return;
         }
 
+        const workdir = getGameServerWorkdir(server);
         const bb = Busboy({ headers: req.headers });
         let uploadPromise: Promise<void> | null = null;
 
         bb.on('file', (_name, file) => {
             // Escape double quotes in path to prevent command injection/errors
-            const safePath = path.replace(/"/g, '\\"');
-            const command = `docker exec -i ${server.containerId} sh -c 'cat > "/data/${safePath}"'`;
+            const safePath = path.replace(/^\//, '').replace(/"/g, '\\"');
+            const command = `docker exec -i ${server.containerId} sh -c 'cat > "${workdir}/${safePath}"'`;
             uploadPromise = uploadStream(config, command, file);
         });
 
