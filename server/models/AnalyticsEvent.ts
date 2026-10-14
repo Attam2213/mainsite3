@@ -2,15 +2,15 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
 
 class AnalyticsEvent extends Model {
-  public id!: string;
-  public path!: string;
-  public sessionId!: string;
-  public ipHash!: string;
-  public userAgent?: string;
-  public referrer?: string;
-  public userId?: string | null;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare id: string;
+  declare path: string;
+  declare sessionId: string;
+  declare ipHash: string;
+  declare userAgent?: string;
+  declare referrer?: string;
+  declare userId?: string | null;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 }
 
 AnalyticsEvent.init(
