@@ -947,9 +947,9 @@ router.post('/:id/sftp-password-reset', authenticateToken, async (req: any, res:
     const sftpChroot = site.sftpChroot || `/srv/sftp/${sftpUser}`;
 
     // SFTP user (SFTP only, Chroot, nologin)
-    await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
+    await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true; usermod -aG users "${sftpUser}" 2>/dev/null || true`);
     await execCommand(cfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
-    await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}" 2>/dev/null || true`);
+    await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,g+rwX,o+rX "${siteDir}" 2>/dev/null || true; chmod g+s "${siteDir}" 2>/dev/null || true`);
 
     // SSH shell user (bash, home=siteDir, NOT sftponly, sudoers NOPASSWD pm2)
     await execCommand(cfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
@@ -1043,7 +1043,8 @@ router.post('/:id/files/upload', authenticateToken, upload.single('file'), async
     const b64 = Buffer.from(file.buffer).toString('base64');
     const cfg = getSshConfigForNode(node);
     await execCommand(cfg, `mkdir -p "${absDir}" && printf '%s' '${b64}' | base64 -d > "${absDir}/${fileName}" && chown -R ${site.sftpUsername || 'wexa-www-data'}:users "${absDir}/${fileName}" 2>/dev/null || true`);
-    return res.json({ ok: true, message: `Файл загружен: ${targetDir}/${fileName}`, size: file.size });
+    const displayPath = (targetDir === '/' ? '' : targetDir) + '/' + fileName;
+    return res.json({ ok: true, message: `Файл загружен: ${displayPath}`, size: file.size });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
 
@@ -1216,7 +1217,7 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
       await execCommand(newCfg, `mkdir -p "${siteDir}" "/var/lib/wexa/backups/sites/${site.id}" "${sftpChroot}/public_html" && chown root:root "${sftpChroot}" && chmod 755 "${sftpChroot}"; true`);
       await execCommand(newCfg, `if [ ! -d "${siteDir}" ] || [ -z "$(ls -A ${siteDir} 2>/dev/null)" ]; then if [ -d "${templateDir}" ]; then cp -R "${templateDir}/." "${siteDir}/" 2>/dev/null; fi; fi; true`);
       // SFTP user
-      await execCommand(newCfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
+      await execCommand(newCfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true; usermod -aG users "${sftpUser}" 2>/dev/null || true`);
       const sftpShadow = await execCommand(newCfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
       await execCommand(newCfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
       // SSH shell user
@@ -1224,8 +1225,8 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
       const sshShadow = await execCommand(newCfg, `openssl passwd -1 '${sshPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
       await execCommand(newCfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
       await execCommand(newCfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
-      // Perms
-      await execCommand(newCfg, `chown -R "${sshUser}":users "${siteDir}" 2>/dev/null || true; chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}"`);
+      // Perms: SFTP user owns, group users writable + setgid
+      await execCommand(newCfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,g+rwX,o+rX "${siteDir}" 2>/dev/null || true; chmod g+s "${siteDir}" 2>/dev/null || true);
       await execCommand(newCfg, `grep -qF "${siteDir}" /etc/fstab || echo "${siteDir} ${sftpChroot}/public_html none bind 0 0" >> /etc/fstab`);
       await execCommand(newCfg, `mount "${sftpChroot}/public_html" 2>/dev/null || true`);
       if (site.coreTemplate === 'nodejs') {
@@ -1391,15 +1392,15 @@ HTMLEOF
 fi; true`);
       }
       // SFTP user: sftponly group, nologin shell, Chroot + ForceCommand SFTP (PuTTY закрывается — это нормально)
-      await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
+      await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true; usermod -aG users "${sftpUser}" 2>/dev/null || true`);
       const sftpShadow = await execCommand(cfg, `openssl passwd -1 '${sftpPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
       await execCommand(cfg, `usermod -p '${sftpShadow.replace(/'/g, "'\\''")}' "${sftpUser}"`);
-      await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" && chmod -R u+rwX,go+rX "${siteDir}"`);
       // SSH shell user: NOT sftponly! shell bash, HOME = siteDir → PuTTY/Terminal OK
       await execCommand(cfg, `id -u "${sshUser}" >/dev/null 2>&1 || ( useradd -M -s /bin/bash -d "${siteDir}" -G users "${sshUser}" 2>&1 ); true; usermod -d "${siteDir}" -s /bin/bash "${sshUser}"`);
       const sshShadow = await execCommand(cfg, `openssl passwd -1 '${sshPass.replace(/'/g, "'\\''")}'`).then(o => o.trim());
       await execCommand(cfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
-      await execCommand(cfg, `chown -R "${sshUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,go+rX "${siteDir}"`);
+      // Owner = SFTP user, group = users, group-writable + setgid so both SFTP & SSH users can write
+      await execCommand(cfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,g+rwX,o+rX "${siteDir}" 2>/dev/null || true; chmod g+s "${siteDir}" 2>/dev/null || true`);
       // Также добавим в sudoers NOPASSWD для pm2/logs чтобы можно было перезапустить свой pm2 из shell (опционально)
       await execCommand(cfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
       // bind mount + fstab permanent
