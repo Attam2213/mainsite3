@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -224,7 +224,7 @@ const formatDate = (date: string | Date) => {
 
 const AdminDashboard = () => {
   const { refreshBalance } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers' | 'web_sites' | 'finances'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'portfolio' | 'users' | 'invoices' | 'projects' | 'orders' | 'discussions' | 'servers' | 'feedback' | 'hosting_nodes' | 'game_servers' | 'web_sites' | 'finances' | 'analytics'>('dashboard');
   const [services, setServices] = useState<Service[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -408,6 +408,11 @@ const AdminDashboard = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
 
+  // Analytics State
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(30);
+
   // Modal State
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service>>({});
@@ -464,6 +469,12 @@ const AdminDashboard = () => {
   const [showToken, setShowToken] = useState<string | null>(null);
   
   useEffect(() => {
+    if (activeTab === 'analytics') {
+      fetchAnalytics();
+    }
+  }, [activeTab, analyticsDays]);
+
+  useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000); // Refresh every 30s
     return () => clearInterval(interval);
@@ -488,6 +499,23 @@ const AdminDashboard = () => {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     };
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      setAnalyticsLoading(true);
+      const res = await fetch(`/api/analytics/stats?days=${analyticsDays}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data);
+      }
+    } catch (err) {
+      console.error('fetchAnalytics error:', err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
   };
 
   const fetchData = async () => {
@@ -1331,6 +1359,7 @@ const AdminDashboard = () => {
                 { id: 'orders', label: 'Заказы (услуги)' },
                 { id: 'discussions', label: 'Обсуждения' },
                 { id: 'feedback', label: 'Обратная связь' },
+                { id: 'analytics', label: 'Аналитика' },
               ].map((tab) => {
                 let badgeCount = 0;
                 let badgeColor = 'bg-red-500';
@@ -2932,6 +2961,164 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="flex flex-col gap-6">
+              {/* Header with period selector */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Аналитика сайта</h2>
+                  <p className="text-sm text-gray-500">Посещаемость и поведение пользователей</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={analyticsDays}
+                    onChange={(e) => setAnalyticsDays(Number(e.target.value))}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value={7}>Последние 7 дней</option>
+                    <option value={14}>Последние 14 дней</option>
+                    <option value={30}>Последние 30 дней</option>
+                    <option value={90}>Последние 90 дней</option>
+                  </select>
+                  <button
+                    onClick={fetchAnalytics}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  >
+                    Обновить
+                  </button>
+                </div>
+              </div>
+
+              {analyticsLoading && (
+                <div className="flex justify-center py-12">
+                  <Loader className="animate-spin text-indigo-600" size={32} />
+                </div>
+              )}
+
+              {!analyticsLoading && analytics && (
+                <>
+                  {/* KPI cards */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <p className="text-sm text-gray-500">Просмотров за {analytics.days} дн.</p>
+                      <p className="mt-1 text-3xl font-bold text-gray-900">{analytics.totalVisits}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <p className="text-sm text-gray-500">Уникальных посетителей</p>
+                      <p className="mt-1 text-3xl font-bold text-gray-900">{analytics.uniqueSessions}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <p className="text-sm text-gray-500">Сегодня</p>
+                      <p className="mt-1 text-3xl font-bold text-emerald-600">{analytics.todayVisits}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                      <p className="text-sm text-gray-500">Вчера</p>
+                      <p className="mt-1 text-3xl font-bold text-gray-700">{analytics.yesterdayVisits}</p>
+                    </div>
+                  </div>
+
+                  {/* Visits by day chart */}
+                  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Посещаемость по дням</h3>
+                    <div className="flex items-end gap-1 h-48 overflow-x-auto pb-2">
+                      {Object.entries(analytics.byDay as Record<string, number>).map(([day, count]) => {
+                        const max = Math.max(...Object.values(analytics.byDay as Record<string, number>), 1);
+                        const height = (count / max) * 100;
+                        return (
+                          <div key={day} className="flex flex-col items-center gap-1 min-w-[28px] flex-1">
+                            <div className="text-[10px] text-gray-500">{count}</div>
+                            <div
+                              className="w-full bg-indigo-500 rounded-t hover:bg-indigo-600 transition-colors"
+                              style={{ height: `${Math.max(height, 2)}%` }}
+                              title={`${day}: ${count}`}
+                            />
+                            <div className="text-[9px] text-gray-400 rotate-[-45deg] origin-left whitespace-nowrap">
+                              {day.slice(5)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Top pages */}
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                      <h3 className="mb-4 text-lg font-semibold text-gray-900">Топ страниц</h3>
+                      <div className="space-y-2">
+                        {analytics.topPages.map((p: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-700 truncate max-w-[70%]">{p.path}</span>
+                            <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                              {p.count}
+                            </span>
+                          </div>
+                        ))}
+                        {analytics.topPages.length === 0 && (
+                          <p className="text-sm text-gray-500">Нет данных</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Top referrers */}
+                    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                      <h3 className="mb-4 text-lg font-semibold text-gray-900">Источники трафика</h3>
+                      <div className="space-y-2">
+                        {analytics.topReferrers.map((r: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-700 truncate max-w-[70%]">
+                              {r.referrer === '(direct)' ? 'Прямой заход' : r.referrer}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              {r.count}
+                            </span>
+                          </div>
+                        ))}
+                        {analytics.topReferrers.length === 0 && (
+                          <p className="text-sm text-gray-500">Нет данных</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent visits */}
+                  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Последние посещения</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase text-gray-500">
+                            <th className="px-3 py-2">Время</th>
+                            <th className="px-3 py-2">Страница</th>
+                            <th className="px-3 py-2">Сессия</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {analytics.recent.map((r: any, i: number) => (
+                            <tr key={i} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                                {new Date(r.createdAt).toLocaleString('ru-RU')}
+                              </td>
+                              <td className="px-3 py-2 text-gray-900 truncate max-w-[400px]">{r.path}</td>
+                              <td className="px-3 py-2 text-gray-500 font-mono text-xs">{r.sessionId}</td>
+                            </tr>
+                          ))}
+                          {analytics.recent.length === 0 && (
+                            <tr>
+                              <td colSpan={3} className="px-3 py-6 text-center text-gray-500">
+                                Нет данных
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

@@ -15,6 +15,7 @@ import WebSite from './WebSite';
 import WebSiteBackup from './WebSiteBackup';
 import WalletTransaction from './WalletTransaction';
 import AITransaction from './AITransaction';
+import AnalyticsEvent from './AnalyticsEvent';
 
 // Associations
 User.hasMany(Project, { foreignKey: 'clientId', as: 'projects' });
@@ -99,4 +100,5 @@ export {
   WebSiteBackup,
   WalletTransaction,
   AITransaction,
+  AnalyticsEvent,
 };

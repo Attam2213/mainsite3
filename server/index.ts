@@ -1,4 +1,4 @@
-﻿﻿﻿﻿import express from 'express';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -34,6 +34,7 @@ import gameServerRoutes from './routes/gameServerRoutes';
 import webSiteRoutes from './routes/webSiteRoutes';
 import walletRoutes from './routes/walletRoutes';
 import aiRoutes from './routes/aiRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 
 // Prevent unused variable errors for now (will use them in routes later)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -88,6 +89,7 @@ app.use('/api/nodes', nodeRoutes);
 app.use('/api/game-servers', gameServerRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Basic health check
 app.get('/api/health', (req, res) => {
