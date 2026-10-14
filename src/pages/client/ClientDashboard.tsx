@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -7071,7 +7071,7 @@ tar -czf /tmp/backup-$(date +%F).tar.gz /var/lib/wexa/sites/${id}
                             </div>
                             <div className="space-y-2">
                               {[
-                                { label: '🪄 Cursor.sh', desc: 'вставьте скопированный конфиг в чат', href: 'https://cursor.sh' },
+                                { label: '✨ Cursor.sh', desc: 'вставьте скопированный конфиг в чат', href: 'https://cursor.sh' },
                                 { label: '💎 Trae IDE', desc: 'вставьте Markdown в «Agent Task»', href: 'https://trae.ai' },
                                 { label: '🧠 Codex.codes', desc: 'приложите скачанный .md-файл', href: 'https://codex.codes' },
                                 {
