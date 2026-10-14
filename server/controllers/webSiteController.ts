@@ -1129,7 +1129,7 @@ router.post('/admin/sites/:id/delete', authenticateToken, isAdmin, async (req: a
       const sftpChroot = site.sftpChroot || `/srv/sftp/${site.sftpUsername || 'wexa_site_' + shortId}`;
       // Cleanup SFTP user + chroot + fstab bind
       if (site.sftpUsername) {
-        await execCommand(cfg, `id "${site.sftpUsername}" >/dev/null 2>&1 && ( umount "${sftpChroot}/public_html" 2>/dev/null; sed -i "\#${siteDir}#d" /etc/fstab 2>/dev/null; userdel -f -r "${site.sftpUsername}" 2>/dev/null; ) || true`);
+        await execCommand(cfg, `id "${site.sftpUsername}" >/dev/null 2>&1 && ( umount "${sftpChroot}/public_html" 2>/dev/null; sed -i "\\#${siteDir}#d" /etc/fstab 2>/dev/null; userdel -f -r "${site.sftpUsername}" 2>/dev/null; ) || true`);
       }
       // Cleanup SSH shell user + sudoers
       if (site.sshUsername) {
@@ -1207,7 +1207,7 @@ else
 fi; true`).catch(() => {});
         await execCommand(oldCfg, `
 ( umount "${sftpChroot}/public_html" 2>/dev/null || true );
-( sed -i "\#/var/lib/wexa/sites/${site.id}#d" /etc/fstab 2>/dev/null || true );
+( sed -i "\\#/var/lib/wexa/sites/${site.id}#d" /etc/fstab 2>/dev/null || true );
 ( id "${sftpUser}" >/dev/null 2>&1 && userdel -f -r "${sftpUser}" 2>/dev/null || true );
 ( id "${sshUser}" >/dev/null 2>&1 && userdel -f -r "${sshUser}" 2>/dev/null || true );
 ( rm -f "/etc/sudoers.d/wexa-ssh-${shortId}" 2>/dev/null || true );
