@@ -1032,13 +1032,18 @@ router.post('/:id/files/upload', authenticateToken, upload.single('file'), async
     if (!file) return res.status(400).json({ message: 'Отсутствует файл' });
     const dstPath = sanitizePath(req.body?.path || '/', site.id);
     const hostDir = `/var/lib/wexa/sites/${site.id}`;
-    const relPath = dstPath.startsWith('/public_html/') ? dstPath.slice('/public_html'.length) : '/';
-    const absDir = relPath === '' || relPath === '/' ? hostDir : `${hostDir}${relPath.startsWith('/') ? relPath : '/' + relPath}`;
-    const fileName = (file.originalname || 'upload.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
+    let relPath = dstPath.startsWith('/public_html/') ? dstPath.slice('/public_html'.length) : '/';
+    const fileNameFromUpload = (file.originalname || 'upload.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
+    // If path ends with a file-like segment (has an extension), treat it as the target filename
+    const lastSeg = relPath.split('/').filter(Boolean).pop() || '';
+    let targetDir = relPath.endsWith('/') || !lastSeg ? relPath : relPath.slice(0, relPath.lastIndexOf('/'));
+    let fileName = lastSeg.includes('.') ? lastSeg : fileNameFromUpload;
+    if (targetDir === '') targetDir = '/';
+    const absDir = targetDir === '/' ? hostDir : `${hostDir}${targetDir.startsWith('/') ? targetDir : '/' + targetDir}`;
     const b64 = Buffer.from(file.buffer).toString('base64');
     const cfg = getSshConfigForNode(node);
     await execCommand(cfg, `mkdir -p "${absDir}" && printf '%s' '${b64}' | base64 -d > "${absDir}/${fileName}" && chown -R ${site.sftpUsername || 'wexa-www-data'}:users "${absDir}/${fileName}" 2>/dev/null || true`);
-    return res.json({ ok: true, message: `Файл загружен: ${relPath}/${fileName}`, size: file.size });
+    return res.json({ ok: true, message: `Файл загружен: ${targetDir}/${fileName}`, size: file.size });
   } catch (e: any) { return res.status(500).json({ message: String(e?.message ?? e) }); }
 });
 
