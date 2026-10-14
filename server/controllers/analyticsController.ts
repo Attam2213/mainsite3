@@ -117,7 +117,7 @@ export async function getStats(req: Request, res: Response) {
     // Recent events (last 50)
     const recent = events.slice(0, 50).map((e) => ({
       path: e.path,
-      sessionId: e.sessionId.slice(0, 8),
+      sessionId: (e.sessionId || '').slice(0, 8),
       createdAt: e.createdAt,
     }));
 
