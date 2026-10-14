@@ -1125,8 +1125,22 @@ router.post('/admin/sites/:id/delete', authenticateToken, isAdmin, async (req: a
     if (node && node.ip !== '127.0.0.1' && site.status !== 'deleted') {
       const cfg = getSshConfigForNode(node);
       const shortId = site.id.slice(0, 8);
-      if (site.sftpUsername) await execCommand(cfg, `id "${site.sftpUsername}" >/dev/null 2>&1 && ( umount "/srv/sftp/${site.sftpUsername}/public_html" 2>/dev/null; sed -i "\#/var/lib/wexa/sites/${site.id}#d" /etc/fstab 2>/dev/null; userdel -f -r "${site.sftpUsername}" 2>/dev/null; ) || true`);
-      if (site.pm2ProcessName) await execCommand(cfg, `pm2 delete "${site.pm2ProcessName}" 2>/dev/null; rm -f "/etc/nginx/sites-enabled/wexa-site-${shortId}.conf"; pm2 save 2>/dev/null || true; nginx -t && systemctl reload nginx || true`);
+      const siteDir = `/var/lib/wexa/sites/${site.id}`;
+      const sftpChroot = site.sftpChroot || `/srv/sftp/${site.sftpUsername || 'wexa_site_' + shortId}`;
+      // Cleanup SFTP user + chroot + fstab bind
+      if (site.sftpUsername) {
+        await execCommand(cfg, `id "${site.sftpUsername}" >/dev/null 2>&1 && ( umount "${sftpChroot}/public_html" 2>/dev/null; sed -i "\#${siteDir}#d" /etc/fstab 2>/dev/null; userdel -f -r "${site.sftpUsername}" 2>/dev/null; ) || true`);
+      }
+      // Cleanup SSH shell user + sudoers
+      if (site.sshUsername) {
+        await execCommand(cfg, `id "${site.sshUsername}" >/dev/null 2>&1 && ( userdel -f -r "${site.sshUsername}" 2>/dev/null; rm -f "/etc/sudoers.d/wexa-ssh-${shortId}" 2>/dev/null; ) || true`);
+      }
+      // Cleanup PM2 process (nodejs sites)
+      if (site.pm2ProcessName) {
+        await execCommand(cfg, `pm2 delete "${site.pm2ProcessName}" 2>/dev/null; pm2 save 2>/dev/null || true`).catch(() => {});
+      }
+      // Always remove nginx conf + site dir + chroot + reload nginx
+      await execCommand(cfg, `rm -f "/etc/nginx/sites-enabled/wexa-site-${shortId}.conf"; rm -rf "${siteDir}" 2>/dev/null; rm -rf "${sftpChroot}" 2>/dev/null; nginx -t 2>/dev/null && systemctl reload nginx 2>/dev/null || true`).catch(() => {});
     }
     if (node && site.status !== 'deleted') {
       const used = Number((node as any).usedWebSites || 0);
