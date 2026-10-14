@@ -46,6 +46,12 @@ export async function getStats(req: Request, res: Response) {
     const days = Math.max(1, Math.min(365, daysParam));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    // Helper: safely parse a date value (string or Date) into a Date; fallback to now
+    const toDate = (v: any): Date => {
+      const d = v instanceof Date ? v : new Date(v);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
     const events = await AnalyticsEvent.findAll({
       where: { createdAt: { [Op.gte]: since } },
       attributes: ['id', 'path', 'sessionId', 'ipHash', 'createdAt', 'referrer', 'userAgent'],
@@ -64,13 +70,13 @@ export async function getStats(req: Request, res: Response) {
     // Today's visits
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const todayVisits = events.filter((e) => new Date(e.createdAt) >= startOfToday).length;
+    const todayVisits = events.filter((e) => toDate(e.createdAt) >= startOfToday).length;
 
     // Yesterday's visits
     const startOfYesterday = new Date(startOfToday);
     startOfYesterday.setDate(startOfYesterday.getDate() - 1);
     const yesterdayVisits = events.filter(
-      (e) => new Date(e.createdAt) >= startOfYesterday && new Date(e.createdAt) < startOfToday
+      (e) => toDate(e.createdAt) >= startOfYesterday && toDate(e.createdAt) < startOfToday
     ).length;
 
     // Visits by day
@@ -83,7 +89,7 @@ export async function getStats(req: Request, res: Response) {
       byDay[key] = 0;
     }
     events.forEach((e) => {
-      const key = new Date(e.createdAt).toISOString().slice(0, 10);
+      const key = toDate(e.createdAt).toISOString().slice(0, 10);
       if (key in byDay) byDay[key]++;
     });
 
