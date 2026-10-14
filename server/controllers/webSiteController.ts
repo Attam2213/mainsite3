@@ -1380,7 +1380,10 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
       await execCommand(cfg, `mkdir -p "${siteDir}" "/var/lib/wexa/backups/sites/${site.id}" "${sftpChroot}/public_html" && chown root:root "${sftpChroot}" && chmod 755 "${sftpChroot}"`);
       await execCommand(cfg, `if [ -d "${templateDir}" ]; then cp -R "${templateDir}/." "${siteDir}/" 2>/dev/null; fi; true`);
       if (site.coreTemplate === 'static') {
-        await execCommand(cfg, `[ -f "${siteDir}/index.html" ] || (echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Сайт на Wexa.su</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#fff}.box{padding:2rem 3rem;border-radius:1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}.tag{background:#22c55e22;color:#86efac;padding:.25rem .6rem;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.04em}</style></head><body><div class="box"><span class="tag">WEXA.SU · LANDING</span><h1>Сайт готов 🎉</h1><p>Загрузите свои файлы через SFTP (данные в ЛК wexa.su) или используйте файловый менеджер.</p></div></body></html>' > "${siteDir}/index.html"; fi; true`);
+        await execCommand(cfg, `if [ ! -f "${siteDir}/index.html" ]; then cat > "${siteDir}/index.html" <<'HTMLEOF'
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Сайт на Wexa.su</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0f172a;color:#fff}.box{padding:2rem 3rem;border-radius:1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}.tag{background:#22c55e22;color:#86efac;padding:.25rem .6rem;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.04em}</style></head><body><div class="box"><span class="tag">WEXA.SU · LANDING</span><h1>Сайт готов</h1><p>Загрузите свои файлы через SFTP (данные в ЛК wexa.su) или используйте файловый менеджер.</p></div></body></html>
+HTMLEOF
+fi; true`);
       }
       // SFTP user: sftponly group, nologin shell, Chroot + ForceCommand SFTP (PuTTY закрывается — это нормально)
       await execCommand(cfg, `id -u "${sftpUser}" >/dev/null 2>&1 || ( useradd -M -s /usr/sbin/nologin -G sftponly "${sftpUser}" 2>&1 ); true`);
