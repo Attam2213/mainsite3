@@ -1226,7 +1226,7 @@ nginx -t && systemctl reload nginx || true`).catch(() => {});
       await execCommand(newCfg, `usermod -p '${sshShadow.replace(/'/g, "'\\''")}' "${sshUser}"`);
       await execCommand(newCfg, `mkdir -p /etc/sudoers.d; echo '${sshUser} ALL=(ALL) NOPASSWD: /usr/bin/pm2, /usr/bin/pm2 restart, /usr/bin/pm2 reload, /usr/bin/pm2 logs, /usr/bin/pm2 status, /usr/bin/pm2 save, /usr/bin/systemctl reload nginx, /usr/bin/nginx -t' > /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null; true; chmod 0440 /etc/sudoers.d/wexa-ssh-${shortId} 2>/dev/null || true`);
       // Perms: SFTP user owns, group users writable + setgid
-      await execCommand(newCfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,g+rwX,o+rX "${siteDir}" 2>/dev/null || true; chmod g+s "${siteDir}" 2>/dev/null || true);
+      await execCommand(newCfg, `chown -R "${sftpUser}":users "${siteDir}" 2>/dev/null || true; chmod -R u+rwX,g+rwX,o+rX "${siteDir}" 2>/dev/null || true; chmod g+s "${siteDir}" 2>/dev/null || true`);
       await execCommand(newCfg, `grep -qF "${siteDir}" /etc/fstab || echo "${siteDir} ${sftpChroot}/public_html none bind 0 0" >> /etc/fstab`);
       await execCommand(newCfg, `mount "${sftpChroot}/public_html" 2>/dev/null || true`);
       if (site.coreTemplate === 'nodejs') {
