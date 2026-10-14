@@ -16,7 +16,7 @@ const GAME_PORTS: Record<string, number> = {
 };
 
 const GAME_IMAGES: Record<string, string> = {
-    'minecraft': 'itzg/minecraft-server',
+    'minecraft': 'itzg/minecraft-server:java21',
     'cs2': 'joedwards32/cs2',
     'cs16': 'archont94/counter-strike1.6:latest'
 };
