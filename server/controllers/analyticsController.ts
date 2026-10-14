@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AnalyticsEvent } from '../models';
+import { Op } from 'sequelize';
 import crypto from 'crypto';
 
 // Hash IP for privacy (no raw IP stored)
@@ -46,7 +47,7 @@ export async function getStats(req: Request, res: Response) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     const events = await AnalyticsEvent.findAll({
-      where: { createdAt: { [require('sequelize').Op.gte]: since } },
+      where: { createdAt: { [Op.gte]: since } },
       attributes: ['id', 'path', 'sessionId', 'ipHash', 'createdAt', 'referrer', 'userAgent'],
       order: [['createdAt', 'DESC']],
     });
