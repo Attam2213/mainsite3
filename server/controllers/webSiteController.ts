@@ -1282,7 +1282,31 @@ router.post('/admin/:id/migrate', authenticateToken, isAdmin, async (req: any, r
 });
 
 // ==================== apply paid invoice ==================
+const ensureDefaultNginxConfig = async (cfg: any) => {
+  const cmd = `mkdir -p /etc/nginx/ssl
+if [ ! -f /etc/nginx/ssl/default.crt ]; then
+  openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \\
+    -keyout /etc/nginx/ssl/default.key -out /etc/nginx/ssl/default.crt \\
+    -subj '/CN=default.wexa.su' 2>/dev/null
+fi
+cat > /etc/nginx/sites-enabled/00-default.conf << 'NGINXEOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    ssl_certificate /etc/nginx/ssl/default.crt;
+    ssl_certificate_key /etc/nginx/ssl/default.key;
+    return 444;
+}
+NGINXEOF
+`;
+  await execCommand(cfg, cmd).catch(() => {});
+};
+
 const writeNginxConfForSite = async (cfg: any, site: any, siteDir: string, domain: string, options: { sslEnforce?: boolean } = {}) => {
+  await ensureDefaultNginxConfig(cfg);
   const shortId = String(site.id || '').slice(0, 8) || 'unknown';
   const hasProxy = Boolean(site.pm2ProcessName);
   const port = Number(site.hostPort || 3000);
