@@ -27,7 +27,7 @@ export const checkSubscriptions = async () => {
         const expiredProjects = await Project.findAll({
             where: {
                 paidUntil: {
-                    [Op.lt]: now // expired
+                    [Op.lte]: now // expired (DATEONLY: paidUntil today = expired)
                 },
                 pm2ProcessName: { [Op.ne]: null } // has PM2 setup
             }
@@ -123,9 +123,11 @@ nginx -t && systemctl reload nginx || true
         }
 
         // ========== WEBSITES SUSPEND EXPIRED ==========
+        // paidUntil is DATEONLY; Sequelize truncates `now` to YYYY-MM-DD.
+        // Use [Op.lte] so a site paid until today is suspended today (matches frontend isOverdue).
         const expiredSites = await WebSite.findAll({
             where: {
-                paidUntil: { [Op.lt]: now },
+                paidUntil: { [Op.lte]: now },
                 status: { [Op.in]: ['active', 'pending', 'provisioning'] as any },
             },
             include: [{ model: ServerNode, as: 'node' }],
@@ -162,7 +164,7 @@ nginx -t && systemctl reload nginx || true
 
         // ========== WEBSITES DELETE AFTER 3 DAYS ==========
         const deletableSites = await WebSite.findAll({
-            where: { paidUntil: { [Op.lt]: overdueDeleteBefore }, status: { [Op.ne]: 'deleted' as any } },
+            where: { paidUntil: { [Op.lte]: overdueDeleteBefore }, status: { [Op.ne]: 'deleted' as any } },
             include: [{ model: ServerNode, as: 'node' }],
         });
         for (const s of deletableSites) {
