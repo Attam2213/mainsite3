@@ -1452,7 +1452,7 @@ fi; true`);
           env: { PORT: hostPort, NODE_ENV: 'production' },
           instances: 1, autorestart: true, watch: false, max_memory_restart: '256M',
         });
-        await execCommand(cfg, `mkdir -p /etc/wexa/pm2 && cat > /etc/wexa/pm2/${pm2Name}.json <<'PM2EOF'\n${pm2Conf}\nPM2EOF\npm2 start /etc/wexa/pm2/${pm2Name}.json 2>/dev/null || true ; pm2 save 2>/dev/null || true`);
+        await execCommand(cfg, `mkdir -p /etc/wexa/pm2 && cat > /etc/wexa/pm2/${pm2Name}.json <<'PM2EOF'\n${pm2Conf}\nPM2EOF\n(pm2 restart ${pm2Name} 2>/dev/null || pm2 start /etc/wexa/pm2/${pm2Name}.json 2>/dev/null) || true ; pm2 save 2>/dev/null || true`);
       }
       await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort, pm2ProcessName: site.coreTemplate === 'nodejs' ? pm2Name : null }, siteDir, publicHost);
       await execCommand(cfg, `nginx -t && systemctl reload nginx || true`);
