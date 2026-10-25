@@ -1,5 +1,6 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import Layout from '../components/Layout';
 import SEO from '../components/SEO';
+import { Helmet } from 'react-helmet-async';
 import GameServerConfigurator, {
   FEATURES, STEPS,
   type GameServerOrderPayload,
@@ -16,6 +17,53 @@ import {
   Headphones, MapPin, Mail, Star, Server, Database, Layers,
   Users, Brain, Cpu, Network,
 } from 'lucide-react';
+
+// FAQ: ответы построены на фактических возможностях платформы (конфигуратор, тарифы сайтов,
+// способы оплаты Platega, бэкапы, статус suspended при просрочке).
+const FAQ_ITEMS: Array<{ q: string; a: string }> = [
+  {
+    q: 'Как быстро запустится сервер после оплаты?',
+    a: 'Сервер разворачивается автоматически: в среднем через 60 секунд после зачисления оплаты вы получаете готовый к игре сервер. Локация, ядро и количество слотов выбираются в конфигураторе до оплаты.',
+  },
+  {
+    q: 'Какими способами можно оплатить и есть ли скидки?',
+    a: 'Оплата картами и через СБП (платёжный сервис Platega), а также с внутреннего баланса личного кабинета. При оплате за период действуют скидки: 3 месяца — 5%, 6 месяцев — 10%, 12 месяцев — 15%.',
+  },
+  {
+    q: 'Сколько стоит аренда игрового сервера?',
+    a: 'Цены начинаются от 15 ₽ за слот в месяц. Минимальный заказ — 10 слотов. Итоговая стоимость зависит от игры (Minecraft, CS2, CS 1.6) и количества слотов и отображается в конфигураторе до оплаты.',
+  },
+  {
+    q: 'Работают ли нелицензионные (Non-Steam) клиенты?',
+    a: 'Да. Для CS 1.6 по умолчанию используется сборка с dproto, которая поддерживает и лицензионные Steam-клиенты, и Non-Steam (пиратские) версии. Для Minecraft по умолчанию серверы запускаются с отключённой проверкой лицензии.',
+  },
+  {
+    q: 'Что входит в хостинг сайтов и сколько он стоит?',
+    a: 'Три тарифа: «Лендинг» — 399 ₽/мес (статический сайт без бэкенда), «Бизнес» — 799 ₽/мес (Node.js + Express/EJS, встроенная админ-панель), «Премиум» — 1299 ₽/мес (расширенные лимиты, Redis, приоритетная поддержка). В каждый тариф входят бесплатный поддомен *.wexa.su, SSL Let\'s Encrypt, SFTP-доступ и файловый менеджер.',
+  },
+  {
+    q: 'Есть ли защита от DDoS и резервные копии?',
+    a: 'Да. Все серверы защищены от DDoS-атак уровня L3/L4 полосой до 1 Тбит/с. Для игровых серверов и сайтов выполняются автоматические ежедневные резервные копии данных.',
+  },
+  {
+    q: 'Как загружать свои файлы, плагины и моды?',
+    a: 'Через SFTP-доступ и файловый менеджер в личном кабинете: миры и плагины Minecraft, карты и моды Counter-Strike, файлы и шаблоны сайтов. Для игровых серверов также доступны консоль и RCON-команды.',
+  },
+  {
+    q: 'Что произойдёт, если вовремя не продлить хостинг сайта?',
+    a: 'В дату окончания оплаты сайт переводится в статус «приостановлен»: он останавливается и вместо него показывается заглушка. В течение 3 дней после просрочки оплату можно внести, и сайт возобновляется с сохранением всех файлов. Если оплата не поступила, ресурсы удаляются.',
+  },
+];
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ_ITEMS.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -100,6 +148,9 @@ const Home = () => {
         title="Аренда игровых серверов Minecraft, CS2, CS 1.6 + Сайты — Wexa.su"
         description="Хостинг игровых серверов Wexa.su. Minecraft, CS2, CS 1.6. Быстрые NVMe ноды, защита от DDoS, SFTP, панель управления. Мгновенный запуск за 60 секунд. Сайты — Landing, Node.js."
       />
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(faqJsonLd)}</script>
+      </Helmet>
       <div className="bg-white overflow-hidden font-sans">
         <style>{`
           @keyframes floatLeft { 0%, 100% { transform: translate(0, 0) rotate(-4deg); } 50% { transform: translate(0, -10px) rotate(-2deg); } }
@@ -707,6 +758,34 @@ const Home = () => {
                   <div className="text-4xl md:text-5xl font-black mb-1.5 text-transparent bg-clip-text bg-gradient-to-b from-white to-indigo-200">{num}</div>
                   <div className="text-indigo-200 font-medium uppercase tracking-wider text-xs">{label}</div>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="py-24 bg-white">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto mb-16">
+              <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Вопросы и ответы</h2>
+              <p className="text-4xl font-extrabold text-gray-900 sm:text-5xl">Частые вопросы о хостинге</p>
+              <p className="mt-4 text-xl text-gray-500">
+                Собрали то, что чаще всего спрашивают перед заказом игрового сервера или сайта.
+              </p>
+            </div>
+
+            <div className="max-w-3xl mx-auto flex flex-col gap-3">
+              {FAQ_ITEMS.map((item, i) => (
+                <details
+                  key={i}
+                  className="group rounded-2xl border border-slate-100/80 bg-white hover:border-indigo-200 transition-colors"
+                >
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer list-none px-6 py-5 [&::-webkit-details-marker]:hidden">
+                    <span className="text-base md:text-lg font-bold text-gray-900">{item.q}</span>
+                    <ChevronDown size={20} className="shrink-0 text-indigo-500 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="px-6 pb-5 -mt-1 text-gray-600 leading-relaxed">{item.a}</div>
+                </details>
               ))}
             </div>
           </div>

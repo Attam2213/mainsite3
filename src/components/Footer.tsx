@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { Link } from 'react-router-dom';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
@@ -6,9 +6,9 @@ const Footer = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center text-center">
           <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Wexa.su — Игровой хостинг</h3>
-            <p className="text-gray-600 mb-4 max-w-sm mx-auto">
-              Аренда игровых серверов Minecraft, CS2, CS 1.6. Быстрые ноды, защита от DDoS, SFTP-доступ и удобная панель управления.
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Wexa.su — игровой хостинг и хостинг сайтов</h3>
+            <p className="text-gray-600 mb-4 max-w-xl mx-auto">
+              Аренда игровых серверов Minecraft, CS2 и CS 1.6 и хостинг сайтов на Node.js. Быстрые NVMe-ноды, защита от DDoS, бесплатный SSL, SFTP-доступ и панель управления. Запуск за 60 секунд.
             </p>
           </div>
         </div>
