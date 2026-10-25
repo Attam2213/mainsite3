@@ -1,0 +1,44 @@
+﻿[
+    {
+        "idx":  1,
+        "file":  "l01.wav",
+        "dur":  2.488,
+        "caption":  "Сайт через Wexa и ИИ"
+    },
+    {
+        "idx":  2,
+        "file":  "l02.wav",
+        "dur":  2.848,
+        "caption":  "Шаг 1 — AI-Сайт в ЛК"
+    },
+    {
+        "idx":  3,
+        "file":  "l03.wav",
+        "dur":  3.417,
+        "caption":  "Шаг 2 — заполни бриф"
+    },
+    {
+        "idx":  4,
+        "file":  "l04.wav",
+        "dur":  2.558,
+        "caption":  "Шаг 3 — предпросчёт"
+    },
+    {
+        "idx":  5,
+        "file":  "l05.wav",
+        "dur":  2.5,
+        "caption":  "Шаг 4 — готовый лендинг"
+    },
+    {
+        "idx":  6,
+        "file":  "l06.wav",
+        "dur":  4.207,
+        "caption":  "Шаг 5 — AGENTS.md"
+    },
+    {
+        "idx":  7,
+        "file":  "l07.wav",
+        "dur":  4.919,
+        "caption":  "Wexa.su — всё в одном"
+    }
+]

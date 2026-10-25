@@ -1,0 +1,10 @@
+# секреты и локальные артефакты автопубликации
+token.json
+client_secret.json
+.env
+.tiktok-profile/
+.tmp/
+uploaded.json
+uploaded-tiktok.json
+node_modules/
+npm-debug.log*

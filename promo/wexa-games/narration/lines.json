@@ -1,0 +1,44 @@
+﻿[
+    {
+        "idx":  1,
+        "file":  "l01.wav",
+        "dur":  2.732,
+        "caption":  "Игровой сервер за 60 секунд"
+    },
+    {
+        "idx":  2,
+        "file":  "l02.wav",
+        "dur":  4.153,
+        "caption":  "CS 2 · 128 tick · низкий пинг"
+    },
+    {
+        "idx":  3,
+        "file":  "l03.wav",
+        "dur":  4.292,
+        "caption":  "CS 1.6 · Steam и Non-Steam"
+    },
+    {
+        "idx":  4,
+        "file":  "l04.wav",
+        "dur":  3.522,
+        "caption":  "Minecraft · плагины и моды"
+    },
+    {
+        "idx":  5,
+        "file":  "l05.wav",
+        "dur":  4.303,
+        "caption":  "NVMe · пинг от 12 мс"
+    },
+    {
+        "idx":  6,
+        "file":  "l06.wav",
+        "dur":  3.487,
+        "caption":  "DDoS-защита · бэкапы ежедневно"
+    },
+    {
+        "idx":  7,
+        "file":  "l07.wav",
+        "dur":  4.013,
+        "caption":  "Wexa.su — запусти свой сервер"
+    }
+]

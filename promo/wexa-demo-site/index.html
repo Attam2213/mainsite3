@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wexa Host Demo — сайт, собранный из AI-брифа</title>
+    <meta
+      name="description"
+      content="Demo-лендинг про хостинг Wexa: игровые серверы, сайты и процесс сборки через AI-бриф и AGENTS.md."
+    />
+    <style>
+      :root {
+        --bg: #05060f;
+        --bg-soft: #0d1022;
+        --panel: rgba(12, 15, 34, 0.88);
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+        --line: rgba(148, 163, 184, 0.16);
+        --indigo: #6366f1;
+        --violet: #a855f7;
+        --pink: #ec4899;
+        --cyan: #38bdf8;
+        --green: #34d399;
+        --container: 1120px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        background:
+          radial-gradient(60% 32% at 50% 0%, rgba(99, 102, 241, 0.28), rgba(99, 102, 241, 0) 72%),
+          radial-gradient(40% 28% at 0% 100%, rgba(168, 85, 247, 0.16), rgba(168, 85, 247, 0) 70%),
+          radial-gradient(36% 24% at 100% 36%, rgba(236, 72, 153, 0.14), rgba(236, 72, 153, 0) 70%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .container {
+        width: min(calc(100% - 32px), var(--container));
+        margin: 0 auto;
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(16px);
+        background: rgba(5, 6, 15, 0.7);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 0;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+      }
+
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--indigo), var(--violet));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .nav-links a,
+      .cta,
+      .ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-weight: 600;
+      }
+
+      .cta {
+        background: linear-gradient(135deg, var(--indigo), var(--pink));
+        border-color: transparent;
+        box-shadow: 0 14px 40px rgba(99, 102, 241, 0.24);
+      }
+
+      .hero {
+        padding: 76px 0 44px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(99, 102, 241, 0.32);
+        background: rgba(99, 102, 241, 0.1);
+        color: #c7d2fe;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 24px;
+        margin-top: 24px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 28px;
+      }
+
+      .hero-copy h1 {
+        max-width: 760px;
+        font-size: clamp(40px, 7vw, 74px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      .accent {
+        color: #ddd6fe;
+      }
+
+      .hero-copy p {
+        max-width: 700px;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.7;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 26px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 26px;
+      }
+
+      .stat {
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 30px;
+        margin-bottom: 6px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .hero-card {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .hero-card img,
+      .shot img {
+        width: 100%;
+        display: block;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .hero-card small,
+      .shot small {
+        color: #a5b4fc;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 32px 0 0;
+      }
+
+      .section-head {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .section-head h2 {
+        font-size: clamp(28px, 4vw, 48px);
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+      }
+
+      .section-head p {
+        color: var(--muted);
+        max-width: 760px;
+        line-height: 1.7;
+      }
+
+      .feature-grid,
+      .steps,
+      .shots,
+      .price-grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .feature-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .feature-card,
+      .step,
+      .price {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 22px;
+      }
+
+      .feature-card h3,
+      .step h3,
+      .price h3 {
+        font-size: 20px;
+        margin-bottom: 10px;
+      }
+
+      .feature-card p,
+      .step p,
+      .price p,
+      .price li {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .steps {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .step-index {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(236, 72, 153, 0.25));
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        font-weight: 800;
+      }
+
+      .shots {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .shot {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 18px;
+      }
+
+      .shot p {
+        margin-top: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .md-box {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      pre {
+        margin: 0;
+        padding: 22px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: rgba(2, 6, 23, 0.84);
+        color: #e2e8f0;
+        overflow: auto;
+        line-height: 1.65;
+        font-size: 14px;
+      }
+
+      .price-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .price strong {
+        display: block;
+        font-size: 42px;
+        margin: 18px 0 6px;
+      }
+
+      .price ul {
+        margin: 16px 0 0;
+        padding-left: 18px;
+      }
+
+      .price.featured {
+        border-color: rgba(99, 102, 241, 0.4);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.14);
+      }
+
+      .footer {
+        padding: 40px 0 72px;
+      }
+
+      .footer-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(236, 72, 153, 0.16));
+        border: 1px solid rgba(99, 102, 241, 0.24);
+        border-radius: 28px;
+        padding: 26px;
+      }
+
+      .footer-card p {
+        color: var(--muted);
+        line-height: 1.6;
+        max-width: 680px;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid,
+        .md-box,
+        .feature-grid,
+        .steps,
+        .shots,
+        .price-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .nav-inner {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a class="brand" href="#top">
+          <span class="brand-mark">&lt;/&gt;</span>
+          <span>Wexa Host Demo</span>
+        </a>
+        <nav class="nav-links">
+          <a href="#features">Преимущества</a>
+          <a href="#workflow">Как создавали</a>
+          <a href="#agents">AGENTS.md</a>
+          <a href="#pricing">Тарифы</a>
+          <a class="cta" href="https://wexa.su" target="_blank" rel="noreferrer">Открыть Wexa.su</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="container">
+          <span class="eyebrow">Demo-сайт, собранный локально по реальным шагам из панели Wexa</span>
+          <div class="hero-grid">
+            <div class="panel hero-copy">
+              <h1>
+                Игровые серверы, сайты и <span class="accent">AI-процесс</span> в одном лендинге
+              </h1>
+              <p>
+                Этот demo-проект показывает, как из реального AI-брифа в кабинете Wexa.su
+                рождается готовый сайт: сначала собираем описание, потом подключаем
+                <code>AGENTS.md</code>, после чего локально доводим интерфейс до финального вида.
+              </p>
+              <div class="hero-actions">
+                <a class="cta" href="#workflow">Посмотреть процесс</a>
+                <a class="ghost" href="#agents">Открыть AI-инструкцию</a>
+              </div>
+              <div class="stats">
+                <div class="stat">
+                  <strong>399 ₽</strong>
+                  <span>Стартовая цена лендинга в панели Wexa.</span>
+                </div>
+                <div class="stat">
+                  <strong>5 ₽</strong>
+                  <span>Предпросчёт генерации AI-брифа в реальном кабинете.</span>
+                </div>
+                <div class="stat">
+                  <strong>1 кабинет</strong>
+                  <span>Сайты, игровые серверы и AI-пайплайн в одном месте.</span>
+                </div>
+              </div>
+            </div>
+            <div class="panel hero-card">
+              <small>Реальный экран из Wexa</small>
+              <img src="assets/wexa-dashboard-ai-entry.png" alt="Панель Wexa с переходом в AI-Сайт" />
+              <p>
+                Мы реально зашли в ЛК Wexa и собрали бриф для сайта на основе текущей
+                панели и AI-формы.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="container">
+          <div class="section-head">
+            <h2>Что этот demo-сайт показывает</h2>
+            <p>
+              Не просто красивый экран, а связанный сценарий: хостинг игровых серверов,
+              сайты от 399 ₽/мес и работа с AI через понятный бриф и готовый markdown-файл.
+            </p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Minecraft, CS2, CS 1.6</h3>
+              <p>Один лендинг закрывает и игровые серверы, и сайты, без раздробления по разным сервисам.</p>
+            </article>
+            <article class="feature-card">
+              <h3>AI-бриф</h3>
+              <p>Описание проекта, разделы, стиль и контакты собираются в один понятный сценарий для генерации.</p>
+            </article>
+            <article class="feature-card">
+              <h3>AGENTS.md</h3>
+              <p>Markdown-файл даёт ИИ-агенту правила проекта, чтобы дальше править сайт уже словами.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Готово для ролика</h3>
+              <p>Реальные скриншоты из кабинета Wexa, локальный demo-сайт и финальный видеоматериал собираются в одну цепочку.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow">
+        <div class="container">
+          <div class="section-head">
+            <h2>Как мы создавали сайт</h2>
+            <p>
+              Ниже — реальные кадры из кабинета Wexa: вход в AI-раздел, пустая форма, заполненный
+              бриф и итоговый расчёт перед генерацией.
+            </p>
+          </div>
+          <div class="steps">
+            <article class="step">
+              <div class="step-index">1</div>
+              <h3>Открыли AI-Сайт</h3>
+              <p>В личном кабинете выбрали раздел AI-Сайт с баланса и перешли к форме генерации.</p>
+            </article>
+            <article class="step">
+              <div class="step-index">2</div>
+              <h3>Собрали бриф</h3>
+              <p>Заполнили оффер, структуру, стили и контакты для demo-лендинга про хостинг Wexa.</p>
+            </article>
+            <article class="step">
+              <div class="step-index">3</div>
+              <h3>Подготовили AI-инструкцию</h3>
+              <p>Отдельно добавили markdown-файл для ИИ-агента, чтобы правки можно было делать уже словами.</p>
+            </article>
+          </div>
+          <div class="shots" style="margin-top: 16px">
+            <article class="shot">
+              <small>Шаг 1</small>
+              <img src="assets/wexa-ai-site-panel.png" alt="Панель AI-Сайт в кабинете Wexa" />
+              <p>Внутри ЛК уже есть отдельный блок для создания сайта через AI.</p>
+            </article>
+            <article class="shot">
+              <small>Шаг 2</small>
+              <img src="assets/wexa-ai-form-empty.png" alt="Пустая AI-форма для создания сайта" />
+              <p>Пустая форма показывает структуру брифа: тариф, описание, разделы, стиль и контакты.</p>
+            </article>
+            <article class="shot">
+              <small>Шаг 3</small>
+              <img src="assets/wexa-ai-form-filled.png" alt="Заполненный AI-бриф для сайта" />
+              <p>Мы собрали описание сайта про игровые серверы, сайты и AI-процесс в стиле Wexa.</p>
+            </article>
+            <article class="shot">
+              <small>Шаг 4</small>
+              <img src="assets/wexa-ai-form-filled-subdomain.png" alt="Заполненный AI-бриф с расчётом генерации" />
+              <p>После заполнения получили предпросчёт и подготовили проект к следующему шагу.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="agents">
+        <div class="container">
+          <div class="section-head">
+            <h2>AGENTS.md для ИИ-агента</h2>
+            <p>
+              После брифа мы даём агенту понятный markdown-файл с ролью, стеком,
+              ограничениями и чеклистом публикации. Благодаря этому сайт можно дальше
+              дорабатывать фразами вроде «добавь блок тарифов» или «сделай шапку контрастнее».
+            </p>
+          </div>
+          <div class="md-box">
+            <div class="panel">
+              <h3 style="margin-bottom: 12px">Что лежит внутри</h3>
+              <p style="color: var(--muted); line-height: 1.7">
+                Роль агента, стек проекта, правила дизайна, ограничения на деструктивные
+                действия, шаги публикации и чеклист перед релизом.
+              </p>
+              <div class="hero-actions" style="margin-top: 18px">
+                <a class="cta" href="./AGENTS.md">Открыть AGENTS.md</a>
+              </div>
+            </div>
+            <pre># AGENTS.md
+
+Ты — ведущий фронтенд-инженер проекта.
+Работай точечно, не ломай существующий дизайн
+и держи проект готовым к публикации на Wexa.su.
+
+Продукт: demo-сайт про хостинг Wexa
+Тип: статический landing
+Язык: русский
+
+Задачи:
+- читать файлы перед правкой
+- не добавлять лишние зависимости
+- сохранять тёмный неоновый стиль
+- не трогать системные файлы хостинга
+
+Перед публикацией:
+- проверить мобильную версию
+- проверить title и description
+- убедиться, что нет заглушек
+- загрузить файлы на хостинг Wexa</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing">
+        <div class="container">
+          <div class="section-head">
+            <h2>Простая витрина тарифов</h2>
+            <p>
+              Для demo-сайта этого достаточно: показать точку входа, разницу между типами сайтов
+              и связать это с процессом AI-сборки.
+            </p>
+          </div>
+          <div class="price-grid">
+            <article class="price">
+              <h3>Landing</h3>
+              <strong>399 ₽</strong>
+              <p>Быстрый статический лендинг для оффера, формы заявок и промо-страницы.</p>
+              <ul>
+                <li>HTML/CSS</li>
+                <li>Быстрый запуск</li>
+                <li>Подходит для рекламы</li>
+              </ul>
+            </article>
+            <article class="price featured">
+              <h3>Business</h3>
+              <strong>799 ₽</strong>
+              <p>Node.js + Express + EJS для более гибких сайтов и админки.</p>
+              <ul>
+                <li>Серверная логика</li>
+                <li>Формы и управление</li>
+                <li>Основа для AI-доработок</li>
+              </ul>
+            </article>
+            <article class="price">
+              <h3>Premium</h3>
+              <strong>1299 ₽</strong>
+              <p>Для проектов, которым нужна более сложная логика и приоритетный контур.</p>
+              <ul>
+                <li>Node.js + SQLite + Redis</li>
+                <li>Больше возможностей</li>
+                <li>Под сложные сценарии</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-card">
+          <div>
+            <h2 style="margin-bottom: 10px">Demo готов для видео</h2>
+            <p>
+              У нас уже есть реальные экраны из Wexa, локальный demo-сайт и AGENTS.md.
+              Следующий шаг — собрать из этого вертикальный ролик 25–30 секунд.
+            </p>
+          </div>
+          <a class="cta" href="https://wexa.su" target="_blank" rel="noreferrer">wexa.su</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

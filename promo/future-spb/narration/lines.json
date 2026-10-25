@@ -1,0 +1,44 @@
+﻿[
+    {
+        "idx":  1,
+        "file":  "l01.wav",
+        "dur":  4.81,
+        "caption":  "FutureСПБ — VPN для телефона"
+    },
+    {
+        "idx":  2,
+        "file":  "l02.wav",
+        "dur":  3.824,
+        "caption":  "Стабильное подключение"
+    },
+    {
+        "idx":  3,
+        "file":  "l03.wav",
+        "dur":  3.011,
+        "caption":  "Запуск за пару касаний"
+    },
+    {
+        "idx":  4,
+        "file":  "l04.wav",
+        "dur":  3.162,
+        "caption":  "Защита трафика и приватность"
+    },
+    {
+        "idx":  5,
+        "file":  "l05.wav",
+        "dur":  3.63,
+        "caption":  "Android и iPhone"
+    },
+    {
+        "idx":  6,
+        "file":  "l06.wav",
+        "dur":  3.081,
+        "caption":  "Просто и всегда под рукой"
+    },
+    {
+        "idx":  7,
+        "file":  "l07.wav",
+        "dur":  3.154,
+        "caption":  "FutureСПБ — ссылка в шапке канала"
+    }
+]

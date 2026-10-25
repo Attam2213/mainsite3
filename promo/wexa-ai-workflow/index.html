@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Wexa.su — реальный AI workflow (Shorts / TikTok)</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #05060f;
+        font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+        color: #f8fafc;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #ground {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(62% 40% at 50% 6%, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0) 72%),
+          radial-gradient(52% 34% at 10% 76%, rgba(168, 85, 247, 0.24), rgba(168, 85, 247, 0) 74%),
+          radial-gradient(56% 38% at 92% 58%, rgba(236, 72, 153, 0.16), rgba(236, 72, 153, 0) 74%),
+          #05060f;
+      }
+      #grid {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-image:
+          linear-gradient(rgba(148, 163, 184, 0.07) 1px, rgba(148, 163, 184, 0) 1px),
+          linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, rgba(148, 163, 184, 0) 1px);
+        background-size: 92px 92px;
+      }
+
+      .scene {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      #scene2,
+      #scene3,
+      #scene4,
+      #scene5,
+      #scene6,
+      #scene7 {
+        opacity: 0;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+      }
+      .scene-content {
+        position: relative;
+        z-index: 2;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 120px 58px 36px;
+        gap: 24px;
+      }
+      .capwrap {
+        position: relative;
+        z-index: 3;
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        height: 380px;
+        padding: 0 116px 254px;
+      }
+
+      .kicker {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #a5b4fc;
+        text-shadow: 0 0 24px rgba(99, 102, 241, 0.7);
+      }
+      .head {
+        font-size: 90px;
+        font-weight: 900;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+        color: #ffffff;
+        text-shadow:
+          0 0 34px rgba(129, 140, 248, 0.55),
+          0 0 90px rgba(168, 85, 247, 0.35);
+      }
+      .head.sm {
+        font-size: 74px;
+      }
+      .head.acc {
+        color: #ddd6fe;
+      }
+      .sub {
+        font-size: 40px;
+        font-weight: 600;
+        color: #c7d2fe;
+        max-width: 880px;
+        line-height: 1.25;
+      }
+      .cap {
+        font-size: 44px;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        color: #fff;
+        text-align: center;
+        max-width: 840px;
+        padding: 18px 28px;
+        border-radius: 26px;
+        border: 2px solid rgba(129, 140, 248, 0.38);
+        background: rgba(8, 10, 24, 0.72);
+        text-shadow: 0 0 22px rgba(129, 140, 248, 0.5);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 34px;
+        border-radius: 999px;
+        border: 2px solid rgba(129, 140, 248, 0.45);
+        background: rgba(129, 140, 248, 0.1);
+        color: #e0e7ff;
+        font-size: 34px;
+        font-weight: 700;
+        box-shadow: 0 0 44px rgba(99, 102, 241, 0.25);
+      }
+      .screen {
+        width: 880px;
+        padding: 18px;
+        border-radius: 36px;
+        border: 2px solid rgba(129, 140, 248, 0.32);
+        background: rgba(10, 13, 31, 0.82);
+        box-shadow:
+          0 0 70px rgba(99, 102, 241, 0.18),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+      .screen img {
+        width: 100%;
+        display: block;
+        border-radius: 22px;
+      }
+      .badge {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        padding: 12px 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(129, 140, 248, 0.35);
+        background: rgba(5, 8, 20, 0.82);
+        color: #c7d2fe;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .bar {
+        width: 320px;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+        box-shadow: 0 0 26px rgba(168, 85, 247, 0.7);
+      }
+      .bar.lg {
+        width: 420px;
+      }
+      .ghost {
+        position: absolute;
+        z-index: 1;
+        left: 50%;
+        top: 50%;
+        font-size: 280px;
+        font-weight: 900;
+        letter-spacing: -0.08em;
+        color: rgba(255, 255, 255, 0.08);
+        -webkit-text-fill-color: rgba(255, 255, 255, 0.08);
+        user-select: none;
+        white-space: nowrap;
+        text-shadow:
+          0 0 90px rgba(99, 102, 241, 0.2),
+          0 0 140px rgba(168, 85, 247, 0.16);
+      }
+      .glow {
+        position: absolute;
+        inset: auto;
+        width: 600px;
+        height: 600px;
+        border-radius: 999px;
+        filter: blur(18px);
+        opacity: 0.7;
+      }
+      .glow.indigo {
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.38), rgba(99, 102, 241, 0) 72%);
+      }
+      .glow.pink {
+        background: radial-gradient(circle, rgba(236, 72, 153, 0.26), rgba(236, 72, 153, 0) 72%);
+      }
+      #brand {
+        position: absolute;
+        left: 48px;
+        top: 38px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #eef2ff;
+      }
+      #brand .mark {
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        font-weight: 900;
+      }
+      #brand .name {
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      #vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at center, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, 0.16) 78%, rgba(0, 0, 0, 0.38) 100%),
+          linear-gradient(to top, rgba(5, 6, 15, 0.62), transparent 26%, transparent 74%, rgba(5, 6, 15, 0.42));
+      }
+      #wipe {
+        position: absolute;
+        inset: 0;
+        z-index: 9;
+        pointer-events: none;
+        opacity: 0;
+        overflow: hidden;
+      }
+      .band {
+        position: absolute;
+        inset: 0 auto 0 -560px;
+        width: 520px;
+        transform: skewX(-18deg);
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.24), rgba(236, 72, 153, 0.18));
+        filter: blur(2px);
+      }
+      .band.b2 {
+        left: -820px;
+        width: 640px;
+      }
+      .band.b3 {
+        left: -1140px;
+        width: 720px;
+      }
+      #fade {
+        position: absolute;
+        inset: 0;
+        z-index: 12;
+        background: #05060f;
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-composition-id="main" data-width="1080" data-height="1920">
+    <div id="ground"></div>
+    <div id="grid"></div>
+
+    <div id="brand">
+      <span class="mark">&lt;/&gt;</span>
+      <span class="name">Wexa.su</span>
+    </div>
+    <div id="vignette"></div>
+
+    <section class="scene" id="scene1">
+      <div class="bg">
+        <div class="glow indigo s1-glow" style="left: -80px; top: 220px"></div>
+        <div class="glow pink s1-glow2" style="right: -120px; bottom: 180px"></div>
+        <div class="ghost s1-ghost">AI</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s1-kick">Реальный процесс</div>
+        <h1 class="head s1-h1">Сайт через</h1>
+        <h1 class="head acc s1-h2">Wexa и ИИ</h1>
+        <div class="bar s1-bar"></div>
+        <div class="pill s1-pill">от брифа до demo-лендинга</div>
+        <div class="screen s1-card">
+          <div class="badge">Шаг 0</div>
+          <img src="assets/wexa-dashboard-ai-entry.png" alt="Панель Wexa" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s1-cap">Сайт через Wexa и ИИ</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene2">
+      <div class="bg">
+        <div class="glow indigo s2-glow" style="left: -120px; top: 340px"></div>
+        <div class="ghost s2-ghost">LK</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s2-kick">Шаг 1</div>
+        <h1 class="head s2-h1">AI-Сайт</h1>
+        <div class="sub s2-sub">прямо в личном кабинете</div>
+        <div class="screen s2-card">
+          <div class="badge">Панель</div>
+          <img src="assets/wexa-ai-site-panel.png" alt="AI-сайт в кабинете Wexa" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s2-cap">Шаг 1 — AI-Сайт в ЛК</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene3">
+      <div class="bg">
+        <div class="glow pink s3-glow" style="right: -140px; top: 300px"></div>
+        <div class="ghost s3-ghost">BRIEF</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s3-kick">Шаг 2</div>
+        <h1 class="head s3-h1">Заполни бриф</h1>
+        <div class="sub s3-sub">оффер, стиль и разделы</div>
+        <div class="screen s3-card">
+          <div class="badge">Brief</div>
+          <img src="assets/wexa-ai-form-filled-subdomain.png" alt="AI-бриф Wexa" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s3-cap">Шаг 2 — заполни бриф</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene4">
+      <div class="bg">
+        <div class="glow indigo s4-glow" style="left: 50%; margin-left: -300px; top: 220px"></div>
+        <div class="ghost s4-ghost">5 ₽</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s4-kick">Шаг 3</div>
+        <h1 class="head s4-h1">Предпросчёт</h1>
+        <div class="sub s4-sub">считаем бюджет генерации</div>
+        <div class="pill s4-pill">OpenAI · GPT-4o-mini · 5 ₽</div>
+        <div class="screen s4-card">
+          <div class="badge">Calc</div>
+          <img src="assets/wexa-ai-form-filled-subdomain.png" alt="Предпросчёт генерации" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s4-cap">Шаг 3 — предпросчёт</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene5">
+      <div class="bg">
+        <div class="glow pink s5-glow" style="right: -140px; bottom: 160px"></div>
+        <div class="ghost s5-ghost">SITE</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s5-kick">Шаг 4</div>
+        <h1 class="head s5-h1">Готовый</h1>
+        <h1 class="head acc s5-h2">demo-лендинг</h1>
+        <div class="screen s5-card">
+          <div class="badge">Result</div>
+          <img src="assets/wexa-demo-site-home.png" alt="Готовый demo-сайт" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s5-cap">Шаг 4 — готовый лендинг</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene6">
+      <div class="bg">
+        <div class="glow indigo s6-glow" style="left: -120px; bottom: 180px"></div>
+        <div class="ghost s6-ghost">MD</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s6-kick">Шаг 5</div>
+        <h1 class="head s6-h1">AGENTS.md</h1>
+        <div class="sub s6-sub">агент правит сайт словами</div>
+        <div class="screen s6-card">
+          <div class="badge">MD</div>
+          <img src="assets/wexa-demo-site-agents.png" alt="AGENTS.md в demo-сайте" />
+        </div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s6-cap">Шаг 5 — AGENTS.md</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene7">
+      <div class="bg">
+        <div class="glow pink s7-glow" style="right: -160px; top: 180px"></div>
+        <div class="glow indigo s7-glow2" style="left: -120px; bottom: 120px"></div>
+        <div class="ghost s7-ghost">WEXA</div>
+      </div>
+      <div class="scene-content">
+        <div class="kicker s7-kick">Один кабинет</div>
+        <h1 class="head s7-h1">Серверы, сайты</h1>
+        <h1 class="head acc s7-h2">и ИИ</h1>
+        <div class="screen s7-card">
+          <div class="badge">Flow</div>
+          <img src="assets/wexa-demo-site-workflow.png" alt="Workflow demo-сайта" />
+        </div>
+        <div class="pill s7-pill">wexa.su</div>
+      </div>
+      <div class="capwrap">
+        <div class="cap s7-cap">Wexa.su — всё в одном</div>
+      </div>
+    </section>
+
+    <div id="wipe">
+      <div class="band b1"></div>
+      <div class="band b2"></div>
+      <div class="band b3"></div>
+    </div>
+    <div id="fade"></div>
+
+    <audio id="a1" data-start="0" data-duration="2.488" data-track-index="2" data-volume="1" src="narration/l01.wav"></audio>
+    <audio id="a2" data-start="2.75" data-duration="2.848" data-track-index="2" data-volume="1" src="narration/l02.wav"></audio>
+    <audio id="a3" data-start="5.85" data-duration="3.417" data-track-index="2" data-volume="1" src="narration/l03.wav"></audio>
+    <audio id="a4" data-start="9.52" data-duration="2.558" data-track-index="2" data-volume="1" src="narration/l04.wav"></audio>
+    <audio id="a5" data-start="12.33" data-duration="2.5" data-track-index="2" data-volume="1" src="narration/l05.wav"></audio>
+    <audio id="a6" data-start="15.08" data-duration="4.207" data-track-index="2" data-volume="1" src="narration/l06.wav"></audio>
+    <audio id="a7" data-start="19.54" data-duration="4.919" data-track-index="2" data-volume="1" src="narration/l07.wav"></audio>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      gsap.set(".ghost", { xPercent: -50, yPercent: -50 });
+      gsap.set(".band", { x: -560 });
+
+      function xfade(prev, next, t) {
+        tl.to(prev, { opacity: 0, duration: 0.34, ease: "power2.inOut" }, t);
+        tl.fromTo(
+          next,
+          { opacity: 0, scale: 1.045 },
+          { opacity: 1, scale: 1, duration: 0.46, ease: "power3.out" },
+          t + 0.04,
+        );
+        tl.set("#wipe", { opacity: 1 }, t - 0.02);
+        tl.fromTo(
+          ".band",
+          { x: -560 },
+          { x: 1780, duration: 0.56, ease: "power3.inOut", stagger: 0.06, immediateRender: false },
+          t,
+        );
+        tl.set("#wipe", { opacity: 0 }, t + 0.72);
+      }
+
+      tl.from(".s1-glow", { opacity: 0, duration: 0.8, ease: "power2.out" }, 0.08);
+      tl.from(".s1-glow2", { opacity: 0, duration: 0.9, ease: "power2.out" }, 0.18);
+      tl.from(".s1-ghost", { opacity: 0, scale: 1.3, duration: 1.0, ease: "power2.out" }, 0.12);
+      tl.from(".s1-kick", { opacity: 0, y: -30, duration: 0.45, ease: "expo.out" }, 0.24);
+      tl.from(".s1-h1", { opacity: 0, y: 60, duration: 0.62, ease: "power4.out" }, 0.34);
+      tl.from(".s1-h2", { opacity: 0, y: 60, duration: 0.62, ease: "power4.out" }, 0.48);
+      tl.from(".s1-bar", { scaleX: 0, duration: 0.58, ease: "power3.inOut" }, 0.58);
+      tl.from(".s1-pill", { opacity: 0, scale: 0.78, duration: 0.46, ease: "back.out(1.6)" }, 0.72);
+      tl.from(".s1-card", { opacity: 0, y: 80, scale: 0.88, duration: 0.82, ease: "power3.out" }, 0.6);
+      tl.from(".s1-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 0.9);
+      tl.to(".s1-card", { y: -14, duration: 2.1, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.2);
+
+      xfade("#scene1", "#scene2", 2.75);
+      tl.from(".s2-glow", { opacity: 0, duration: 0.7, ease: "power2.out" }, 2.84);
+      tl.from(".s2-ghost", { opacity: 0, scale: 1.24, duration: 0.9, ease: "power2.out" }, 2.88);
+      tl.from(".s2-kick", { opacity: 0, y: -26, duration: 0.44, ease: "expo.out" }, 2.98);
+      tl.from(".s2-h1", { opacity: 0, y: 58, duration: 0.6, ease: "power4.out" }, 3.08);
+      tl.from(".s2-sub", { opacity: 0, y: 34, duration: 0.5, ease: "power3.out" }, 3.22);
+      tl.from(".s2-card", { opacity: 0, y: 84, scale: 0.9, duration: 0.82, ease: "power3.out" }, 3.02);
+      tl.from(".s2-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 3.24);
+      tl.to(".s2-card", { y: -12, duration: 1.9, repeat: 1, yoyo: true, ease: "sine.inOut" }, 3.7);
+
+      xfade("#scene2", "#scene3", 5.85);
+      tl.from(".s3-glow", { opacity: 0, duration: 0.72, ease: "power2.out" }, 5.94);
+      tl.from(".s3-ghost", { opacity: 0, scale: 1.2, duration: 0.94, ease: "power2.out" }, 5.98);
+      tl.from(".s3-kick", { opacity: 0, y: -28, duration: 0.44, ease: "expo.out" }, 6.06);
+      tl.from(".s3-h1", { opacity: 0, y: 60, duration: 0.62, ease: "power4.out" }, 6.14);
+      tl.from(".s3-sub", { opacity: 0, y: 34, duration: 0.5, ease: "power3.out" }, 6.3);
+      tl.from(".s3-card", { opacity: 0, y: 86, scale: 0.9, duration: 0.84, ease: "power3.out" }, 6.12);
+      tl.from(".s3-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 6.34);
+      tl.to(".s3-card", { y: -14, duration: 2.1, repeat: 1, yoyo: true, ease: "sine.inOut" }, 6.86);
+
+      xfade("#scene3", "#scene4", 9.52);
+      tl.from(".s4-glow", { opacity: 0, duration: 0.7, ease: "power2.out" }, 9.6);
+      tl.from(".s4-ghost", { opacity: 0, scale: 1.18, duration: 0.9, ease: "power2.out" }, 9.64);
+      tl.from(".s4-kick", { opacity: 0, y: -24, duration: 0.42, ease: "expo.out" }, 9.72);
+      tl.from(".s4-h1", { opacity: 0, y: 56, duration: 0.58, ease: "power4.out" }, 9.8);
+      tl.from(".s4-sub", { opacity: 0, y: 30, duration: 0.46, ease: "power3.out" }, 9.94);
+      tl.from(".s4-pill", { opacity: 0, scale: 0.82, duration: 0.46, ease: "back.out(1.6)" }, 10.02);
+      tl.from(".s4-card", { opacity: 0, y: 82, scale: 0.9, duration: 0.8, ease: "power3.out" }, 9.9);
+      tl.from(".s4-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 10.18);
+
+      xfade("#scene4", "#scene5", 12.33);
+      tl.from(".s5-glow", { opacity: 0, duration: 0.72, ease: "power2.out" }, 12.41);
+      tl.from(".s5-ghost", { opacity: 0, scale: 1.18, duration: 0.92, ease: "power2.out" }, 12.45);
+      tl.from(".s5-kick", { opacity: 0, y: -24, duration: 0.42, ease: "expo.out" }, 12.52);
+      tl.from(".s5-h1", { opacity: 0, y: 54, duration: 0.58, ease: "power4.out" }, 12.6);
+      tl.from(".s5-h2", { opacity: 0, y: 54, duration: 0.58, ease: "power4.out" }, 12.74);
+      tl.from(".s5-card", { opacity: 0, y: 84, scale: 0.9, duration: 0.82, ease: "power3.out" }, 12.7);
+      tl.from(".s5-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 12.94);
+
+      xfade("#scene5", "#scene6", 15.08);
+      tl.from(".s6-glow", { opacity: 0, duration: 0.72, ease: "power2.out" }, 15.16);
+      tl.from(".s6-ghost", { opacity: 0, scale: 1.2, duration: 0.92, ease: "power2.out" }, 15.2);
+      tl.from(".s6-kick", { opacity: 0, y: -24, duration: 0.42, ease: "expo.out" }, 15.28);
+      tl.from(".s6-h1", { opacity: 0, y: 58, duration: 0.6, ease: "power4.out" }, 15.38);
+      tl.from(".s6-sub", { opacity: 0, y: 32, duration: 0.46, ease: "power3.out" }, 15.54);
+      tl.from(".s6-card", { opacity: 0, y: 84, scale: 0.9, duration: 0.82, ease: "power3.out" }, 15.46);
+      tl.from(".s6-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 15.7);
+      tl.to(".s6-card", { y: -12, duration: 2.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 16.2);
+
+      xfade("#scene6", "#scene7", 19.54);
+      tl.from(".s7-glow", { opacity: 0, duration: 0.8, ease: "power2.out" }, 19.62);
+      tl.from(".s7-glow2", { opacity: 0, duration: 0.84, ease: "power2.out" }, 19.72);
+      tl.from(".s7-ghost", { opacity: 0, scale: 1.22, duration: 0.94, ease: "power2.out" }, 19.68);
+      tl.from(".s7-kick", { opacity: 0, y: -24, duration: 0.42, ease: "expo.out" }, 19.82);
+      tl.from(".s7-h1", { opacity: 0, y: 56, duration: 0.6, ease: "power4.out" }, 19.92);
+      tl.from(".s7-h2", { opacity: 0, y: 56, duration: 0.6, ease: "power4.out" }, 20.06);
+      tl.from(".s7-card", { opacity: 0, y: 84, scale: 0.9, duration: 0.82, ease: "power3.out" }, 20.02);
+      tl.from(".s7-pill", { opacity: 0, scale: 0.8, duration: 0.5, ease: "back.out(1.6)" }, 20.36);
+      tl.from(".s7-cap", { opacity: 0, y: 22, duration: 0.45, ease: "power2.out" }, 20.26);
+      tl.to(".s7-card", { y: -16, duration: 2.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 21.0);
+      tl.to(".s7-pill", { scale: 1.06, duration: 0.92, repeat: 4, yoyo: true, ease: "sine.inOut" }, 22.1);
+
+      tl.to("#fade", { opacity: 1, duration: 0.72, ease: "power2.inOut" }, 28.2);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines.main = tl;
+      tl.seek(0);
+    </script>
+    </div>
+  </body>
+</html>
