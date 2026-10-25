@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
@@ -683,7 +683,25 @@ const ClientDashboard = () => {
   const [aiKeysAnthropic, setAiKeysAnthropic] = useState('');
   const [aiKeysGemini, setAiKeysGemini] = useState('');
   const [aiKeysSaving, setAiKeysSaving] = useState(false);
-  const [aiKeysStatus, setAiKeysStatus] = useState<{ openAI: boolean; anthropic: boolean; gemini: boolean }>({ openAI: false, anthropic: false, gemini: false });
+  const [aiKeysStatus, setAiKeysStatus] = useState<{
+    openAI: boolean;
+    anthropic: boolean;
+    gemini: boolean;
+    serverOpenAI: boolean;
+    serverAnthropic: boolean;
+    serverGemini: boolean;
+    hasServerKey: boolean;
+    preferredProvider: 'openai' | 'anthropic' | 'gemini';
+  }>({
+    openAI: false,
+    anthropic: false,
+    gemini: false,
+    serverOpenAI: false,
+    serverAnthropic: false,
+    serverGemini: false,
+    hasServerKey: false,
+    preferredProvider: 'openai',
+  });
 
   const loadAIKeysStatus = async () => {
     try {
@@ -691,7 +709,16 @@ const ClientDashboard = () => {
       const res = await fetch('/api/ai/keys/status', { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const j = await res.json();
-        setAiKeysStatus(j?.status || { openAI: false, anthropic: false, gemini: false });
+        setAiKeysStatus(j?.status || {
+          openAI: false,
+          anthropic: false,
+          gemini: false,
+          serverOpenAI: false,
+          serverAnthropic: false,
+          serverGemini: false,
+          hasServerKey: false,
+          preferredProvider: 'openai',
+        });
       }
     } catch (e) { console.warn(e); }
   };
@@ -713,12 +740,12 @@ const ClientDashboard = () => {
         const j = await res.json();
         setAiKeysStatus(j?.status || aiKeysStatus);
         setAiKeysOpenAI(''); setAiKeysAnthropic(''); setAiKeysGemini('');
-        alert('Ключи сохранены (AES-256 зашифрованы на сервере). Старые значения в полях очищены в целях безопасности.');
+        showToast('success', 'Ключи сохранены. Они зашифрованы на сервере, а поля очищены в целях безопасности.');
       } else {
         const j = await res.json().catch(() => ({}));
-        alert(j.message || 'Не удалось сохранить ключи');
+        showToast('error', j.message || 'Не удалось сохранить ключи');
       }
-    } catch (e) { alert('Ошибка сохранения'); }
+    } catch (e) { showToast('error', 'Ошибка сохранения ключей'); }
     finally { setAiKeysSaving(false); }
   };
 
@@ -734,6 +761,9 @@ const ClientDashboard = () => {
   const [aiEstimate, setAiEstimate] = useState<any>(null);
   const [aiResultPayload, setAiResultPayload] = useState<any>(null);
   const [aiResultSite, setAiResultSite] = useState<any>(null);
+  const hasOwnAIKey = aiKeysStatus.openAI || aiKeysStatus.anthropic || aiKeysStatus.gemini;
+  const canUseSharedAIKey = aiKeysStatus.hasServerKey;
+  const canGenerateAI = hasOwnAIKey || canUseSharedAIKey;
 
   const estimateAI = async () => {
     try {
@@ -758,7 +788,12 @@ const ClientDashboard = () => {
 
   const generateAIWebsite = async () => {
     if (!aiFormDescription.trim()) {
-      alert('Опишите сайт: что он должен делать?');
+      showToast('error', 'Опишите сайт: что именно он должен делать.');
+      return;
+    }
+    if (!canGenerateAI) {
+      showToast('error', 'Сейчас нет ни вашего, ни серверного AI-ключа. Добавьте ключ в настройках.');
+      setActiveTab('settings');
       return;
     }
     try {
@@ -786,13 +821,13 @@ const ClientDashboard = () => {
         setAiResultPayload(j.payload);
         setAiResultSite(j.webSite);
         try { await refreshBalance(); await fetchData(); } catch {}
-        alert(`Готово! Сайт создан: ${j.webSite?.subdomain || j.webSite?.id}. Заработок на марже: ${j.billing?.profitRUB ? j.billing.profitRUB + ' ₽' : '0 ₽ (использован ваш личный ключ)'}`);
+        showToast('success', `Готово: сайт создан, файлы сгенерированы${j.webSite?.subdomain ? `, адрес ${j.webSite.subdomain}.wexa.su` : ''}.`);
       } else if (res.status === 402) {
         showInsufficientFundsAlert(j, j?.message || 'Недостаточно средств на балансе');
       } else {
-        alert(j?.message || 'Ошибка генерации');
+        showToast('error', j?.message || 'Ошибка генерации сайта');
       }
-    } catch (e) { alert('Ошибка сети'); }
+    } catch (e) { showToast('error', 'Ошибка сети при генерации сайта'); }
     finally { setAiFormLoading(false); }
   };
 
@@ -2214,7 +2249,13 @@ const ClientDashboard = () => {
           <div className="grid gap-8 lg:grid-cols-3 dashboard-no-flash">
             
             {/* Main Content */}
-            <div className="lg:col-span-2 flex flex-col gap-8 relative" style={{minHeight: '1400px'}}>
+            <div
+              className="lg:col-span-2 flex flex-col gap-8 relative"
+              style={{
+                minHeight: activeTab === 'settings' || activeTab === 'ai' || activeTab === 'ai_report' ? undefined : '1400px',
+                display: activeTab === 'settings' || activeTab === 'ai' || activeTab === 'ai_report' ? 'none' : undefined,
+              }}
+            >
 
               {/* Overview Tab Content */}
               <div aria-hidden={activeTab !== 'overview'} style={{display: activeTab === 'overview' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-8 flex flex-col gap-8">
@@ -3826,7 +3867,7 @@ const ClientDashboard = () => {
           </div>
 
           {/* ============= SETTINGS PANEL ============= */}
-          <div aria-hidden={activeTab !== 'settings'} style={{display: activeTab === 'settings' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+          <div aria-hidden={activeTab !== 'settings'} style={{display: activeTab === 'settings' ? undefined : 'none', transition: 'none', animation: 'none'}} className="lg:col-span-2 flex flex-col gap-6">
             <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-6 md:p-8 text-white shadow-lg">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
@@ -3873,7 +3914,7 @@ const ClientDashboard = () => {
               <div className="rounded-3xl bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 border border-purple-100 p-6 shadow-sm">
                 <h3 className="text-xl font-black text-gray-900 mb-2 flex items-center gap-2"><KeyRound className="h-5 w-5 text-purple-700" /> 🔑 API-ключи ИИ (необязательно)</h3>
                 <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                  Если добавите свой ключ — генерация AI-сайтов <b>не будет списывать рубли с вашего баланса Wexa</b>. Вместо этого ваш провайдер (OpenAI / Anthropic / Google) выставит счёт напрямую вам. Если поля пустые — используется <b>наш общий ключ</b>, и с вашего баланса спишется сумма по тарифам маржи ≈5–25 ₽ за сайт.
+                  Если добавите свой ключ — генерация AI-сайтов <b>не будет списывать рубли с вашего баланса Wexa</b>. Вместо этого ваш провайдер (OpenAI / Anthropic / Google) выставит счёт напрямую вам. Если поля пустые, система попробует использовать <b>серверный ключ Wexa</b>; если его нет, генерация будет недоступна, пока вы не добавите свой ключ.
                 </p>
                 <div className="space-y-3">
                   <div>
@@ -3936,7 +3977,7 @@ const ClientDashboard = () => {
           </div>
 
           {/* ============= AI WEBSITE BUILDER TAB ============= */}
-          <div aria-hidden={activeTab !== 'ai'} style={{display: activeTab === 'ai' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+          <div aria-hidden={activeTab !== 'ai'} style={{display: activeTab === 'ai' ? undefined : 'none', transition: 'none', animation: 'none'}} className="lg:col-span-2 flex flex-col gap-6">
             <div className="rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700">
               <div className="absolute -top-24 -right-24 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
               <div className="absolute -bottom-28 -left-20 w-72 h-72 bg-fuchsia-400/15 rounded-full blur-3xl" />
@@ -3945,20 +3986,24 @@ const ClientDashboard = () => {
                   <div className="mb-3 inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-bold tracking-wider uppercase text-purple-100"><Sparkles className="mr-2 h-4 w-4 text-amber-300" /> Wexa AI · Генератор сайтов</div>
                   <h2 className="text-2xl sm:text-4xl font-black leading-tight">🤖 Создайте сайт <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-200 via-pink-200 to-fuchsia-200">за 1 минуту</span> — без программиста</h2>
                   <p className="mt-2 text-indigo-100 sm:text-lg max-w-3xl">
-                    Опишите, что вам нужно. ИИ сгенерирует HTML/CSS/JS (Landing) или готовый Node.js Express + EJS (Business/Premium) с формой обратной связи, деструктурирует на файлы, <b>сразу же создаст хостинг-сайт</b> и отправит вам результат.
+                    Опишите, что вам нужно. ИИ сгенерирует HTML/CSS/JS (Landing) или готовый Node.js Express + EJS (Business/Premium), создаст сайт-аккаунт в ЛК и вернёт готовые файлы для загрузки. Авто-заливка на ноду — следующий этап.
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/15 border border-white/10 backdrop-blur text-sm font-semibold">
                     <Brain className="h-5 w-5" />
-                    {(aiKeysStatus.openAI || aiKeysStatus.anthropic || aiKeysStatus.gemini) ? <>🟢 Используется ВАШ ключ</> : <>🟡 Используется НАШ ключ · <b>с баланса спишется ≈ 5–25 ₽</b></>}
+                    {hasOwnAIKey
+                      ? <>🟢 Используется ВАШ ключ</>
+                      : canUseSharedAIKey
+                        ? <>🟡 Используется ключ Wexa · <b>с баланса спишется ≈ 5–25 ₽</b></>
+                        : <>🔒 Нужен ваш AI-ключ · серверный ключ не настроен</>}
                   </div>
-                  {!(aiKeysStatus.openAI || aiKeysStatus.anthropic || aiKeysStatus.gemini) && (
+                  {!hasOwnAIKey && (
                     <button
                       onClick={() => setActiveTab('settings')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-white/90 text-indigo-800 hover:bg-white transition"
                     >
-                      <KeyRound className="h-3.5 w-3.5" /> Добавить мой ключ (бесплатная генерация) →
+                      <KeyRound className="h-3.5 w-3.5" /> {canUseSharedAIKey ? 'Добавить мой ключ (без списания баланса) →' : 'Добавить мой ключ →'}
                     </button>
                   )}
                 </div>
@@ -4057,11 +4102,11 @@ const ClientDashboard = () => {
                     </button>
                     <button
                       onClick={generateAIWebsite}
-                      disabled={aiFormLoading || !aiFormDescription.trim()}
+                      disabled={aiFormLoading || !aiFormDescription.trim() || !canGenerateAI}
                       className="inline-flex items-center rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/30 hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {aiFormLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                      {aiFormLoading ? 'ИИ пишет код · 1–3 минуты...' : '✨ Сгенерировать сайт и задеплоить →'}
+                      {aiFormLoading ? 'ИИ пишет код · 1–3 минуты...' : '✨ Сгенерировать сайт и файлы →'}
                     </button>
                     {!aiFormLoading && aiEstimate && (
                       <div className="text-sm font-mono bg-slate-900 text-white rounded-xl px-4 py-2">
@@ -4078,7 +4123,7 @@ const ClientDashboard = () => {
                   {!aiEstimate && !aiResultPayload && (
                     <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-6 text-center">
                       <Bot className="mx-auto mb-2 h-10 w-10 text-indigo-500" />
-                      <p className="text-sm text-gray-600">Нажмите «Предварительный расчёт» чтобы узнать сколько токенов уйдёт и какая сумма будет списана. Или сразу «Сгенерировать сайт».</p>
+                      <p className="text-sm text-gray-600">Нажмите «Предварительный расчёт», чтобы узнать расход токенов и стоимость. Затем сгенерируйте сайт-аккаунт и готовые файлы.</p>
                     </div>
                   )}
                   {aiEstimate && !aiResultPayload && (
@@ -4096,17 +4141,20 @@ const ClientDashboard = () => {
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 leading-relaxed">
-                        ℹ️ Если у вас <b>недостаточно баланса</b> — откройте вкладку «Баланс» и пополните. Или вставьте свой API-ключ в «Настройки» — генерация будет за счёт вашего провайдера LLM.
+                        {!canGenerateAI
+                          ? <>🔒 Сейчас на сервере нет общего AI-ключа. Добавьте свой ключ во вкладке «Настройки», чтобы включить генерацию.</>
+                          : <>ℹ️ Если у вас <b>недостаточно баланса</b> — откройте вкладку «Баланс» и пополните. Или вставьте свой API-ключ в «Настройки» — генерация будет за счёт вашего провайдера LLM.</>}
                       </div>
                     </div>
                   )}
                   {aiResultPayload && (
                     <div className="space-y-4">
                       <div className="rounded-2xl p-4 bg-emerald-50 border-2 border-emerald-100">
-                        <div className="flex items-center gap-2 text-emerald-800 font-black"><CheckCircle className="h-5 w-5" /> Сайт сгенерирован! {aiResultSite?.id && <>· ID {aiResultSite.id.slice(0,8)}</>}</div>
+                        <div className="flex items-center gap-2 text-emerald-800 font-black"><CheckCircle className="h-5 w-5" /> Сайт-аккаунт создан, файлы сгенерированы! {aiResultSite?.id && <>· ID {aiResultSite.id.slice(0,8)}</>}</div>
                         <div className="mt-2 text-sm text-emerald-800/90">
                           {aiResultSite?.subdomain && <a className="underline font-bold" target="_blank" rel="noreferrer" href={`https://${aiResultSite.subdomain}.wexa.su`}>🌐 https://{aiResultSite.subdomain}.wexa.su →</a>}
                         </div>
+                        <div className="mt-2 text-xs text-emerald-700">Phase 1: файлы уже готовы. Заливка на ноду пока делается через SFTP из раздела сайта.</div>
                       </div>
                       <div className="rounded-2xl p-4 bg-white border border-slate-100 text-sm">
                         <div className="text-xs font-bold uppercase text-slate-500 mb-2">Файлы ({aiResultPayload.files?.length || 0})</div>
@@ -4124,7 +4172,7 @@ const ClientDashboard = () => {
                           onClick={downloadAIPayloadZip}
                           className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
                         >
-                          <Download className="mr-2 h-4 w-4" /> Скачать все файлы .txt
+                          <Download className="mr-2 h-4 w-4" /> Скачать все файлы
                         </button>
                         <button
                           onClick={() => setActiveTab('websites')}
@@ -4151,7 +4199,7 @@ const ClientDashboard = () => {
           </div>
 
           {/* ============= AI ADMIN REPORT TAB ============= */}
-          <div aria-hidden={activeTab !== 'ai_report'} style={{display: activeTab === 'ai_report' ? undefined : 'none', transition: 'none', animation: 'none'}} className="flex flex-col gap-6">
+          <div aria-hidden={activeTab !== 'ai_report'} style={{display: activeTab === 'ai_report' ? undefined : 'none', transition: 'none', animation: 'none'}} className="lg:col-span-2 flex flex-col gap-6">
             <div className="rounded-3xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 text-white p-6 md:p-8 shadow-lg relative overflow-hidden">
               <div className="absolute -top-32 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
               <div className="relative z-10">

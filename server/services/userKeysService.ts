@@ -35,12 +35,29 @@ export async function getUserKeysStatus(userId: string): Promise<{
   openAI: boolean;
   anthropic: boolean;
   gemini: boolean;
+  serverOpenAI: boolean;
+  serverAnthropic: boolean;
+  serverGemini: boolean;
+  hasServerKey: boolean;
+  preferredProvider: 'openai' | 'anthropic' | 'gemini';
 }> {
   const u = await User.findByPk(userId, { attributes: ['id', 'aiOpenAIEnc', 'aiAnthropicEnc', 'aiGeminiEnc'] });
+  const serverOpenAI = !!process.env.OPENAI_API_KEY;
+  const serverAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const serverGemini = !!(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY);
+  let preferredProvider: 'openai' | 'anthropic' | 'gemini' = 'openai';
+  if (!!u?.aiOpenAIEnc || serverOpenAI) preferredProvider = 'openai';
+  else if (!!u?.aiAnthropicEnc || serverAnthropic) preferredProvider = 'anthropic';
+  else if (!!u?.aiGeminiEnc || serverGemini) preferredProvider = 'gemini';
   return {
     openAI: !!u?.aiOpenAIEnc,
     anthropic: !!u?.aiAnthropicEnc,
     gemini: !!u?.aiGeminiEnc,
+    serverOpenAI,
+    serverAnthropic,
+    serverGemini,
+    hasServerKey: serverOpenAI || serverAnthropic || serverGemini,
+    preferredProvider,
   };
 }
 
