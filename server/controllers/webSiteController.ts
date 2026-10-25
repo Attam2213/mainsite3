@@ -1390,6 +1390,7 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
   const period = Number(invoice.periodMonths || 1);
   const paidUntil = getPaidUntilDate(period, site.paidUntil ? new Date(site.paidUntil) : undefined);
   const isActiveRenewal = site.status === 'active' || site.status === 'provisioning';
+  const isSuspendedResume = site.status === 'suspended';
   if (isActiveRenewal) {
     await site.update({ paidUntil } as any);
     try {
@@ -1399,6 +1400,50 @@ const applyWebSitePaidInvoice = async (invoice: any): Promise<void> => {
       }
     } catch (_) { /* ignore */ }
     return;
+  }
+  if (isSuspendedResume) {
+    const node = site.node;
+    const isMock = !node || node.ip === '127.0.0.1';
+    const shortId = site.id.slice(0, 8);
+    const pm2Name = site.pm2ProcessName || `wexa-site-${shortId}`;
+    const siteDir = `/var/lib/wexa/sites/${site.id}`;
+    const publicHost = site.domain || `${shortId}.sites.wexa.su`;
+    const hostPort = 3000 + (Math.abs(site.id.charCodeAt(0) + site.id.charCodeAt(7)) % 1000);
+    const nginxConf = `/etc/nginx/sites-enabled/wexa-site-${shortId}.conf`;
+
+    try {
+      if (!isMock) {
+        const cfg = getSshConfigForNode(node);
+        if (site.coreTemplate === 'nodejs') {
+          const pm2Conf = JSON.stringify({
+            name: pm2Name, cwd: siteDir, script: 'server.js',
+            env: { PORT: hostPort, NODE_ENV: 'production' },
+            instances: 1, autorestart: true, watch: false, max_memory_restart: '256M',
+          });
+          await execCommand(cfg, `mkdir -p /etc/wexa/pm2 && cat > /etc/wexa/pm2/${pm2Name}.json <<'PM2EOF'\n${pm2Conf}\nPM2EOF\n(pm2 restart ${pm2Name} 2>/dev/null || pm2 start /etc/wexa/pm2/${pm2Name}.json 2>/dev/null) || true ; pm2 save 2>/dev/null || true`);
+        }
+        await writeNginxConfForSite(cfg, { ...site.toJSON(), hostPort, pm2ProcessName: site.coreTemplate === 'nodejs' ? pm2Name : null }, siteDir, publicHost);
+        await execCommand(cfg, `nginx -t && systemctl reload nginx || true`);
+      }
+
+      await site.update({
+        paidUntil,
+        status: 'active',
+        pm2ProcessName: site.coreTemplate === 'nodejs' ? pm2Name : null,
+        nginxConfPath: nginxConf,
+      } as any);
+      try {
+        if (site.nodeId) {
+          const count = await WebSite.count({ where: { nodeId: site.nodeId, status: 'active' } });
+          await ServerNode.update({ usedWebSites: count }, { where: { id: site.nodeId } });
+        }
+      } catch (_) { /* ignore */ }
+      return;
+    } catch (err) {
+      console.error('[applyWebSitePaidInvoice] suspended resume failed:', err);
+      await site.update({ status: 'suspended' });
+      throw err;
+    }
   }
   await site.update({ status: 'provisioning' });
   try {
