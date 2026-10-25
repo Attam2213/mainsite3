@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
@@ -45,7 +45,8 @@ const Register = () => {
     <Layout>
       <SEO 
         title="Регистрация" 
-        description="Wexa - создание аккаунта для доступа к личному кабинету." 
+        description="Wexa.su — создание аккаунта для доступа к личному кабинету: игровые серверы и хостинг сайтов." 
+        noindex
       />
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <div 

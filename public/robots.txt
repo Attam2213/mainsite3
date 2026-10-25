@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# Служебные и приватные разделы не индексируем
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /client
+Disallow: /api/
+
+Sitemap: https://wexa.su/sitemap.xml
+Host: wexa.su
